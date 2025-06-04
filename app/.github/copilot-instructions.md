@@ -3,7 +3,15 @@
 ## Project Overview
 This is a vanity address generator CLI project that interacts with Golem network to generate cryptocurrency addresses with specific patterns.
 
+## Technology Stack
 
+- **Languages**: TypeScript
+- **Frameworks**: Node.js, Golem
+- **Testing**: Jest
+- **Linting**: ESLint
+- **Formatting**: Prettier
+- **Dependency Management**: npm
+  
 ## Development Philosophy
 - **Test-Driven Development (TDD)**: Always write failing tests first, then implement functions to pass those tests
 - **Incremental Development**: Make small, well-defined changes with clear justification
