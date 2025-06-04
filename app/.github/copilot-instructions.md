@@ -1,7 +1,8 @@
 # GitHub Copilot Instructions for Vanity Address Generator
 
 ## Project Overview
-This is a vanity address generator project that creates custom cryptocurrency addresses with specific patterns or prefixes. The project follows strict development guidelines emphasizing test-driven development and incremental changes.
+This is a vanity address generator CLI project that interacts with Golem network to generate cryptocurrency addresses with specific patterns.
+
 
 ## Development Philosophy
 - **Test-Driven Development (TDD)**: Always write failing tests first, then implement functions to pass those tests
@@ -30,23 +31,11 @@ This is a vanity address generator project that creates custom cryptocurrency ad
 
 ## Architecture Patterns
 
-### Address Generation
-- Implement modular address generation functions
-- Support multiple cryptocurrency types (Bitcoin, Ethereum, etc.)
-- Use factory patterns for different address types
-- Implement efficient pattern matching algorithms
-
 ### Error Handling
 - Use custom error classes for different error types
 - Implement graceful degradation for network issues
 - Validate all inputs thoroughly
 - Provide meaningful error messages to users
-
-### Performance Considerations
-- Implement efficient algorithms for address generation
-- Use worker threads for CPU-intensive operations
-- Cache computed results where appropriate
-- Monitor memory usage for long-running operations
 
 ## Testing Strategy
 
@@ -62,7 +51,6 @@ This is a vanity address generator project that creates custom cryptocurrency ad
 - Use beforeEach/afterEach for test setup and cleanup
 
 ### Test Coverage
-- Aim for 90%+ code coverage
 - Test both success and failure paths
 - Include boundary condition tests
 - Test with various input combinations
@@ -88,12 +76,6 @@ This is a vanity address generator project that creates custom cryptocurrency ad
 - Regular security audits
 
 ## Documentation Standards
-
-### Code Documentation
-- Document all public APIs with JSDoc/docstrings
-- Include usage examples in documentation
-- Explain complex algorithms and their time complexity
-- Document security considerations
 
 ### README Requirements
 - Clear installation and setup instructions
@@ -136,18 +118,6 @@ async function generateVanityAddress(options) {
 
 ## Performance Optimization
 
-### Generation Algorithms
-- Implement parallel processing for multiple address generation
-- Use efficient random number generation
-- Optimize pattern matching algorithms
-- Consider GPU acceleration for intensive computations
-
-### Memory Management
-- Avoid memory leaks in long-running processes
-- Implement proper cleanup for resources
-- Use streaming for large datasets
-- Monitor and optimize memory usage
-
 ## Deployment and Operations
 
 ### Build Process
@@ -157,7 +127,7 @@ async function generateVanityAddress(options) {
 - Generate optimized production builds
 
 ### Monitoring
-- Implement logging for all major operations
+- Implement tracing for all major operations
 - Add performance metrics collection
 - Monitor error rates and types
 - Include health check endpoints
@@ -202,21 +172,6 @@ const config = {
 
 ## File Organization
 
-### Directory Structure
-```
-src/
-  generators/     # Address generation implementations
-  validators/     # Input validation utilities
-  utils/         # Common utility functions
-  types/         # Type definitions
-  errors/        # Custom error classes
-tests/
-  unit/          # Unit tests
-  integration/   # Integration tests
-  performance/   # Performance tests
-docs/            # Additional documentation
-```
-
 ### Naming Conventions
 - Use kebab-case for file names
 - Group related functionality in directories
@@ -227,14 +182,15 @@ docs/            # Additional documentation
 
 ### Recommended Libraries
 - **Crypto**: Use well-established libraries (crypto-js, elliptic)
-- **Testing**: Jest for JavaScript, pytest for Python
+- **Testing**: Jest for JavaScript
 - **Validation**: Joi or Yup for schema validation
-- **Logging**: Winston for Node.js, loguru for Python
+- **Logging**: Winston for Node.js
 
 ### Dependency Management
-- Pin dependency versions in package.json/requirements.txt
+- Pin dependency versions in package.json
 - Regular security audits with npm audit/safety
 - Use minimal dependencies to reduce attack surface
 - Document all dependencies and their purposes
 
-Remember: Always prioritize security, performance, and maintainability. When in doubt, choose the more explicit and well-documented approach over clever shortcuts.
+Remember: Always prioritize code simpolicity, security, performance, and maintainability.
+ When in doubt, choose the more explicit and well-documented approach over clever shortcuts.
