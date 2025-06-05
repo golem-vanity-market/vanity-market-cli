@@ -5,6 +5,7 @@ import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentation
 import { Command } from 'commander';
 import { readFileSync, existsSync } from 'fs';
 import { join, resolve } from 'path';
+import { TaskManager, GenerationParams, TaskUpdate } from './task-manager';
 
 /**
  * Custom error class for address generation validation errors
@@ -180,7 +181,36 @@ function handleGenerateCommand(options: any): void {
     console.log('✓ All parameters validated successfully');
     console.log('✓ OpenTelemetry tracing enabled for generation process');
     console.log('');
-    console.log('⚠️  Address generation not yet implemented - placeholder for Step 3');
+
+    // Initialize TaskManager and start generation
+    const taskManager = new TaskManager();
+    
+    // Set up event listeners for real-time updates
+    taskManager.on('update', (update: TaskUpdate) => {
+      console.log(`[${update.status.toUpperCase()}] ${update.message}`);
+      if (update.activeWorkers !== undefined) {
+        console.log(`   Active workers: ${update.activeWorkers}`);
+      }
+      if (update.numOfGeneratedAddresses) {
+        console.log(`   Generated addresses: ${update.numOfGeneratedAddresses}`);
+      }
+      if (update.foundPrivateKey) {
+        console.log(`   🎉 Found private key: ${update.foundPrivateKey}`);
+      }
+      if (update.error) {
+        console.error(`   ❌ Error: ${update.error}`);
+      }
+    });
+
+    // Start the generation process
+    const generationParams: GenerationParams = {
+      publicKey: generateOptions.publicKey!,
+      vanityAddressPrefix: generateOptions.vanityAddressPrefix!,
+      budgetGlm: generateOptions.budgetGlm!,
+      numberOfWorkers: 4 // Default number of workers
+    };
+
+    taskManager.startGenerating(generationParams);
 
   } catch (error) {
     if (error instanceof ValidationError) {
