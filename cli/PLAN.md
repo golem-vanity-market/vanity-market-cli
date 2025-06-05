@@ -7,7 +7,7 @@
 
     Do not introduce any complex file structure, minimize the number of files.
 
-2. [ ] Add the following commands:
+2. [x] Add the following commands:
 
    - generate with the arguments public-key, vanity-address-prefix, and budget-glm
 
