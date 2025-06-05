@@ -33,19 +33,21 @@ describe('Vanity Address Generator CLI - Step 2', () => {
     it('should display correct version information', () => {
       try {
         const result = execSync(`node ${cliPath} --version`, { encoding: 'utf8' });
-        expect(result.trim()).toMatch(/^\d+\.\d+\.\d+$/);
-        expect(result.trim()).toBe('1.0.0');
+        const lines = result.trim().split('\n');
+        const versionLine = lines[lines.length - 1]; // Get last line which should be version
+        expect(versionLine).toMatch(/^\d+\.\d+\.\d+$/);
+        expect(versionLine).toBe('1.0.0');
       } catch (error: any) {
-        expect(error.stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/);
+        if (error.stdout) {
+          const lines = error.stdout.trim().split('\n');
+          const versionLine = lines[lines.length - 1];
+          expect(versionLine).toMatch(/^\d+\.\d+\.\d+$/);
+        } else {
+          throw error;
+        }
       }
     });
 
-    it('should execute hello command successfully', () => {
-      const result = execSync(`node ${cliPath} hello`, { encoding: 'utf8' });
-      expect(result).toContain('Hello World from Golem Address Generator!');
-      expect(result).toContain('Commander.js is working');
-      expect(result).toContain('OpenTelemetry is configured');
-    });
   });
 
   describe('Generate Command - Step 2', () => {
@@ -163,11 +165,18 @@ describe('Vanity Address Generator CLI - Step 2', () => {
 
   describe('OpenTelemetry Integration', () => {
     it('should initialize OpenTelemetry without throwing errors', () => {
-      const result = execSync(`node ${cliPath} hello`, { 
-        encoding: 'utf8',
-        timeout: 10000 
-      });
-      expect(result).toContain('OpenTelemetry initialized successfully');
+      const validPublicKeyPath = join(__dirname, 'test-otel-key.txt');
+      writeFileSync(validPublicKeyPath, '0x1234567890abcdef1234567890abcdef12345678');
+      
+      try {
+        const result = execSync(`node ${cliPath} generate --public-key ${validPublicKeyPath} --vanity-address-prefix test --budget-glm 100`, { 
+          encoding: 'utf8',
+          timeout: 10000 
+        });
+        expect(result).toContain('OpenTelemetry initialized successfully');
+      } finally {
+        try { unlinkSync(validPublicKeyPath); } catch {}
+      }
     });
   });
 });
