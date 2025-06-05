@@ -29,12 +29,12 @@ interface GenerateOptions {
 /**
  * Maximum allowed vanity prefix length for security and performance
  */
-const MAX_VANITY_PREFIX_LENGTH = 20;
+const MAX_VANITY_PREFIX_LENGTH = 8;
 
 /**
  * Maximum budget to prevent excessive resource usage
  */
-const MAX_BUDGET_GLM = 1000000;
+const MAX_BUDGET_GLM = 1000;
 
 /**
  * Regular expression for validating Ethereum public key format
