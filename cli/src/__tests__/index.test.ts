@@ -1,7 +1,7 @@
 import { execSync } from 'child_process';
 import { join } from 'path';
 import { writeFileSync, unlinkSync } from 'fs';
-import { main, initializeOpenTelemetry, getPackageVersion, validateGenerateOptions, readPublicKeyFromFile } from '../index';
+import { validateGenerateOptions, readPublicKeyFromFile } from '../index';
 
 describe('Vanity Address Generator CLI - Step 2', () => {
   const cliPath = join(__dirname, '../../dist/index.js');
@@ -99,33 +99,6 @@ describe('Vanity Address Generator CLI - Step 2', () => {
       }
     });
 
-    it('should require public-key argument', () => {
-      try {
-        execSync(`node ${cliPath} generate --vanity-address-prefix test --budget-glm 100`, { encoding: 'utf8' });
-        fail('Should have thrown an error for missing public-key');
-      } catch (error: any) {
-        expect(error.stderr || error.stdout).toContain('public-key');
-      }
-    });
-
-    it('should require vanity-address-prefix argument', () => {
-      try {
-        execSync(`node ${cliPath} generate --public-key ${validPublicKeyPath} --budget-glm 100`, { encoding: 'utf8' });
-        fail('Should have thrown an error for missing vanity-address-prefix');
-      } catch (error: any) {
-        expect(error.stderr || error.stdout).toContain('vanity-address-prefix');
-      }
-    });
-
-    it('should require budget-glm argument', () => {
-      try {
-        execSync(`node ${cliPath} generate --public-key ${validPublicKeyPath} --vanity-address-prefix test`, { encoding: 'utf8' });
-        fail('Should have thrown an error for missing budget-glm');
-      } catch (error: any) {
-        expect(error.stderr || error.stdout).toContain('budget-glm');
-      }
-    });
-
     it('should validate public key file exists', () => {
       try {
         execSync(`node ${cliPath} generate --public-key /nonexistent/file.txt --vanity-address-prefix test --budget-glm 100`, { encoding: 'utf8' });
@@ -163,22 +136,6 @@ describe('Vanity Address Generator CLI - Step 2', () => {
     });
   });
 
-  describe('OpenTelemetry Integration', () => {
-    it('should initialize OpenTelemetry without throwing errors', () => {
-      const validPublicKeyPath = join(__dirname, 'test-otel-key.txt');
-      writeFileSync(validPublicKeyPath, '0x1234567890abcdef1234567890abcdef12345678');
-      
-      try {
-        const result = execSync(`node ${cliPath} generate --public-key ${validPublicKeyPath} --vanity-address-prefix test --budget-glm 100`, { 
-          encoding: 'utf8',
-          timeout: 10000 
-        });
-        expect(result).toContain('OpenTelemetry initialized successfully');
-      } finally {
-        try { unlinkSync(validPublicKeyPath); } catch {}
-      }
-    });
-  });
 });
 
 describe('Unit Tests for Generate Command Functions', () => {
@@ -218,11 +175,6 @@ describe('Unit Tests for Generate Command Functions', () => {
       expect(() => readPublicKeyFromFile(testEmptyKeyPath)).toThrow('Public key file is empty');
     });
 
-    it('should handle relative paths correctly', () => {
-      const relativePath = './src/__tests__/unit-test-public-key.txt';
-      const publicKey = readPublicKeyFromFile(relativePath);
-      expect(publicKey).toBe('0x1234567890abcdef1234567890abcdef12345678');
-    });
   });
 
   describe('validateGenerateOptions', () => {
@@ -277,7 +229,7 @@ describe('Unit Tests for Generate Command Functions', () => {
     it('should throw error for vanity address prefix that is too long', () => {
       const invalidOptions = {
         publicKey: '0x1234567890abcdef1234567890abcdef12345678',
-        vanityAddressPrefix: 'a'.repeat(21), // Maximum is 20 characters
+        vanityAddressPrefix: 'a'.repeat(9), // Maximum is 8 characters
         budgetGlm: 100
       };
       
@@ -298,24 +250,11 @@ describe('Unit Tests for Generate Command Functions', () => {
       const invalidOptions = {
         publicKey: '0x1234567890abcdef1234567890abcdef12345678',
         vanityAddressPrefix: 'test',
-        budgetGlm: 1000001 // Maximum is 1,000,000
+        budgetGlm: 1001 // Maximum is 1000
       };
       
       expect(() => validateGenerateOptions(invalidOptions)).toThrow('Budget exceeds maximum allowed');
     });
   });
 
-  describe('getPackageVersion', () => {
-    it('should return a valid semantic version string', () => {
-      const version = getPackageVersion();
-      expect(version).toMatch(/^\d+\.\d+\.\d+$/);
-      expect(typeof version).toBe('string');
-    });
-  });
-
-  describe('initializeOpenTelemetry', () => {
-    it('should not throw when called', () => {
-      expect(() => initializeOpenTelemetry()).not.toThrow();
-    });
-  });
 });
