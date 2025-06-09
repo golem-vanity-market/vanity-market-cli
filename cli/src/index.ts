@@ -5,7 +5,7 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
-import { Scheduler, GenerationParams, JobUpdate } from "./task-manager";
+import { Scheduler, GenerationParams, JobUpdate } from "./scheduler";
 
 /**
  * Custom error class for address generation validation errors
