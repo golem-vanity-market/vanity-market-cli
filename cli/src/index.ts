@@ -182,7 +182,7 @@ function validateGenerateOptions(options: GenerateOptions): void {
  * Handles the generate command execution with proper validation and error handling
  * @param options - Command options from commander.js
  */
-function handleGenerateCommand(options: any): void {
+function handleGenerateCommand(options: any): void { // eslint-disable-line @typescript-eslint/no-explicit-any
   try {
     // Read public key from file first
     const publicKey = readPublicKeyFromFile(options.publicKey);

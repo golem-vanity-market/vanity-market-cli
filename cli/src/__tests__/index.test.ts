@@ -1,4 +1,4 @@
-import { execSync } from "child_process";
+import { execSync, SpawnSyncReturns } from "child_process";
 import { join } from "path";
 import { writeFileSync, unlinkSync } from "fs";
 import { validateGenerateOptions, readPublicKeyFromFile } from "../index";
@@ -10,7 +10,7 @@ describe("Vanity Address Generator CLI - Step 2", () => {
     // Build the project before running integration tests
     try {
       execSync("npm run build", { stdio: "inherit" });
-    } catch (error) {
+    } catch (error: unknown) {
       console.error("Failed to build project for testing:", error);
       throw error;
     }
@@ -18,36 +18,20 @@ describe("Vanity Address Generator CLI - Step 2", () => {
 
   describe("CLI Basic Functionality", () => {
     it("should display help when no arguments are provided", () => {
-      try {
-        const result = execSync(`node ${cliPath} --help`, { encoding: "utf8" });
-        expect(result).toContain("Usage:");
-        expect(result).toContain("golem-addr");
-        expect(result).toContain("Vanity address generator CLI");
-      } catch (error: any) {
-        // Commander exits with code 1 for help, but outputs help text to stdout
-        expect(error.stdout).toContain("Usage:");
-        expect(error.stdout).toContain("golem-addr");
-      }
+      const result = execSync(`node ${cliPath} --help`, { encoding: "utf8" });
+      expect(result).toContain("Usage:");
+      expect(result).toContain("golem-addr");
+      expect(result).toContain("Vanity address generator CLI");
     });
 
     it("should display correct version information", () => {
-      try {
-        const result = execSync(`node ${cliPath} --version`, {
-          encoding: "utf8",
-        });
-        const lines = result.trim().split("\n");
-        const versionLine = lines[lines.length - 1]; // Get last line which should be version
-        expect(versionLine).toMatch(/^\d+\.\d+\.\d+$/);
-        expect(versionLine).toBe("1.0.0");
-      } catch (error: any) {
-        if (error.stdout) {
-          const lines = error.stdout.trim().split("\n");
-          const versionLine = lines[lines.length - 1];
-          expect(versionLine).toMatch(/^\d+\.\d+\.\d+$/);
-        } else {
-          throw error;
-        }
-      }
+      const result = execSync(`node ${cliPath} --version`, {
+        encoding: "utf8",
+      });
+      const lines = result.trim().split("\n");
+      const versionLine = lines[lines.length - 1]; // Get last line which should be version
+      expect(versionLine).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(versionLine).toBe("1.0.0");
     });
   });
 
@@ -72,37 +56,28 @@ describe("Vanity Address Generator CLI - Step 2", () => {
         unlinkSync(validPublicKeyPath);
         unlinkSync(invalidPublicKeyPath);
         unlinkSync(emptyPublicKeyPath);
-      } catch (error) {
+      } catch (_error: unknown) {
         // Ignore cleanup errors
       }
     });
 
     it("should display generate command help", () => {
-      try {
-        const result = execSync(`node ${cliPath} generate --help`, {
-          encoding: "utf8",
-        });
-        expect(result).toContain("generate");
-        expect(result).toContain("public-key");
-        expect(result).toContain("vanity-address-prefix");
-        expect(result).toContain("budget-glm");
-        expect(result).toContain("Path to file containing the public key");
-      } catch (error: any) {
-        expect(error.stdout).toContain("generate");
-        expect(error.stdout).toContain("public-key");
-        expect(error.stdout).toContain("vanity-address-prefix");
-        expect(error.stdout).toContain("budget-glm");
-        expect(error.stdout).toContain(
-          "Path to file containing the public key",
-        );
-      }
+      const result = execSync(`node ${cliPath} generate --help`, {
+        encoding: "utf8",
+      });
+      expect(result).toContain("generate");
+      expect(result).toContain("public-key");
+      expect(result).toContain("vanity-address-prefix");
+      expect(result).toContain("budget-glm");
+      expect(result).toContain("Path to file containing the public key");
     });
 
     it("should require all mandatory arguments for generate command", () => {
       try {
         execSync(`node ${cliPath} generate`, { encoding: "utf8" });
         fail("Should have thrown an error for missing arguments");
-      } catch (error: any) {
+      } catch (e: unknown) {
+        const error = e as SpawnSyncReturns<string>;
         expect(error.stderr || error.stdout).toContain("required");
       }
     });
@@ -114,7 +89,8 @@ describe("Vanity Address Generator CLI - Step 2", () => {
           { encoding: "utf8" },
         );
         fail("Should have thrown an error for nonexistent file");
-      } catch (error: any) {
+      } catch (e: unknown) {
+        const error = e as SpawnSyncReturns<string>;
         expect(error.stderr || error.stdout).toContain(
           "Public key file not found",
         );
@@ -128,7 +104,7 @@ describe("Vanity Address Generator CLI - Step 2", () => {
           { encoding: "utf8" },
         );
         fail("Should have thrown an error for invalid public key");
-      } catch (error: any) {
+      } catch (error: unknown) {
         expect(error.stderr || error.stdout).toContain(
           "Invalid public key format",
         );
@@ -142,7 +118,7 @@ describe("Vanity Address Generator CLI - Step 2", () => {
           { encoding: "utf8" },
         );
         fail("Should have thrown an error for negative budget");
-      } catch (error: any) {
+      } catch (error: unknown) {
         expect(error.stderr || error.stdout).toContain(
           "Budget must be a positive number",
         );
@@ -186,7 +162,7 @@ describe("Unit Tests for Generate Command Functions", () => {
       unlinkSync(testPublicKeyPath);
       unlinkSync(testInvalidKeyPath);
       unlinkSync(testEmptyKeyPath);
-    } catch (error) {
+    } catch (_error: unknown) {
       // Ignore cleanup errors
     }
   });
