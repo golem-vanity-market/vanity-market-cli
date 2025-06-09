@@ -35,11 +35,13 @@ npm run dev -- generate --public-key <path-to-key-file> --vanity-address-prefix 
 #### Example Usage
 
 1. **Create a public key file:**
+
 ```bash
 echo "0x1234567890abcdef1234567890abcdef12345678" > my-public-key.txt
 ```
 
 2. **Run the generate command:**
+
 ```bash
 npm run dev -- generate \
   --public-key my-public-key.txt \
@@ -62,11 +64,11 @@ node dist/index.js generate \
 
 ## Arguments
 
-| Argument | Type | Description | Example |
-|----------|------|-------------|---------|
-| `--public-key` | file path | Path to file containing the public key (Ethereum format: 0x...) | `my-key.txt` |
-| `--vanity-address-prefix` | string | Desired vanity prefix for the generated address (max 20 chars) | `vanity` |
-| `--budget-glm` | number | Budget in GLM tokens for the generation process (1-1,000,000) | `1000` |
+| Argument                  | Type      | Description                                                     | Example      |
+| ------------------------- | --------- | --------------------------------------------------------------- | ------------ |
+| `--public-key`            | file path | Path to file containing the public key (Ethereum format: 0x...) | `my-key.txt` |
+| `--vanity-address-prefix` | string    | Desired vanity prefix for the generated address (max 20 chars)  | `vanity`     |
+| `--budget-glm`            | number    | Budget in GLM tokens for the generation process (1-1,000,000)   | `1000`       |
 
 ## Public Key File Format
 

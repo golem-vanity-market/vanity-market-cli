@@ -7,14 +7,14 @@ code_style:
     quotes: single
     indent_size: 2
     trailing_commas: true
-  
+
   typescript:
     semicolons: true
     quotes: single
     indent_size: 2
     trailing_commas: true
     strict_mode: true
-  
+
   python:
     indent_size: 4
     line_length: 88
@@ -26,12 +26,12 @@ testing:
     javascript: jest
     typescript: jest
     python: pytest
-  
+
   test_file_naming:
     javascript: "*.test.js"
     typescript: "*.test.ts"
     python: "test_*.py"
-  
+
   coverage_target: 90
 
 # Security preferences
@@ -40,12 +40,12 @@ security:
     - crypto-js
     - elliptic
     - noble-secp256k1
-  
+
   avoid_patterns:
     - hardcoded_private_keys
     - insecure_random
     - weak_encryption
-  
+
   required_validations:
     - input_sanitization
     - pattern_validation
@@ -57,7 +57,7 @@ documentation:
     - public_functions
     - complex_algorithms
     - security_critical_code
-  
+
   style:
     javascript: jsdoc
     typescript: tsdoc
@@ -69,7 +69,7 @@ performance:
     - address_generation_speed
     - memory_efficiency
     - cpu_utilization
-  
+
   monitoring_points:
     - generation_time
     - success_rate
@@ -82,13 +82,13 @@ vanity_address:
     - ethereum
     - litecoin
     - dogecoin
-  
+
   pattern_types:
     - prefix
     - suffix
     - contains
     - regex
-  
+
   validation_rules:
     - max_pattern_length: 10
     - min_pattern_length: 1
@@ -106,7 +106,7 @@ file_organization:
     - tests/unit/
     - tests/integration/
     - tests/performance/
-  
+
   naming_conventions:
     files: kebab-case
     functions: camelCase
@@ -127,7 +127,7 @@ dependencies:
     testing: jest
     validation: joi
     logging: winston
-  
+
   security_scanning: true
   version_pinning: true
   minimal_dependencies: true

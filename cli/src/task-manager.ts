@@ -1,15 +1,15 @@
-import { EventEmitter } from 'events';
+import { EventEmitter } from "events";
 
 /**
  * Status types for vanity address generation tasks
  */
 export enum TaskStatus {
-  PENDING = 'pending',
-  INITIALIZING = 'initializing',
-  RUNNING = 'running',
-  COMPLETED = 'completed',
-  FAILED = 'failed',
-  CANCELLED = 'cancelled'
+  PENDING = "pending",
+  INITIALIZING = "initializing",
+  RUNNING = "running",
+  COMPLETED = "completed",
+  FAILED = "failed",
+  CANCELLED = "cancelled",
 }
 
 /**
@@ -46,10 +46,10 @@ export class TaskManager extends EventEmitter {
   private startTime: number;
   private totalAttempts: number;
   private isRunning: boolean;
-  
+
   constructor() {
     super();
-    this.taskId = 'keygen-' + Date.now();
+    this.taskId = "keygen-" + Date.now();
     this.status = TaskStatus.PENDING;
     this.generationParams = null;
     this.workers = new Set();
@@ -63,7 +63,7 @@ export class TaskManager extends EventEmitter {
    */
   public startGenerating(params: GenerationParams): void {
     if (this.isRunning) {
-      throw new Error('Generation is already running');
+      throw new Error("Generation is already running");
     }
 
     this.generationParams = params;
@@ -72,19 +72,19 @@ export class TaskManager extends EventEmitter {
     this.totalAttempts = 0;
     this.status = TaskStatus.INITIALIZING;
 
-    this.emit('update', {
+    this.emit("update", {
       status: this.status,
-      message: 'Initializing vanity address generation...',
-      activeWorkers: 0
+      message: "Initializing vanity address generation...",
+      activeWorkers: 0,
     } as TaskUpdate);
 
     // Simulate initialization and start workers
     setTimeout(() => {
       this.status = TaskStatus.RUNNING;
-      this.emit('update', {
+      this.emit("update", {
         status: this.status,
         message: `Started generation for prefix "${params.vanityAddressPrefix}"`,
-        activeWorkers: params.numberOfWorkers
+        activeWorkers: params.numberOfWorkers,
       } as TaskUpdate);
     }, 1000);
   }

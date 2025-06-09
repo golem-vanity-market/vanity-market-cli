@@ -3,11 +3,12 @@
 ## Chat Behavior Guidelines
 
 ### Response Style
+
 - Provide clear, actionable guidance
 - Include code examples when relevant
 - Explain security implications for cryptographic operations
 - Suggest test cases alongside implementation
-- Reference best practices for creating CLI applications 
+- Reference best practices for creating CLI applications
 
 ### Code Examples Format
 
@@ -18,10 +19,10 @@ Always provide complete, runnable examples:
 function generateVanityAddress(options) {
   // 1. Validate inputs
   validateOptions(options);
-  
+
   // 2. Initialize generator
   const generator = new AddressGenerator(options.type);
-  
+
   // 3. Generate with proper error handling
   try {
     return generator.findPattern(options.pattern);
@@ -31,13 +32,13 @@ function generateVanityAddress(options) {
 }
 
 // Include corresponding test
-describe('generateVanityAddress', () => {
-  it('should generate Bitcoin address with prefix', async () => {
+describe("generateVanityAddress", () => {
+  it("should generate Bitcoin address with prefix", async () => {
     const result = await generateVanityAddress({
-      type: 'bitcoin',
-      pattern: 'ABC'
+      type: "bitcoin",
+      pattern: "ABC",
     });
-    
+
     expect(result.address).toMatch(/^1ABC/);
     expect(result.privateKey).toBeDefined();
   });
@@ -47,12 +48,14 @@ describe('generateVanityAddress', () => {
 ### Error Scenarios
 
 #### When User Asks for Insecure Practices
+
 - Politely explain security risks
 - Suggest secure alternatives
 - Provide educational context
 - Offer compromise solutions when possible
 
 #### When User Requests Impossible Tasks
+
 - Explain mathematical limitations
 - Provide realistic alternatives
 - Suggest optimization strategies
@@ -61,6 +64,7 @@ describe('generateVanityAddress', () => {
 ### Resource References
 
 When appropriate, reference:
+
 - Cryptocurrency documentation
 - Cryptographic standards (RFC, NIST)
 - Security research papers
@@ -78,6 +82,7 @@ When appropriate, reference:
 ### Anti-Patterns to Avoid
 
 Never suggest:
+
 - Hardcoded private keys
 - Insecure random number generation
 - Unbounded loops without progress tracking

@@ -48,12 +48,14 @@ npm run dev -- generate \
 ## Development Guidelines
 
 ### Code Style (from .github/copilot-workspace-settings.yml)
+
 - **TypeScript**: Single quotes, 2-space indentation, trailing commas, strict mode
 - **Testing**: Jest framework, 90% coverage target
 - **File naming**: kebab-case for files, camelCase for functions, PascalCase for classes
 - **Security**: Input sanitization, pattern validation, secure crypto libraries
 
 ### Testing Strategy
+
 - Test-driven development (TDD) approach
 - Comprehensive unit tests for all functions
 - Performance tests for generation algorithms
@@ -61,6 +63,7 @@ npm run dev -- generate \
 - Test file pattern: `*.test.ts`
 
 ### Architecture Patterns
+
 - Custom error classes for different error types
 - Comprehensive input validation
 - Graceful error handling and degradation
@@ -68,6 +71,7 @@ npm run dev -- generate \
 - Secure random number generation
 
 ### Security Guidelines
+
 - Never store private keys in plaintext
 - Use established crypto libraries (crypto-js, elliptic, noble-secp256k1)
 - Implement proper input validation and sanitization
@@ -75,6 +79,7 @@ npm run dev -- generate \
 - Avoid hardcoded secrets
 
 ### Performance Optimization
+
 - Efficient pattern matching algorithms
 - Memory efficiency considerations
 - CPU utilization optimization
@@ -83,10 +88,11 @@ npm run dev -- generate \
 ## Current Status
 
 - ✅ Basic CLI structure with Commander.js
-- ✅ OpenTelemetry integration  
+- ✅ OpenTelemetry integration
 - ✅ Generate command with validation
 
 ## Supported Features (Planned)
+
 - **Cryptocurrencies**: Bitcoin, Ethereum, Litecoin, Dogecoin
 - **Pattern Types**: Prefix, suffix, contains, regex
 - **Validation**: 1-10 character patterns, alphanumeric, case-insensitive
