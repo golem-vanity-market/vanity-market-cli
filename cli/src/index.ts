@@ -5,7 +5,7 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
-import { TaskManager, GenerationParams, TaskUpdate } from "./task-manager";
+import { Scheduler, GenerationParams, JobUpdate } from "./task-manager";
 
 /**
  * Custom error class for address generation validation errors
@@ -214,10 +214,10 @@ function handleGenerateCommand(options: any): void { // eslint-disable-line @typ
     console.log("");
 
     // Initialize TaskManager and start generation
-    const taskManager = new TaskManager();
+    const taskManager = new Scheduler();
 
     // Set up event listeners for real-time updates
-    taskManager.on("update", (update: TaskUpdate) => {
+    taskManager.on("update", (update: JobUpdate) => {
       console.log(`[${update.status.toUpperCase()}] ${update.message}`);
       if (update.activeWorkers !== undefined) {
         console.log(`   Active workers: ${update.activeWorkers}`);
