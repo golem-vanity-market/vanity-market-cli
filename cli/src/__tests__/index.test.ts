@@ -104,7 +104,8 @@ describe("Vanity Address Generator CLI - Step 2", () => {
           { encoding: "utf8" },
         );
         fail("Should have thrown an error for invalid public key");
-      } catch (error: unknown) {
+      } catch (e: unknown) {
+        const error = e as SpawnSyncReturns<string>;
         expect(error.stderr || error.stdout).toContain(
           "Invalid public key format",
         );
@@ -118,7 +119,8 @@ describe("Vanity Address Generator CLI - Step 2", () => {
           { encoding: "utf8" },
         );
         fail("Should have thrown an error for negative budget");
-      } catch (error: unknown) {
+      } catch (e: unknown) {
+        const error = e as SpawnSyncReturns<string>;
         expect(error.stderr || error.stdout).toContain(
           "Budget must be a positive number",
         );
