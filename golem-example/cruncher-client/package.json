@@ -1,0 +1,23 @@
+{
+  "name": "cruncher-client",
+  "version": "1.0.0",
+  "description": "Sample how to compile and run cuda samples on Golem",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "crunch": "ts-node src/crunch.ts",
+    "crunch-js": "node dist/crunch.js"
+  },
+  "dependencies": {
+    "@golem-sdk/golem-js": "git://github.com/golemfactory/golem-js.git#3f33d82d5d512b21ee91cb1d90cb863c2caa4b27",
+    "@golem-sdk/pino-logger": "^1.1",
+    "dotenv": "^16.4.5",
+    "axios": "^1.7.9",
+    "rxjs": "^7.8.2",
+    "typescript": "^5.8.3",
+    "ts-node": "^10.9.2"
+  },
+  "author": "",
+  "license": "ISC"
+}

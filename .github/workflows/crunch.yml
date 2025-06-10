@@ -1,0 +1,43 @@
+name: Golem Example
+
+on:
+  workflow_dispatch:
+
+jobs:
+  golem-example:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # Maximum run time for the job
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Run prepare
+        run: |
+          cd golem-example
+          python prepare.py
+          tree
+
+      - name: Run yagna service
+        run: |
+          cd golem-example/yagna
+          ./yagna service run&
+
+      - name: Build cruncher client
+        run: |
+          cd golem-example/cruncher-client
+          npm install
+          npm run build
+
+      - name: Check payments
+        run: |
+          cd golem-example/yagna
+          ./yagna payment status --network polygon
+
+      - name: Run example
+        run: |
+          cd golem-example/cruncher-client
+          npm run crunch
+          
+
+
