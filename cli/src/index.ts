@@ -1,4 +1,4 @@
-import 'dotenv/config'
+import "dotenv/config";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { Command } from "commander";
