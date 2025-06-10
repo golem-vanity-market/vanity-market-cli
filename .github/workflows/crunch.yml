@@ -42,9 +42,9 @@ jobs:
       - name: Trigger yagna payments
         run: |
           cd golem-example/yagna
-          ./yagna payment process now --network polygon
           ./yagna payment status --network polygon
-          sleep 30
+          ./yagna payment process now --network polygon
+          sleep 2
           ./yagna payment status --network polygon
           sleep 30
           ./yagna payment status --network polygon
