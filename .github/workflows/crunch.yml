@@ -39,5 +39,27 @@ jobs:
           cd golem-example/cruncher-client
           npm run crunch
           
+      - name: Trigger yagna payments
+        run: |
+          cd golem-example/yagna
+          ./yagna payment process now --network polygon
+          ./yagna payment status --network polygon
+          sleep 30
+          ./yagna payment status --network polygon
+          sleep 30
+          ./yagna payment status --network polygon
+          sleep 30
+          ./yagna payment status --network polygon
+          sleep 30
+          ./yagna payment status --network polygon
+          sleep 30
+          ./yagna payment status --network polygon
+
+      - name: Shutdown yagna service
+        run: |
+          cd golem-example/yagna
+          ./yagna service shutdown
+
+
 
 
