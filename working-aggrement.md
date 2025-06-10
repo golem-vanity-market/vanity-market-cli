@@ -1,4 +1,4 @@
-# Working Aggrement
+# Working Agreement
 
 ## General
 
@@ -19,8 +19,10 @@
 ## Communication
 
 * Discord - channels:
-  * General
-  * Create a separate channel per big issues or implemetnation effort YYYY-MM-DD-task-NAME
+  * Default to public channels. For significant issues or implementation efforts, create a dedicated, short-lived channel (refer to the naming pattern specified below for these).
+  * *General*
+  * *Development*
+  * Create dedicated (short-living) channels for major issues or decisions: `YYYYMMDD-task-NAME`
 
 * Kanban Board on JIRA - TBA
 
@@ -32,4 +34,4 @@
 ## References
 
 - [Working Agreement Guide by Linear](https://linearb.io/blog/team-working-agreements)
-- [Working Aggrement Session](https://github.com/artsy/README/blob/main/playbooks/agile/team-working-agreement.md)
+- [Working Agreement Session](https://github.com/artsy/README/blob/main/playbooks/agile/team-working-agreement.md)
