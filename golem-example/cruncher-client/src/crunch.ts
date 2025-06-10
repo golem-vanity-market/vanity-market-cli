@@ -18,11 +18,9 @@ const CRUNCHER_VERSION = process.env.CRUNCHER_VERSION ?? "prod-12.4.1";
 // @ts-ignore
 const CRUNCHER_ALLOCATION = parseFloat(process.env.CRUNCHER_ALLOCATION ?? "0.04");
 
-
-function timeout(ms: number) {
-    // @ts-ignore
-    return new Promise((_, reject) =>
-        setTimeout(() => reject(new Error(`Timed out after ${ms}ms`)), ms)
+function sleep(ms: number) {
+    return new Promise<void>((resolve) =>
+        setTimeout(resolve, ms)
     );
 }
 
@@ -228,20 +226,26 @@ function timeout(ms: number) {
         // We're done, let's clean up provider
         // First we need to destroy the activity
         await glm.activity.destroyActivity(activity)
+        console.log("Activity destroyed");
         await glm.market.terminateAgreement(agreement);
+        console.log("Agreement terminated");
 
+        await sleep(10000); // wait a bit for the invoice and debit note to be processed
         invoiceSubscription.unsubscribe();
         debitNoteSubscription.unsubscribe();
 
         if (allocation) {
             await glm.payment.releaseAllocation(allocation);
+            console.log("Released allocation");
         }
         await glm.disconnect();
+        console.log("Disconnected from Golem network");
     } catch (err) {
         if (allocation) {
             await glm.payment.releaseAllocation(allocation);
         }
         await glm.disconnect();
+        console.error("Error during crunching:", err);
         throw err;
     }
 
