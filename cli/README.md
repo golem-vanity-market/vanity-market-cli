@@ -37,7 +37,7 @@ npm run dev -- generate --public-key <path-to-key-file> --vanity-address-prefix 
 1. **Create a public key file:**
 
 ```bash
-echo "0x1234567890abcdef1234567890abcdef12345678" > my-public-key.txt
+echo "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28" > my-public-key.txt
 ```
 
 2. **Run the generate command:**
@@ -75,7 +75,7 @@ node dist/index.js generate \
 The public key file should contain a single line with an Ethereum address in hex format:
 
 ```
-0x1234567890abcdef1234567890abcdef12345678
+0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28
 ```
 
 ## Validation Rules
@@ -108,7 +108,7 @@ npm test:watch
 ```
 🚀 Starting vanity address generation with the following parameters:
    Public Key File: my-public-key.txt
-   Public Key: 0x1234567890abcdef1234567890abcdef12345678
+   Public Key: 0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28
    Vanity Address Prefix: vanity
    Budget (GLM): 1000
 

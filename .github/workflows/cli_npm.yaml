@@ -12,8 +12,8 @@ on:
 
 jobs:
   checks:
-    name: "Check CLI code"
-    runs-on: ubuntu-24.04
+    name: "Check CLI code - NPM"
+    runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4

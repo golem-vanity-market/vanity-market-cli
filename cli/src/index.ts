@@ -4,7 +4,10 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
-import { Scheduler, GenerationParams, JobUpdate } from "./scheduler";
+//import { Scheduler } from "./scheduler";
+import { ethers } from "ethers";
+import { computeOnGolem } from "./crunch";
+import { GenerationParams } from "./scheduler";
 
 /**
  * Custom error class for address generation validation errors
@@ -14,7 +17,7 @@ class ValidationError extends Error {
     message: string,
     public field?: string,
   ) {
-    super(message);
+    super(message + ": " + field);
     this.name = "ValidationError";
   }
 }
@@ -38,11 +41,6 @@ const MAX_VANITY_PREFIX_LENGTH = 8;
  * Maximum budget to prevent excessive resource usage
  */
 const MAX_BUDGET_GLM = 1000;
-
-/**
- * Regular expression for validating Ethereum public key format
- */
-const PUBLIC_KEY_REGEX = /^0x[0-9a-fA-F]{40}$/;
 
 /**
  * Initialize OpenTelemetry SDK for comprehensive observability
@@ -94,7 +92,7 @@ function readPublicKeyFromFile(publicKeyPath: string): string {
     if (!existsSync(resolvedPath)) {
       throw new ValidationError(
         `Public key file not found: ${resolvedPath}`,
-        "publicKeyPath",
+        publicKeyPath,
       );
     }
 
@@ -102,7 +100,7 @@ function readPublicKeyFromFile(publicKeyPath: string): string {
     const fileContent = readFileSync(resolvedPath, "utf8").trim();
 
     if (!fileContent) {
-      throw new ValidationError("Public key file is empty", "publicKeyPath");
+      throw new ValidationError("Public key file is empty", publicKeyPath);
     }
 
     return fileContent;
@@ -128,12 +126,32 @@ function validateGenerateOptions(options: GenerateOptions): void {
     throw new ValidationError("Public key is required", "publicKey");
   }
 
-  if (!PUBLIC_KEY_REGEX.test(options.publicKey)) {
+  let publicKey = options.publicKey;
+  if (!publicKey.startsWith("0x")) {
+    publicKey = "0x" + publicKey; // Ensure public key starts with '0x'
+  }
+  let byteArray: Uint8Array<ArrayBufferLike>;
+  try {
+    byteArray = ethers.getBytes(publicKey);
+  } catch (error) {
+    throw new ValidationError(`Invalid public key format. ${error}`, publicKey);
+  }
+
+  if (byteArray.length != 65) {
+    throw new ValidationError("Public key must be 65 bytes long", publicKey);
+  }
+  if (byteArray[0] !== 4) {
     throw new ValidationError(
-      "Invalid public key format. Must be a valid Ethereum address (0x followed by 40 hex characters)",
-      "publicKey",
+      "Public key must start with byte 0x04",
+      publicKey,
     );
   }
+
+  const xCoord = byteArray.slice(1, 33);
+  const yCoord = byteArray.slice(33, 65);
+  console.log("Public key coordinates:");
+  console.log(`   X: ${ethers.hexlify(xCoord)}`);
+  console.log(`   Y: ${ethers.hexlify(yCoord)}`);
 
   // Validate vanity address prefix presence and constraints
   if (
@@ -214,8 +232,31 @@ function handleGenerateCommand(options: any): void {
     console.log("");
 
     // Initialize TaskManager and start generation
-    const taskManager = new Scheduler();
+    // const taskManager = new Scheduler();
 
+    const generationParams: GenerationParams = {
+      publicKey: generateOptions.publicKey!.replace("0x04", ""),
+      vanityAddressPrefix: generateOptions.vanityAddressPrefix!,
+      budgetGlm: generateOptions.budgetGlm!,
+      numberOfWorkers: 4, // Default number of workers
+      singlePassSeconds: options.singlePassSec
+        ? parseInt(options.singlePassSec, 10)
+        : 20, // Default single pass duration
+      numberOfPasses: options.numberOfPasses
+        ? parseInt(options.numberOfPasses, 10)
+        : 1, // Default number of passes
+    };
+
+    computeOnGolem(generationParams)
+      .then(() => {
+        console.log("✅ Golem computation started successfully");
+      })
+      .catch((error) => {
+        console.error("❌ Golem computation failed:", error);
+        process.exit(1);
+      });
+
+    /*
     // Set up event listeners for real-time updates
     taskManager.on("update", (update: JobUpdate) => {
       console.log(`[${update.status.toUpperCase()}] ${update.message}`);
@@ -243,7 +284,7 @@ function handleGenerateCommand(options: any): void {
       numberOfWorkers: 4, // Default number of workers
     };
 
-    taskManager.startGenerating(generationParams);
+    taskManager.startGenerating(generationParams);*/
   } catch (error) {
     if (error instanceof ValidationError) {
       console.error(`❌ Validation Error: ${error.message}`);
@@ -278,7 +319,7 @@ function main(): void {
     .description("Generate vanity addresses with specified parameters")
     .requiredOption(
       "--public-key <path>",
-      "Path to file containing the public key (Ethereum format: 0x...)",
+      "Path to file containing the public key",
     )
     .requiredOption(
       "--vanity-address-prefix <prefix>",
@@ -287,6 +328,14 @@ function main(): void {
     .requiredOption(
       "--budget-glm <amount>",
       "Budget in GLM tokens for the generation process",
+    )
+    .option(
+      "--single-pass-sec <singlePassSec>",
+      "How long single pass should take in seconds (default: 20)",
+    )
+    .option(
+      "--number-of-passes <numberOfPasses>",
+      "Number of passes to perform (default: 1)",
     )
     .action(handleGenerateCommand);
 

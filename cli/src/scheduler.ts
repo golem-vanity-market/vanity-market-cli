@@ -20,6 +20,8 @@ export interface GenerationParams {
   vanityAddressPrefix: string;
   budgetGlm: number;
   numberOfWorkers: number;
+  singlePassSeconds: number;
+  numberOfPasses: number;
 }
 
 /**

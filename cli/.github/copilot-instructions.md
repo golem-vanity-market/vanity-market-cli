@@ -224,5 +224,5 @@ const config = {
 - Use minimal dependencies to reduce attack surface
 - Document all dependencies and their purposes
 
-Remember: Always prioritize code simpolicity, security, performance, and maintainability.
+Remember: Always prioritize code simplicity, security, performance, and maintainability.
 When in doubt, choose the more explicit and well-documented approach over clever shortcuts.
