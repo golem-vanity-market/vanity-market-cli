@@ -5,7 +5,7 @@ import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
 //import { Scheduler } from "./scheduler";
-import { ethers } from "ethers";
+import { ethers, hexlify } from "ethers";
 import { computeOnGolem } from "./crunch";
 import { GenerationParams } from "./scheduler";
 
@@ -28,6 +28,15 @@ class ValidationError extends Error {
 interface GenerateOptions {
   publicKey?: string; // The actual public key content
   publicKeyPath?: string; // Path to the public key file
+  vanityAddressPrefix?: string;
+  budgetGlm?: number;
+}
+
+/**
+ * Interface for validated options
+ */
+interface GenerateOptionsValidated {
+  publicKey: PublicKey; // The actual public key content
   vanityAddressPrefix?: string;
   budgetGlm?: number;
 }
@@ -115,43 +124,59 @@ function readPublicKeyFromFile(publicKeyPath: string): string {
   }
 }
 
+class PublicKey {
+  bytes: Uint8Array;
+
+  constructor(publicKey: string) {
+    if (!publicKey.startsWith("0x")) {
+      publicKey = "0x" + publicKey; // Ensure public key starts with '0x'
+    }
+    let byteArray: Uint8Array<ArrayBufferLike>;
+    try {
+      byteArray = ethers.getBytes(publicKey);
+    } catch (error) {
+      throw new ValidationError(
+        `Invalid public key format. ${error}`,
+        publicKey,
+      );
+    }
+
+    if (byteArray.length != 65) {
+      throw new ValidationError("Public key must be 65 bytes long", publicKey);
+    }
+    if (byteArray[0] !== 4) {
+      throw new ValidationError(
+        "Public key must start with byte 0x04",
+        publicKey,
+      );
+    }
+
+    this.bytes = byteArray;
+  }
+
+  toHex(): string {
+    return hexlify(this.bytes);
+  }
+
+  toTruncatedHex(): string {
+    return this.toHex().replace("0x04", "");
+  }
+}
+
 /**
  * Validates generate command options with comprehensive error checking
  * @param options - The options object containing publicKey, vanityAddressPrefix, and budgetGlm
  * @throws {ValidationError} When validation fails
  */
-function validateGenerateOptions(options: GenerateOptions): void {
+function validateGenerateOptions(
+  options: GenerateOptions,
+): GenerateOptionsValidated {
   // Validate public key presence and format
   if (!options.publicKey) {
     throw new ValidationError("Public key is required", "publicKey");
   }
 
-  let publicKey = options.publicKey;
-  if (!publicKey.startsWith("0x")) {
-    publicKey = "0x" + publicKey; // Ensure public key starts with '0x'
-  }
-  let byteArray: Uint8Array<ArrayBufferLike>;
-  try {
-    byteArray = ethers.getBytes(publicKey);
-  } catch (error) {
-    throw new ValidationError(`Invalid public key format. ${error}`, publicKey);
-  }
-
-  if (byteArray.length != 65) {
-    throw new ValidationError("Public key must be 65 bytes long", publicKey);
-  }
-  if (byteArray[0] !== 4) {
-    throw new ValidationError(
-      "Public key must start with byte 0x04",
-      publicKey,
-    );
-  }
-
-  const xCoord = byteArray.slice(1, 33);
-  const yCoord = byteArray.slice(33, 65);
-  console.log("Public key coordinates:");
-  console.log(`   X: ${ethers.hexlify(xCoord)}`);
-  console.log(`   Y: ${ethers.hexlify(yCoord)}`);
+  const publicKey = new PublicKey(options.publicKey);
 
   // Validate vanity address prefix presence and constraints
   if (
@@ -193,6 +218,12 @@ function validateGenerateOptions(options: GenerateOptions): void {
       "budgetGlm",
     );
   }
+
+  return {
+    publicKey: publicKey,
+    vanityAddressPrefix: options.vanityAddressPrefix,
+    budgetGlm: options.budgetGlm,
+  };
 }
 
 /**
@@ -214,18 +245,18 @@ function handleGenerateCommand(options: any): void {
     };
 
     // Validate all options
-    validateGenerateOptions(generateOptions);
+    const validatedOptions = validateGenerateOptions(generateOptions);
 
     // Display generation parameters
     console.log(
       "🚀 Starting vanity address generation with the following parameters:",
     );
     console.log(`   Public Key File: ${generateOptions.publicKeyPath}`);
-    console.log(`   Public Key: ${generateOptions.publicKey}`);
+    console.log(`   Public Key: ${validatedOptions.publicKey.toHex()}`);
     console.log(
-      `   Vanity Address Prefix: ${generateOptions.vanityAddressPrefix}`,
+      `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}`,
     );
-    console.log(`   Budget (GLM): ${generateOptions.budgetGlm}`);
+    console.log(`   Budget (GLM): ${validatedOptions.budgetGlm}`);
     console.log("");
     console.log("✓ All parameters validated successfully");
     console.log("✓ OpenTelemetry tracing enabled for generation process");
@@ -235,9 +266,9 @@ function handleGenerateCommand(options: any): void {
     // const taskManager = new Scheduler();
 
     const generationParams: GenerationParams = {
-      publicKey: generateOptions.publicKey!.replace("0x04", ""),
-      vanityAddressPrefix: generateOptions.vanityAddressPrefix!,
-      budgetGlm: generateOptions.budgetGlm!,
+      publicKey: validatedOptions.publicKey.toTruncatedHex(),
+      vanityAddressPrefix: validatedOptions.vanityAddressPrefix!,
+      budgetGlm: validatedOptions.budgetGlm!,
       numberOfWorkers: 4, // Default number of workers
       singlePassSeconds: options.singlePassSec
         ? parseInt(options.singlePassSec, 10)
@@ -278,9 +309,9 @@ function handleGenerateCommand(options: any): void {
 
     // Start the generation process
     const generationParams: GenerationParams = {
-      publicKey: generateOptions.publicKey!,
-      vanityAddressPrefix: generateOptions.vanityAddressPrefix!,
-      budgetGlm: generateOptions.budgetGlm!,
+      publicKey: validatedOptions.publicKey!,
+      vanityAddressPrefix: validatedOptions.vanityAddressPrefix!,
+      budgetGlm: validatedOptions.budgetGlm!,
       numberOfWorkers: 4, // Default number of workers
     };
 
