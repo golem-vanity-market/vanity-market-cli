@@ -2,7 +2,7 @@
 
 ## General
 
-1. TBA
+1. CI must be green
 2. TBA
 3. How about Tests
 4. How about PRs
