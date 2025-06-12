@@ -12,9 +12,10 @@
 
 ## Meeting
 
-1. Planning: weekly XYZ
-2. Retro 20 min: bi-weekly
-3. Demo: bi-weekly
+1. Daily
+2. Planning (weekly): TBA
+3. Retro (bi-weekly): TBA
+4. Demo (bi-weekly): before planning
 
 ## Communication
 
@@ -24,7 +25,7 @@
   * *Development*
   * Create dedicated (short-living) channels for major issues or decisions: `YYYYMMDD-task-NAME`
 
-* Kanban Board on JIRA - TBA
+* Kanban Board on JIRA - [board](https://unoperate.atlassian.net/jira/software/projects/GOL/boards/82)
 
 ## Tools
 
@@ -33,5 +34,7 @@
 
 ## References
 
+- [vanity.market Design Doc](https://docs.google.com/document/d/1uQCl548xVI7DX_ykY_yxzahHhkkv8ODGJtpJk1FIeLg/edit?tab=t.0#heading=h.mrakbabhnmym)
+- [vanity.market Product Spec](https://docs.google.com/document/d/10MnCkt5k9sX0xF7sOUCUnMFIOLZIuS_L_G3xe9k4ZXI/edit?tab=t.0#heading=h.k9gvamsqfnm6)
 - [Working Agreement Guide by Linear](https://linearb.io/blog/team-working-agreements)
 - [Working Agreement Session](https://github.com/artsy/README/blob/main/playbooks/agile/team-working-agreement.md)
