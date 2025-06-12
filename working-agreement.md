@@ -3,12 +3,14 @@
 ## General
 
 1. CI must be green
-2. TBA
-3. How about Tests
-4. How about PRs
-5. WB: Feel-stuck > 1.5h, let's jump on a pairing session/call on Discord
-6. WB: open a PR in draft as you start work
-7. WB: deploy at least 1 time per day
+2. Create a PR for all the changes - Default
+3. Misspellings / small changes push to the main
+4. PR reviews -> we are in the PoC phase, so let's review the code accordingly
+5. PR: squash before merging main
+6. TBA
+7. Feel-stuck > 1.5h, let's jump on a pairing session/call on Discord
+8. Open a PR in draft as you start work
+9. WB: deploy at least 1 time per day
 
 ## Meeting
 
