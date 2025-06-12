@@ -29,8 +29,8 @@
 
 ## Tools
 
-* TBA
-* Copilot/CLAUDE?
+* https://www.reviewable.io/ ?
+* Copilot/CLAUDE code?
 
 ## References
 
