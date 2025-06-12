@@ -1,0 +1,19 @@
+{
+    // Enable MCP server support
+    "github.copilot.advanced": {
+        "language.enableMCP": true
+    },
+    
+    // Enable the Atlassian MCP server
+    "github.copilot.chat.localeOverride": "en-US",
+    
+    // Specify the MCP servers to use
+    "github.copilot.chat.mcp.agentHub.servers": [
+        {
+            "id": "atlassian",
+            "title": "Jira/Atlassian",
+            "description": "Atlassian MCP server for accessing Jira data",
+            "icon": "atlassian"
+        }
+    ]
+}
