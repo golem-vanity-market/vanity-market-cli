@@ -1,0 +1,14 @@
+name: Crunch on Golem using Bun
+
+on:
+  workflow_dispatch:
+    inputs:
+      argument-prefix:
+        description: 'Prefix argument'
+        required: false
+        default: '0xabcd1234'
+
+jobs:
+  golem-example:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # Maximum run time for the job
