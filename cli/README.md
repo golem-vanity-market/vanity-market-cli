@@ -2,6 +2,48 @@
 
 A TypeScript CLI application for generating vanity cryptocurrency addresses with OpenTelemetry observability support.
 
+## Running CLI with NPX (Private Repository)
+
+You can run the CLI directly from the private GitHub npm package repository.
+
+### Prerequisites
+
+1. **GitHub Personal Access Token**: You need a GitHub token with `read:packages` ([GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)) permission to access the private npm package.
+
+2. **Configure npm authentication**: Set up your npm configuration to authenticate with GitHub Packages:
+
+```bash
+echo "@unoperate:registry=https://npm.pkg.github.com" >> ~/.npmrc
+echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN" >> ~/.npmrc
+```
+
+### Running with NPX
+
+Once authentication is configured, you can run the CLI directly:
+
+```bash
+# Display help
+npx @unoperate/golem-vaddr-cli@1.0.1 --help
+
+# Generate vanity address
+npx @unoperate/golem-vaddr-cli@1.0.1 generate \
+  --public-key my-public-key.txt \
+  --vanity-address-prefix vanity \
+  --budget-glm 1000
+```
+
+### Alternative: One-time authentication
+
+You can also authenticate for a single command:
+
+```bash
+# Set token and run in one command
+NPM_TOKEN=YOUR_GITHUB_TOKEN npx @unoperate/golem-vaddr-cli@1.0.1 generate \
+  --public-key my-public-key.txt \
+  --vanity-address-prefix vanity \
+  --budget-glm 1000
+```
+
 ## Installation
 
 ```bash

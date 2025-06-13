@@ -1,6 +1,6 @@
 {
-  "name": "golem-addr-cli",
-  "version": "1.0.0",
+  "name": "@unoperate/golem-vaddr-cli",
+  "version": "0.1.0",
   "description": "Vanity address generator CLI",
   "main": "dist/index.js",
   "bin": {

@@ -1,0 +1,132 @@
+name: Publish Release Package to Github Packages
+
+on:
+  push:
+    tags:
+      - "v*" # Triggers on version tags like v1.0.0, v2.1.3, etc.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag version (e.g., v1.0.0)"
+        required: true
+        type: string
+
+jobs:
+  cli:
+    name: "Publish CLI Release"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: cli/package-lock.json
+          registry-url: "https://npm.pkg.github.com"
+
+      - working-directory: cli
+        run: npm install
+
+      - working-directory: cli
+        run: npm run test
+
+      - working-directory: cli
+        run: npm run lint
+
+      - working-directory: cli
+        run: npm run format
+
+      - name: Validate tag version matches package.json
+        run: |
+          cd cli
+
+          # Get version from git tag (remove 'v' prefix if present)
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_VERSION="${{ github.event.inputs.tag }}"
+          else
+            TAG_VERSION="${{ github.ref_name }}"
+          fi
+
+          # Remove 'v' prefix if present
+          TAG_VERSION_CLEAN=${TAG_VERSION#v}
+
+          # Get current version from package.json
+          PACKAGE_VERSION=$(npm pkg get version | tr -d '"')
+
+          echo "Tag version: $TAG_VERSION_CLEAN"
+          echo "Package.json version: $PACKAGE_VERSION"
+
+          # Compare versions
+          if [ "$TAG_VERSION_CLEAN" != "$PACKAGE_VERSION" ]; then
+            echo "❌ ERROR: Tag version ($TAG_VERSION_CLEAN) does not match package.json version ($PACKAGE_VERSION)"
+            echo "Please update package.json version to match the tag or use the correct tag."
+            exit 1
+          fi
+
+          echo "✅ Version validation passed: $TAG_VERSION_CLEAN"
+
+      - name: Configure package for publishing
+        run: |
+          cd cli
+
+          # Update package.json to include publishConfig and repository fields
+          npm pkg set "publishConfig.registry"="https://npm.pkg.github.com"
+          npm pkg set "publishConfig.access"="restricted"
+          npm pkg set "repository.type"="git"
+          npm pkg set "repository.url"="git+https://github.com/${{ github.repository }}.git"
+
+          # Ensure package name is scoped to organization
+          CURRENT_NAME=$(npm pkg get name | tr -d '"')
+          if [[ "$CURRENT_NAME" != @* ]]; then
+            npm pkg set "name"="@${{ github.repository_owner }}/$CURRENT_NAME"
+          fi
+
+          # Display final package configuration for verification
+          echo "Final package configuration:"
+          cat package.json | jq '.name, .version, .publishConfig, .repository'
+
+      - name: Publish package
+        working-directory: cli
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Package Published
+
+            Published `@${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }}` to GitHub Packages.
+
+            ### Authentication Setup
+
+            First, configure npm to authenticate with GitHub Packages:
+
+            ```bash
+            echo "@${{ github.repository_owner }}:registry=https://npm.pkg.github.com" >> ~/.npmrc
+            echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN" >> ~/.npmrc
+            ```
+
+            ### Running with NPX
+
+            Once authentication is configured, you can run the CLI directly:
+
+            ```bash
+            # Display help
+            npx @${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }} --help
+
+            # Generate vanity address
+            npx @${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }} generate \
+              --public-key my-public-key.txt \
+              --vanity-address-prefix vanity \
+              --budget-glm 1000
+            ```
+          draft: false
+          prerelease: false

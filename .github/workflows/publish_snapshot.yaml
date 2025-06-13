@@ -1,0 +1,70 @@
+name: Publish the package (snapshot) to Github Packages
+
+on:
+  push:
+    branches:
+      - "main"
+    tags-ignore:
+      - "**"
+    paths:
+      - "cli/**"
+  workflow_dispatch:
+
+jobs:
+  cli:
+    name: "Publish CLI"
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+          cache-dependency-path: cli/package-lock.json
+          registry-url: "https://npm.pkg.github.com"
+      - working-directory: cli
+        run: npm install
+      - working-directory: cli
+        run: npm run test
+      - working-directory: cli
+        run: npm run lint
+      - working-directory: cli
+        run: npm run format
+      - name: Set the right version
+        run: |
+          cd cli
+
+          # Bump patch version automatically
+          # Get short git hash and set version with hash postfix
+          GIT_HASH=$(git rev-parse --short HEAD)
+          CURRENT_VERSION=$(npm pkg get version | tr -d '"')
+          npm pkg set "version"="${CURRENT_VERSION}-${GIT_HASH}"
+
+      - name: Configure package for publishing
+        run: |
+          cd cli
+
+          # Update package.json to include publishConfig and repository fields
+          npm pkg set "publishConfig.registry"="https://npm.pkg.github.com"
+          npm pkg set "publishConfig.access"="restricted"
+          npm pkg set "repository.type"="git"
+          npm pkg set "repository.url"="git+https://github.com/${{ github.repository }}.git"
+          # Ensure package name is scoped to organization
+          CURRENT_NAME=$(npm pkg get name | tr -d '"')
+          if [[ "$CURRENT_NAME" != @* ]]; then
+            npm pkg set "name"="@${{ github.repository_owner }}/$CURRENT_NAME"
+          fi
+
+          # Display final package configuration for verification
+          echo "Final package configuration:"
+          cat package.json | jq '.name, .version, .publishConfig, .repository'
+
+      - name: Publish package
+        working-directory: cli
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

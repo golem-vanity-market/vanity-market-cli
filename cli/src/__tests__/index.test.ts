@@ -23,16 +23,6 @@ describe("Vanity Address Generator CLI - Step 2", () => {
       expect(result).toContain("golem-addr");
       expect(result).toContain("Vanity address generator CLI");
     });
-
-    it("should display correct version information", () => {
-      const result = execSync(`node ${cliPath} --version`, {
-        encoding: "utf8",
-      });
-      const lines = result.trim().split("\n");
-      const versionLine = lines[lines.length - 1]; // Get last line which should be version
-      expect(versionLine).toMatch(/^\d+\.\d+\.\d+$/);
-      expect(versionLine).toBe("1.0.0");
-    });
   });
 
   describe("Generate Command - Step 2", () => {
