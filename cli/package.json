@@ -42,12 +42,16 @@
   },
   "dependencies": {
     "@golem-sdk/golem-js": "git://github.com/golemfactory/golem-js.git#3f33d82d5d512b21ee91cb1d90cb863c2caa4b27",
-    "@opentelemetry/api": "^1.7.0",
-    "@opentelemetry/auto-instrumentations-node": "^0.41.0",
-    "@opentelemetry/sdk-node": "^0.45.0",
+    "@opentelemetry/api": "~1",
+    "@opentelemetry/auto-instrumentations-node": "~0.57",
+    "@opentelemetry/sdk-logs": "~0.57",
+    "@opentelemetry/sdk-metrics": "~1.30",
+    "@opentelemetry/sdk-node": "~0.57",
+    "@opentelemetry/sdk-trace-node": "~1.30",
     "commander": "^11.0.0",
     "dotenv": "^16.5.0",
     "ethers": "^6.14.3",
+    "pino": "^9.7.0",
     "rxjs": "^7.8.2"
   },
   "jest": {

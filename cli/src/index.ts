@@ -1,6 +1,5 @@
-import "dotenv/config";
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+// Don't import anything before it!
+import { shutdownOpenTelemetry } from "./instrumentation";
 import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
@@ -8,6 +7,7 @@ import { join, resolve } from "path";
 import { ethers, hexlify } from "ethers";
 import { computeOnGolem } from "./crunch";
 import { GenerationParams } from "./scheduler";
+import process from "process";
 
 /**
  * Custom error class for address generation validation errors
@@ -50,25 +50,6 @@ const MAX_VANITY_PREFIX_LENGTH = 8;
  * Maximum budget to prevent excessive resource usage
  */
 const MAX_BUDGET_GLM = 1000;
-
-/**
- * Initialize OpenTelemetry SDK for comprehensive observability
- * Sets up automatic instrumentation for the CLI application
- * Following best practices for telemetry initialization
- */
-function initializeOpenTelemetry(): void {
-  const sdk = new NodeSDK({
-    instrumentations: [getNodeAutoInstrumentations()],
-  });
-
-  try {
-    sdk.start();
-    console.log("OpenTelemetry initialized successfully");
-  } catch (error) {
-    console.error("OpenTelemetry initialization failed:", error);
-    // Continue execution - telemetry failure should not break CLI functionality
-  }
-}
 
 /**
  * Retrieves package version from package.json with proper error handling
@@ -327,14 +308,28 @@ function handleGenerateCommand(options: any): void {
   }
 }
 
+function setUpSignalHandlers() {
+  // We'd prefer to do it on 'exit', but the docs claim that async operations are forbidden in 'exit' listeners.
+  // Note that this solution does not work on Windows.
+  ["SIGTERM", "SIGINT"].forEach((event) =>
+    process.on(event, () => {
+      shutdownOpenTelemetry()
+        .then(
+          () => console.log("OpenTelemetry shut down successfully"),
+          (err) => console.log("Error shutting down OpenTelemetry", err),
+        )
+        .finally(() => process.exit(0));
+    }),
+  );
+}
+
 /**
  * Main CLI application entry point
  * Implements generate command with comprehensive validation
  * Following TDD principles and professional development standards
  */
 function main(): void {
-  // Initialize observability first for comprehensive monitoring
-  initializeOpenTelemetry();
+  setUpSignalHandlers();
 
   // Create CLI program using commander.js with proper configuration
   const program = new Command();
@@ -382,7 +377,6 @@ if (require.main === module) {
 // Export functions for comprehensive testing coverage
 export {
   main,
-  initializeOpenTelemetry,
   getPackageVersion,
   validateGenerateOptions,
   readPublicKeyFromFile,
