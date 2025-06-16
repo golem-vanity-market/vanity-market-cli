@@ -17,6 +17,14 @@ echo "@unoperate:registry=https://npm.pkg.github.com" >> ~/.npmrc
 echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN" >> ~/.npmrc
 ```
 
+3. You need to run a local yagna instance, grab a YAGNA_APP_KEY:
+
+```bash
+yagna app-key create golem-vaddr
+
+yagna app-key list
+```
+
 ### Running with NPX
 
 Once authentication is configured, you can run the CLI directly:
@@ -24,6 +32,8 @@ Once authentication is configured, you can run the CLI directly:
 ```bash
 # Display help
 npx @unoperate/golem-vaddr-cli@1.0.1 --help
+
+export YAGNA_APP_KEY=
 
 # Generate vanity address
 npx @unoperate/golem-vaddr-cli@1.0.1 generate \
