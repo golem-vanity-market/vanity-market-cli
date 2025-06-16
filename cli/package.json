@@ -9,7 +9,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "generate": "ts-node ../keys/generate.ts",
+    "generate": "ts-node ../tools/generate.ts",
     "dev": "ts-node src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 444 --budget-glm 1",
     "crunch": "ts-node src/crunch.ts",
     "format": "prettier . --check",

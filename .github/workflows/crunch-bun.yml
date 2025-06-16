@@ -53,7 +53,7 @@ jobs:
           ./yagna payment status --network polygon
 
       - name: Generate key pair (secure by deno)
-        working-directory: keys
+        working-directory: tools
         run: |
           deno install
           deno --allow-env --allow-write=generated.private,../cli/generated.pub generate.ts
@@ -76,7 +76,7 @@ jobs:
           cat results.json
 
       - name: Reveal keys (secure by deno)
-        working-directory: keys
+        working-directory: tools
         run: |
           deno --allow-env --allow-read=generated.private,../cli/results.json --allow-write=keys reveal.ts
           tree
@@ -85,7 +85,7 @@ jobs:
 
       - name: Finally select and reveal one of the keys
         run: |
-          cp "$(ls -1 keys/keys/*.private | head -n 1)" sandbox/yagna/keystore.json
+          cp "$(ls -1 tools/keys/*.keystore.json | head -n 1)" sandbox/yagna/keystore.json
 
       - name: Check if key is readable using yagna
         working-directory: sandbox/yagna

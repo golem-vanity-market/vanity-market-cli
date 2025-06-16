@@ -56,7 +56,7 @@ async function reveal() {
             console.log("Found matching entry:");
             console.log(`Private-secret, Address: ${entry.addr}`);
 
-            writeFileSync(`keys/${entry.addr}.private`, JSON.stringify(JSON.parse(await newWallet.encrypt(pass)), null, 2).toLowerCase());
+            writeFileSync(`keys/${entry.addr}.keystore.json`, JSON.stringify(JSON.parse(await newWallet.encrypt(pass)), null, 2).toLowerCase());
         }
     }
 }
