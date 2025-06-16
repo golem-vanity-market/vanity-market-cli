@@ -1,4 +1,4 @@
-
+## Run Yagna for development
 
 ### 1. Run python prepare script to set up the environment and download yagna binaries
 
@@ -52,7 +52,3 @@ npm run crunch
 ```
 ./yagna payment process now --network polygon
 ```
-
-
-
-
