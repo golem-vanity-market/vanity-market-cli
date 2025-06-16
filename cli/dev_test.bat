@@ -1,0 +1,1 @@
+bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x02000000 --budget-glm 1 --number-of-passes 100

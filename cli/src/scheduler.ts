@@ -1,4 +1,5 @@
 import { EventEmitter } from "events";
+import { GenerationPrefix } from "./prefix";
 
 /**
  * Status types for vanity address generation tasks
@@ -17,11 +18,20 @@ export enum JobStatus {
  */
 export interface GenerationParams {
   publicKey: string;
-  vanityAddressPrefix: string;
+  vanityAddressPrefix: GenerationPrefix;
   budgetGlm: number;
   numberOfWorkers: number;
   singlePassSeconds: number;
   numberOfPasses: number;
+}
+export interface GenerationEntryResult {
+  addr: string;
+  salt: string;
+  pubKey: string;
+}
+
+export interface GenerationResults {
+  entries: GenerationEntryResult[];
 }
 
 /**

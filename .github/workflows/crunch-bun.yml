@@ -7,8 +7,119 @@ on:
         description: 'Prefix argument'
         required: false
         default: '0xabcd1234'
+      test-timeout:
+        description: 'Max total action time (minutes)'
+        required: false
+        default: 10
+
 
 jobs:
   golem-example:
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # Maximum run time for the job
+    strategy:
+      matrix:
+        test-timeout:
+          - ${{ inputs.test-timeout }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install bun
+        uses: oven-sh/setup-bun@v2
+      - name: Install deno
+        uses: denoland/setup-deno@v2
+
+      - name: Run prepare
+        working-directory: sandbox
+        run: |
+          python prepare.py
+          tree
+
+      - name: Run yagna service
+        working-directory: sandbox/yagna
+        run: |
+          ./yagna service run&
+
+      - working-directory: cli
+        run: bun install
+
+      - name: Build cruncher client
+        working-directory: cli
+        run: |
+          bun install
+
+      - name: Check payments
+        working-directory: sandbox/yagna
+        run: |
+          ./yagna payment status --network polygon
+
+      - name: Generate key pair (secure by deno)
+        working-directory: keys
+        run: |
+          deno install
+          deno --allow-env --allow-write=generated.private,../cli/generated.pub generate.ts
+        env:
+          KEYSTORE_PASSWORD: verySecurePassword123
+
+      - name: Run crunch on Golem
+        working-directory: cli
+        run: |
+          bun src/index.ts generate \
+            --public-key generated.pub \
+            --vanity-address-prefix ${{ github.event.inputs.argument-prefix }} \
+            --budget-glm 1 \
+            --number-of-passes 100 \
+            --results-file results.json
+
+      - name: Show results
+        working-directory: cli
+        run: |
+          cat results.json
+
+      - name: Reveal keys (secure by deno)
+        working-directory: keys
+        run: |
+          deno --allow-env --allow-read=generated.private,../cli/results.json --allow-write=keys reveal.ts
+          tree
+        env:
+          KEYSTORE_PASSWORD: verySecurePassword123
+
+      - name: Finally select and reveal one of the keys
+        run: |
+          cp "$(ls -1 keys/keys/*.private | head -n 1)" sandbox/yagna/keystore.json
+
+      - name: Check if key is readable using yagna
+        working-directory: sandbox/yagna
+        run: |
+          ./yagna id create --from-keystore keystore.json imported
+          ./yagna id unlock imported --password verySecurePassword123
+
+      - name: Trigger yagna payments
+        working-directory: sandbox/yagna
+        run: |
+          echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
+          ./yagna payment status --network polygon
+          
+          echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
+          ./yagna payment process now --network polygon
+          sleep 2
+          
+          echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
+          ./yagna payment status --network polygon
+          sleep 30
+          echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
+          ./yagna payment status --network polygon
+          sleep 30
+          echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
+          ./yagna payment status --network polygon
+          sleep 30
+          echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
+          ./yagna payment status --network polygon
+          sleep 30
+          echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
+          ./yagna payment status --network polygon
+
+      - name: Shutdown yagna service
+        working-directory: sandbox/yagna
+        run: |
+          ./yagna service shutdown
+

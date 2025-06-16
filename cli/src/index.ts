@@ -1,12 +1,13 @@
 // Don't import anything before it!
 import { shutdownOpenTelemetry } from "./instrumentation";
 import { Command } from "commander";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 //import { Scheduler } from "./scheduler";
 import { ethers, hexlify } from "ethers";
 import { computeOnGolem } from "./crunch";
 import { GenerationParams } from "./scheduler";
+import { GenerationPrefix } from "./prefix";
 import process from "process";
 
 /**
@@ -30,6 +31,8 @@ interface GenerateOptions {
   publicKeyPath?: string; // Path to the public key file
   vanityAddressPrefix?: string;
   budgetGlm?: number;
+  prefix?: string;
+  resultsFile?: string; // Path to save results
 }
 
 /**
@@ -37,14 +40,14 @@ interface GenerateOptions {
  */
 interface GenerateOptionsValidated {
   publicKey: PublicKey; // The actual public key content
-  vanityAddressPrefix?: string;
   budgetGlm?: number;
+  vanityAddressPrefix: GenerationPrefix;
 }
 
 /**
  * Maximum allowed vanity prefix length for security and performance
  */
-const MAX_VANITY_PREFIX_LENGTH = 8;
+const MAX_VANITY_PREFIX_LENGTH = 16;
 
 /**
  * Maximum budget to prevent excessive resource usage
@@ -177,7 +180,10 @@ function validateGenerateOptions(
     );
   }
 
-  if (options.vanityAddressPrefix.length > MAX_VANITY_PREFIX_LENGTH) {
+  if (
+    options.vanityAddressPrefix.replace("0x", "").length >
+    MAX_VANITY_PREFIX_LENGTH
+  ) {
     throw new ValidationError(
       `Vanity address prefix too long. Maximum length is ${MAX_VANITY_PREFIX_LENGTH} characters`,
       "vanityAddressPrefix",
@@ -202,7 +208,7 @@ function validateGenerateOptions(
 
   return {
     publicKey: publicKey,
-    vanityAddressPrefix: options.vanityAddressPrefix,
+    vanityAddressPrefix: new GenerationPrefix(options.vanityAddressPrefix),
     budgetGlm: options.budgetGlm,
   };
 }
@@ -223,6 +229,7 @@ function handleGenerateCommand(options: any): void {
       publicKeyPath: options.publicKey,
       vanityAddressPrefix: options.vanityAddressPrefix,
       budgetGlm: parseInt(options.budgetGlm, 10),
+      resultsFile: options.resultsFile,
     };
 
     // Validate all options
@@ -248,7 +255,7 @@ function handleGenerateCommand(options: any): void {
 
     const generationParams: GenerationParams = {
       publicKey: validatedOptions.publicKey.toTruncatedHex(),
-      vanityAddressPrefix: validatedOptions.vanityAddressPrefix!,
+      vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
       budgetGlm: validatedOptions.budgetGlm!,
       numberOfWorkers: 4, // Default number of workers
       singlePassSeconds: options.singlePassSec
@@ -260,8 +267,15 @@ function handleGenerateCommand(options: any): void {
     };
 
     computeOnGolem(generationParams)
-      .then(() => {
-        console.log("✅ Golem computation started successfully");
+      .then((res) => {
+        const fileContent = JSON.stringify(res, null, 2);
+        console.log(
+          `✅ Golem computation completed successfully. Results saved to ${generateOptions.resultsFile ?? "results.json"}`,
+        );
+        writeFileSync(
+          generateOptions.resultsFile ?? "results.json",
+          fileContent,
+        );
       })
       .catch((error) => {
         console.error("❌ Golem computation failed:", error);
@@ -362,6 +376,10 @@ function main(): void {
     .option(
       "--number-of-passes <numberOfPasses>",
       "Number of passes to perform (default: 1)",
+    )
+    .option(
+      "--results-file <file>",
+      "Path to save the generation results (default: golem_results.json)",
     )
     .action(handleGenerateCommand);
 

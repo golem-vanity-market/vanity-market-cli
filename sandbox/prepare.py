@@ -59,7 +59,7 @@ def prepare_env_file():
     content += "CENTRAL_NET_HOST=polygongas.org:7999\n"
     content += "\n"
 
-    env_file_path = "yagna/.env"
+    env_file_path = "./yagna/.env"
     with open(env_file_path, 'w') as env_file:
         env_file.write(content)
 
@@ -68,14 +68,10 @@ def prepare_client_env_file():
     content = ""
 
     content += "YAGNA_APPKEY=Y2TZTgGsD4HX\n"
-    content += "ONE_PASS_TIME=20\n"
-    content += "NUMBER_OF_PASSES=2\n"
-    content += "PASS_EVERY_SECONDS=15\n"
 
     content += "\n"
 
-
-    env_file_path = "cruncher-client/.env"
+    env_file_path = "../cli/.env"
     with open(env_file_path, 'w') as env_file:
         env_file.write(content)
 

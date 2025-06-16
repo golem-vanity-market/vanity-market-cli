@@ -186,7 +186,7 @@ describe("Unit Tests for Generate Command Functions", () => {
       const validOptions = {
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
-        vanityAddressPrefix: "test",
+        vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 100,
       };
 
@@ -195,7 +195,7 @@ describe("Unit Tests for Generate Command Functions", () => {
 
     it("should throw error for missing public key", () => {
       const invalidOptions = {
-        vanityAddressPrefix: "test",
+        vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 100,
       };
 
@@ -207,7 +207,7 @@ describe("Unit Tests for Generate Command Functions", () => {
     it("should throw error for invalid public key format", () => {
       const invalidOptions = {
         publicKey: "invalid-key",
-        vanityAddressPrefix: "test",
+        vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 100,
       };
 
@@ -245,7 +245,7 @@ describe("Unit Tests for Generate Command Functions", () => {
       const invalidOptions = {
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
-        vanityAddressPrefix: "a".repeat(9), // Maximum is 8 characters
+        vanityAddressPrefix: "0x" + "a".repeat(17), // Maximum is 6 characters
         budgetGlm: 100,
       };
 
@@ -258,7 +258,7 @@ describe("Unit Tests for Generate Command Functions", () => {
       const invalidOptions = {
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
-        vanityAddressPrefix: "test",
+        vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: -1,
       };
 
@@ -271,7 +271,7 @@ describe("Unit Tests for Generate Command Functions", () => {
       const invalidOptions = {
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
-        vanityAddressPrefix: "test",
+        vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 1001, // Maximum is 1000
       };
 

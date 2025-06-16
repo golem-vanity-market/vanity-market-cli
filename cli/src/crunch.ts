@@ -4,7 +4,7 @@
 import { GolemNetwork, OfferProposal } from "@golem-sdk/golem-js";
 import { filter, map, switchMap, take } from "rxjs";
 import dotenv from "dotenv";
-import { GenerationParams } from "./scheduler";
+import { GenerationParams, GenerationResults } from "./scheduler";
 
 dotenv.config();
 
@@ -14,7 +14,13 @@ function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }
 
-export async function computeOnGolem(generationParams: GenerationParams) {
+export async function computeOnGolem(
+  generationParams: GenerationParams,
+): Promise<GenerationResults> {
+  const generationResults: GenerationResults = {
+    entries: [],
+  };
+
   const glm = new GolemNetwork();
 
   const rentalDurationHours =
@@ -186,10 +192,17 @@ export async function computeOnGolem(generationParams: GenerationParams) {
       console.log(res);
     });
 
+    console.log("Prefix value: ", generationParams.vanityAddressPrefix.toArg());
     for (let passNo = 0; passNo < generationParams.numberOfPasses; passNo++) {
+      if (generationResults.entries.length > 0) {
+        console.log(
+          "Found addresses in previous pass, stopping further passes",
+        );
+        break;
+      }
       await exe
         .run(
-          `profanity_cuda -k 64 -b ${generationParams.singlePassSeconds} -z ${generationParams.publicKey}`,
+          `profanity_cuda -k 64 -p ${generationParams.vanityAddressPrefix.toArg()} -b ${generationParams.singlePassSeconds} -z ${generationParams.publicKey}`,
         )
         .then(async (res) => {
           let _biggestCompute = 0;
@@ -219,17 +232,34 @@ export async function computeOnGolem(generationParams: GenerationParams) {
             try {
               line = line.trim();
               if (line.startsWith("0x")) {
-                const salt = line.split(",")[0];
-                const addr = line.split(",")[1];
-                const pubKey = line.split(",")[2];
-                console.log(
-                  "Found address: ",
-                  addr,
-                  " with salt: ",
-                  salt,
-                  " public address: ",
-                  pubKey,
-                );
+                const salt = line.split(",")[0].trim();
+                const addr = line.split(",")[1].trim();
+                const pubKey = line.split(",")[2].trim();
+                //console.log("Address: ", addr);
+                //console.log("Address: ", generationParams.vanityAddressPrefix.toHex());
+                if (
+                  addr.startsWith(
+                    generationParams.vanityAddressPrefix
+                      .fullPrefix()
+                      .toLowerCase(),
+                  )
+                ) {
+                  generationResults.entries.push({
+                    addr,
+                    salt,
+                    pubKey,
+                  });
+                  console.log(
+                    "Found address: ",
+                    addr,
+                    " with salt: ",
+                    salt,
+                    " public address: ",
+                    pubKey,
+                    " prefix: ",
+                    generationParams.vanityAddressPrefix.toHex(),
+                  );
+                }
               }
             } catch (e) {
               console.error(e);
@@ -263,4 +293,6 @@ export async function computeOnGolem(generationParams: GenerationParams) {
     console.error("Error during crunching:", err);
     throw err;
   }
+
+  return generationResults;
 }

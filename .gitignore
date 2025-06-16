@@ -49,3 +49,6 @@ temp/
 # cli test data
 **/my-public-key.txt
 **/test-key.txt
+
+# cli generated keys
+/cli/generated.pub
