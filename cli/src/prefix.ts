@@ -5,12 +5,16 @@ export class GenerationPrefix {
   original: string;
 
   constructor(prefix: string) {
+    const prefixOrig = prefix;
+    while (prefix.length < 10) {
+      prefix = prefix + "0";
+    }
     const byt = getBytes(prefix.slice(0, 10));
     if (byt.length !== 4) {
       throw new Error("Prefix must be exactly 8 bytes long");
     }
     this.val = byt;
-    this.original = prefix;
+    this.original = prefixOrig;
   }
 
   fullPrefix(): string {

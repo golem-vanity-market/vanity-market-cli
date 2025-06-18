@@ -9,6 +9,9 @@ import { GenerationParams, GenerationResults } from "./scheduler";
 dotenv.config();
 
 const CRUNCHER_VERSION = process.env.CRUNCHER_VERSION ?? "prod-12.4.1";
+const USE_CPU = ["true", "1"].includes(
+  (process.env.USE_CPU || "").toLowerCase(),
+);
 
 function sleep(ms: number) {
   return new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -185,12 +188,16 @@ export async function computeOnGolem(
 
     const exe = await glm.activity.createExeUnit(activity);
 
-    await exe.run("chmod +x /usr/local/bin/profanity_cuda").then((res) => {
-      console.log(res);
-    });
-    await exe.run("nvidia-smi").then((res) => {
-      console.log(res);
-    });
+    let cpuCount = 1;
+    if (!USE_CPU) {
+      await exe.run("nvidia-smi").then((res) => {
+        console.log(res);
+      });
+    } else {
+      await exe.run("nproc").then((res) => {
+        cpuCount = parseInt(res.stdout?.toString().trim() ?? "N/A");
+      });
+    }
 
     console.log("Prefix value: ", generationParams.vanityAddressPrefix.toArg());
     for (let passNo = 0; passNo < generationParams.numberOfPasses; passNo++) {
@@ -200,14 +207,38 @@ export async function computeOnGolem(
         );
         break;
       }
-      await exe
-        .run(
-          `profanity_cuda -k 64 -p ${generationParams.vanityAddressPrefix.toArg()} -b ${generationParams.singlePassSeconds} -z ${generationParams.publicKey}`,
-        )
-        .then(async (res) => {
-          let _biggestCompute = 0;
-          // @ts-expect-error descr
-          for (const line of res.stderr.split("\n")) {
+      let kernelCount = 64;
+      let roundCount = 1000;
+      let groupCount = 1000;
+
+      if (USE_CPU) {
+        console.log("Using CPU for generation");
+        kernelCount = 1;
+        groupCount = 1;
+        roundCount = 20000;
+      }
+
+      const p = generationParams.vanityAddressPrefix.toArg();
+      let command;
+
+      if (USE_CPU) {
+        if (cpuCount < 1) {
+          throw "CPU count cannot be smaller than 1";
+        }
+        if (cpuCount > 255) {
+          throw "CPU count cannot be greater than 255";
+        }
+        const pp = ` ${p}`.repeat(cpuCount);
+        command = `parallel profanity_cuda --cpu -k ${kernelCount} -g ${groupCount} -r ${roundCount} -b ${generationParams.singlePassSeconds} -z ${generationParams.publicKey} -p {} :::${pp}`;
+      } else {
+        command = `profanity_cuda -g ${groupCount} -r ${roundCount} -k ${kernelCount} -p ${p} -b ${generationParams.singlePassSeconds} -z ${generationParams.publicKey}`;
+      }
+      console.log("Using command: ", command);
+      await exe.run(command).then(async (res) => {
+        let _biggestCompute = 0;
+        if (res.stderr) {
+          const stdErrStr = res.stderr.toString().trim();
+          for (const line of stdErrStr.split("\n")) {
             console.log(line);
             if (line.includes("Total compute")) {
               try {
@@ -217,18 +248,21 @@ export async function computeOnGolem(
                   .split(" GH")[0];
                 const totalComputeFloatGh = parseFloat(totalCompute);
                 _biggestCompute = totalComputeFloatGh * 1e9;
-                //console.log("Total compute: " + totalCompute);
+                console.log("Total compute: " + totalCompute);
               } catch (e) {
                 console.error(e);
               }
             }
           }
-          // @ts-expect-error descr
+        } else {
+          console.log("No stderr received");
+        }
+        if (!res.stdout) {
+          console.log("No stdout received");
+        } else {
+          const stdOutStr = res.stdout.toString().trim();
 
-          console.log("Received stdout bytes: ", res.stdout.length);
-          // @ts-expect-error descr
-
-          for (let line of res.stdout.split("\n")) {
+          for (let line of stdOutStr.split("\n")) {
             try {
               line = line.trim();
               if (line.startsWith("0x")) {
@@ -257,7 +291,9 @@ export async function computeOnGolem(
                     " public address: ",
                     pubKey,
                     " prefix: ",
-                    generationParams.vanityAddressPrefix.toHex(),
+                    generationParams.vanityAddressPrefix
+                      .fullPrefix()
+                      .toLowerCase(),
                   );
                 }
               }
@@ -265,8 +301,8 @@ export async function computeOnGolem(
               console.error(e);
             }
           }
-          //todo: do something with the results
-        });
+        }
+      });
     }
     // We're done, let's clean up provider
     // First we need to destroy the activity

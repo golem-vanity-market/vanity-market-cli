@@ -50,8 +50,8 @@ def prepare_env_file():
     content += "YAGNA_AUTOCONF_APPKEY=Y2TZTgGsD4HX\n"
     content += "YAGNA_APPKEY=Y2TZTgGsD4HX\n"
 
-    content += "# Ethereum address 0x2DaDD439ae713C09396B81F43373E87cD9c5e129, used only for show-run - do not use it for production\n"
-    content += "YAGNA_AUTOCONF_ID_SECRET=ee2b8d244b612606eebdc86e87ccaa29dfa752b8353d735f24b682558abf1d88\n"
+    content += "# TODO fill your ethereum account private key here\n"
+    content += "YAGNA_AUTOCONF_ID_SECRET=%%YAGNA_AUTOCONF_ID_SECRET%%\n"
     content += "\n"
 
     content += "# Testnet for addressology\n"
