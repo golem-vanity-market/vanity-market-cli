@@ -2,22 +2,23 @@
 
 ## General
 
-1. CI must be green
-2. Create a PR for all the changes - Default
-3. Misspellings / small changes push to the main
-4. PR reviews -> we are in the PoC phase, so let's review the code accordingly
-5. PR: squash before merging main
-6. TBA
-7. Feel-stuck > 1.5h, let's jump on a pairing session/call on Discord
-8. Open a PR in draft as you start work
+1. CI must be green on the main branch
+2. Create a Pull Request for all changes - Default
+3. Open a Pull Request in draft as you start work
+4. Keep the lifetime of PullRequests to a minimum, 1 PullRequest = 1 Functionality
+5. Misspellings / small changes push to main
+6. Pull Request reviews -> we are in the PoC phase, so let's review the code accordingly
+7. Pull Request: squash before merging to main
+8. If feeling stuck for > 1.5h, let's jump on a pairing session/call on Discord
+
 9. WB: deploy at least 1 time per day
 
 ## Meeting
 
-1. Daily
-2. Planning (weekly): TBA
-3. Retro (bi-weekly): TBA
-4. Demo (bi-weekly): before planning
+1. Daily: 13:00 CET
+2. Planning: weekly
+3. Retro: bi-weekly (starting 2.07)
+4. Demo: bi-weekly (starting 25.06)
 
 ## Communication
 
@@ -25,7 +26,7 @@
   * Default to public channels. For significant issues or implementation efforts, create a dedicated, short-lived channel (refer to the naming pattern specified below for these).
   * *General*
   * *Development*
-  * Create dedicated (short-living) channels for major issues or decisions: `YYYYMMDD-task-NAME`
+  * Create dedicated (short-lived) channels for major issues or decisions: `YYYYMMDD-task-NAME`
 
 * Kanban Board on JIRA - [board](https://unoperate.atlassian.net/jira/software/projects/GOL/boards/82)
 
