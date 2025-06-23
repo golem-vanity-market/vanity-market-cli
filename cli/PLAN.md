@@ -91,7 +91,7 @@ interface WorkerPoolParams {
 
 #### Task 4: Update WorkerPool to support worker types
 - Modify `WorkerPool` constructor to accept worker type
-- Update `getOrder()` method to use worker-specific configurations
+- `getOrder()` in WorkerPool should call `getOrder()` method from worker, all order configurations except `rentalDuratioHours` and `allocation` should come from Worker specific implemetnation  
 - Modify worker acquisition logic for different types
 
 ### Phase 2: Integration (Medium Priority)
