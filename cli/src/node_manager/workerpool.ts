@@ -5,11 +5,11 @@ import {
   GolemNetwork,
   OfferProposal,
 } from "@golem-sdk/golem-js";
-import { AppContext } from "./app_context";
+import { AppContext } from "./../app_context";
 import { filter, map, switchMap, take } from "rxjs";
-import { GenerationResults, GenerationParams } from "./scheduler";
-import { WorkerPoolParams, WorkerType, BaseWorker } from "./node_manager/types";
-import { createWorker } from "./node_manager/worker";
+import { GenerationResults, GenerationParams } from "./../scheduler";
+import { WorkerPoolParams, WorkerType, BaseWorker } from "./types";
+import { createWorker } from "./worker";
 
 export interface Worker {
   id: string;

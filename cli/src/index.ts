@@ -165,14 +165,14 @@ function validateWorkerType(workerType?: string): WorkerType {
   }
 
   const normalizedType = workerType.toLowerCase();
-  if (normalizedType === 'cpu') {
+  if (normalizedType === "cpu") {
     return WorkerType.CPU;
-  } else if (normalizedType === 'gpu') {
+  } else if (normalizedType === "gpu") {
     return WorkerType.GPU;
   } else {
     throw new ValidationError(
       `Invalid worker type '${workerType}'. Must be 'cpu' or 'gpu'`,
-      'workerType'
+      "workerType",
     );
   }
 }
