@@ -37,6 +37,7 @@ interface GenerateCmdOptions {
   budgetGlm?: number;
   prefix?: string;
   resultsFile?: string; // Path to save results
+  workerType?: string; // Worker type: 'cpu' or 'gpu'
 }
 
 /**
@@ -46,6 +47,7 @@ interface GenerateOptionsValidated {
   publicKey: PublicKey; // The actual public key content
   budgetGlm?: number;
   vanityAddressPrefix: GenerationPrefix;
+  workerType: WorkerType;
 }
 
 /**
@@ -152,8 +154,32 @@ class PublicKey {
 }
 
 /**
+ * Validates worker type parameter
+ * @param workerType - Worker type string ('cpu' or 'gpu')
+ * @returns WorkerType enum value
+ * @throws {ValidationError} When worker type is invalid
+ */
+function validateWorkerType(workerType?: string): WorkerType {
+  if (!workerType) {
+    return WorkerType.GPU; // Default to GPU for backward compatibility
+  }
+
+  const normalizedType = workerType.toLowerCase();
+  if (normalizedType === 'cpu') {
+    return WorkerType.CPU;
+  } else if (normalizedType === 'gpu') {
+    return WorkerType.GPU;
+  } else {
+    throw new ValidationError(
+      `Invalid worker type '${workerType}'. Must be 'cpu' or 'gpu'`,
+      'workerType'
+    );
+  }
+}
+
+/**
  * Validates generate command options with comprehensive error checking
- * @param options - The options object containing publicKey, vanityAddressPrefix, and budgetGlm
+ * @param options - The options object containing publicKey, vanityAddressPrefix, budgetGlm, and workerType
  * @throws {ValidationError} When validation fails
  */
 function validateGenerateOptions(
@@ -210,10 +236,14 @@ function validateGenerateOptions(
     );
   }
 
+  // Validate worker type
+  const workerType = validateWorkerType(options.workerType);
+
   return {
     publicKey: publicKey,
     vanityAddressPrefix: new GenerationPrefix(options.vanityAddressPrefix),
     budgetGlm: options.budgetGlm,
+    workerType: workerType,
   };
 }
 
@@ -234,6 +264,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       vanityAddressPrefix: options.vanityAddressPrefix,
       budgetGlm: parseInt(options.budgetGlm, 10),
       resultsFile: options.resultsFile,
+      workerType: options.workerType,
     };
 
     // Validate all options
@@ -249,6 +280,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}`,
     );
     console.log(`   Budget (GLM): ${validatedOptions.budgetGlm}`);
+    console.log(`   Worker Type: ${validatedOptions.workerType}`);
     console.log("");
     console.log("✓ All parameters validated successfully");
     console.log("✓ OpenTelemetry tracing enabled for generation process");
@@ -273,7 +305,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       rentalDurationSeconds:
         generationParams.singlePassSeconds * generationParams.numberOfPasses,
       budgetGlm: generationParams.budgetGlm,
-      workerType: WorkerType.GPU, // Default worker type, can be extended to support GPU
+      workerType: validatedOptions.workerType,
     };
 
     const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(
@@ -430,6 +462,10 @@ function main(): void {
       "--results-file <file>",
       "Path to save the generation results (default: golem_results.json)",
     )
+    .option(
+      "--worker-type <type>",
+      "Worker type to use: 'cpu' or 'gpu' (default: gpu)",
+    )
     .action(handleGenerateCommand);
 
   // Parse command line arguments and execute appropriate command
@@ -446,5 +482,6 @@ export {
   main,
   getPackageVersion,
   validateGenerateOptions,
+  validateWorkerType,
   readPublicKeyFromFile,
 };
