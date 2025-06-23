@@ -93,6 +93,6 @@ npm run dev -- generate \
 
 ## Supported Features (Planned)
 
-- **Cryptocurrencies**: Bitcoin, Ethereum, Litecoin, Dogecoin
-- **Pattern Types**: Prefix, suffix, contains, regex
+- **Cryptocurrencies**: Ethereum and CREATE1 addresses
+- **Pattern Types**: Prefix, suffix, regex
 - **Validation**: 1-10 character patterns, alphanumeric, case-insensitive

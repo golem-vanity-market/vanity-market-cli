@@ -5,10 +5,13 @@ import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
 //import { Scheduler } from "./scheduler";
 import { ethers, hexlify } from "ethers";
-import { computeOnGolem } from "./crunch";
 import { GenerationParams } from "./scheduler";
 import { GenerationPrefix } from "./prefix";
+import { WorkerPool, WorkerPoolParams } from "./node_manager";
+import { AppContext } from "./app_context";
 import process from "process";
+import { ROOT_CONTEXT } from "@opentelemetry/api";
+import pino from "pino";
 
 /**
  * Custom error class for address generation validation errors
@@ -26,7 +29,7 @@ class ValidationError extends Error {
 /**
  * Interface for generate command options
  */
-interface GenerateOptions {
+interface GenerateCmdOptions {
   publicKey?: string; // The actual public key content
   publicKeyPath?: string; // Path to the public key file
   vanityAddressPrefix?: string;
@@ -153,7 +156,7 @@ class PublicKey {
  * @throws {ValidationError} When validation fails
  */
 function validateGenerateOptions(
-  options: GenerateOptions,
+  options: GenerateCmdOptions,
 ): GenerateOptionsValidated {
   // Validate public key presence and format
   if (!options.publicKey) {
@@ -218,13 +221,13 @@ function validateGenerateOptions(
  * @param options - Command options from commander.js
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function handleGenerateCommand(options: any): void {
+async function handleGenerateCommand(options: any): Promise<void> {
   try {
     // Read public key from file first
     const publicKey = readPublicKeyFromFile(options.publicKey);
 
     // Extract and validate options
-    const generateOptions: GenerateOptions = {
+    const generateOptions: GenerateCmdOptions = {
       publicKey: publicKey,
       publicKeyPath: options.publicKey,
       vanityAddressPrefix: options.vanityAddressPrefix,
@@ -250,14 +253,11 @@ function handleGenerateCommand(options: any): void {
     console.log("✓ OpenTelemetry tracing enabled for generation process");
     console.log("");
 
-    // Initialize TaskManager and start generation
-    // const taskManager = new Scheduler();
-
     const generationParams: GenerationParams = {
       publicKey: validatedOptions.publicKey.toTruncatedHex(),
       vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
       budgetGlm: validatedOptions.budgetGlm!,
-      numberOfWorkers: 4, // Default number of workers
+      numberOfWorkers: 2, // Default number of workers
       singlePassSeconds: options.singlePassSec
         ? parseInt(options.singlePassSec, 10)
         : 20, // Default single pass duration
@@ -266,51 +266,98 @@ function handleGenerateCommand(options: any): void {
         : 1, // Default number of passes
     };
 
-    computeOnGolem(generationParams)
-      .then((res) => {
-        const fileContent = JSON.stringify(res, null, 2);
-        console.log(
-          `✅ Golem computation completed successfully. Results saved to ${generateOptions.resultsFile ?? "results.json"}`,
-        );
-        writeFileSync(
-          generateOptions.resultsFile ?? "results.json",
-          fileContent,
-        );
-      })
-      .catch((error) => {
-        console.error("❌ Golem computation failed:", error);
-        process.exit(1);
-      });
-
-    /*
-    // Set up event listeners for real-time updates
-    taskManager.on("update", (update: JobUpdate) => {
-      console.log(`[${update.status.toUpperCase()}] ${update.message}`);
-      if (update.activeWorkers !== undefined) {
-        console.log(`   Active workers: ${update.activeWorkers}`);
-      }
-      if (update.numOfGeneratedAddresses) {
-        console.log(
-          `   Generated addresses: ${update.numOfGeneratedAddresses}`,
-        );
-      }
-      if (update.foundPrivateKey) {
-        console.log(`   🎉 Found private key: ${update.foundPrivateKey}`);
-      }
-      if (update.error) {
-        console.error(`   ❌ Error: ${update.error}`);
-      }
-    });
-
-    // Start the generation process
-    const generationParams: GenerationParams = {
-      publicKey: validatedOptions.publicKey!,
-      vanityAddressPrefix: validatedOptions.vanityAddressPrefix!,
-      budgetGlm: validatedOptions.budgetGlm!,
-      numberOfWorkers: 4, // Default number of workers
+    // Initialize Scheduler for task management and subproblem generation
+    const workerPoolParams: WorkerPoolParams = {
+      numberOfWorkers: generationParams.numberOfWorkers,
+      rentalDurationSeconds:
+        generationParams.singlePassSeconds * generationParams.numberOfPasses,
+      budgetGlm: generationParams.budgetGlm,
     };
 
-    taskManager.startGenerating(generationParams);*/
+    const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(
+      pino({ level: "info" }),
+    );
+
+    const workerPool = new WorkerPool(workerPoolParams);
+
+    try {
+      await workerPool.connectToGolemNetwork(ctx);
+      console.log("✅ Connected to Golem network successfully");
+
+      const workers = await workerPool.getWorkers(ctx);
+      console.log(`✅ Acquired ${workers.length} workers`);
+
+      const results = await workerPool.runCommandConcurrent(
+        ctx,
+        workers,
+        generationParams,
+      );
+      console.log("✅ Workers completed successfully");
+      console.log(`Found ${results.entries.length} vanity addresses`);
+
+      if (generateOptions.resultsFile) {
+        writeFileSync(
+          generateOptions.resultsFile,
+          JSON.stringify(results, null, 2),
+        );
+        console.log(`✅ Results saved to ${generateOptions.resultsFile}`);
+      } else {
+        console.log("Results:", results);
+      }
+
+      // Clean up workers
+      try {
+        await workerPool.closeWorkers(ctx, workers);
+        console.log("✅ All workers cleaned up");
+      } catch (workerCleanupError) {
+        console.error("❌ Error during worker cleanup:", workerCleanupError);
+      } finally {
+        // Always disconnect from Golem network, even if worker cleanup failed
+        try {
+          await workerPool.disconnectFromGolemNetwork(ctx);
+          console.log("✅ Disconnected from Golem network");
+        } catch (disconnectError) {
+          console.error(
+            "❌ Error disconnecting from Golem network:",
+            disconnectError,
+          );
+        }
+      }
+    } catch (error) {
+      console.error("❌ Failed during execution:", error);
+      // Ensure disconnection even if main execution failed
+      try {
+        await workerPool.disconnectFromGolemNetwork(ctx);
+        console.log("✅ Disconnected from Golem network (cleanup)");
+      } catch (disconnectError) {
+        console.error(
+          "❌ Error disconnecting from Golem network during cleanup:",
+          disconnectError,
+        );
+      }
+      process.exit(1);
+    }
+
+    // const scheduler = new Scheduler();
+    // scheduler.setWorkerPool(workerPool);
+    // scheduler.startGenerating(generationParams);
+
+    // to wrap the computeOnGolen with Scheduler/Subproblem gen
+    // computeOnGolem(generationParams)
+    //   .then((res) => {
+    //     const fileContent = JSON.stringify(res, null, 2);
+    //     console.log(
+    //       `✅ Golem computation completed successfully. Results saved to ${generateOptions.resultsFile ?? "results.json"}`,
+    //     );
+    //     writeFileSync(
+    //       generateOptions.resultsFile ?? "results.json",
+    //       fileContent,
+    //     );
+    //   })
+    //   .catch((error) => {
+    //     console.error("❌ Golem computation failed:", error);
+    //     process.exit(1);
+    //   });
   } catch (error) {
     if (error instanceof ValidationError) {
       console.error(`❌ Validation Error: ${error.message}`);
