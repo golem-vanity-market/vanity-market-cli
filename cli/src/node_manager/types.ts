@@ -2,7 +2,7 @@
  * Worker type system for CPU and GPU vanity address generation
  */
 
-import { ExeUnit } from "@golem-sdk/golem-js";
+import { ExeUnit, Allocation } from "@golem-sdk/golem-js";
 import { GenerationParams } from "../scheduler";
 
 /**
@@ -91,6 +91,38 @@ export abstract class BaseWorker {
    * @returns CPU count for CPU workers, or 1 for GPU workers
    */
   public abstract validateCapabilities(exe: ExeUnit): Promise<number>;
+  
+  /**
+   * Get the Golem order configuration for this worker type
+   */
+  public getOrder(
+    rentalDurationSeconds: number,
+    allocation: Allocation,
+  ): any /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
+    const rentalDurationHours = Math.ceil(rentalDurationSeconds / 3600);
+    
+    return {
+      demand: {
+        workload: {
+          imageTag: this.config.imageTag,
+          capabilities: this.config.capabilities,
+          engine: this.config.engine,
+        },
+      },
+      market: {
+        rentHours: rentalDurationHours,
+        pricing: {
+          model: "linear",
+          maxStartPrice: 0.0,
+          maxCpuPerHourPrice: 0.0,
+          maxEnvPerHourPrice: 2.0,
+        },
+      },
+      payment: {
+        allocation,
+      },
+    };
+  }
   
   /**
    * Get the worker type

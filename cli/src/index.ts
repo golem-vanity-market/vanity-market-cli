@@ -7,7 +7,8 @@ import { join, resolve } from "path";
 import { ethers, hexlify } from "ethers";
 import { GenerationParams } from "./scheduler";
 import { GenerationPrefix } from "./prefix";
-import { WorkerPool, WorkerPoolParams } from "./node_manager";
+import { WorkerPoolParams, WorkerType } from "./node_manager/types";
+import { WorkerPool } from "./workerpool";  
 import { AppContext } from "./app_context";
 import process from "process";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
@@ -272,6 +273,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       rentalDurationSeconds:
         generationParams.singlePassSeconds * generationParams.numberOfPasses,
       budgetGlm: generationParams.budgetGlm,
+      workerType: WorkerType.GPU, // Default worker type, can be extended to support GPU
     };
 
     const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(

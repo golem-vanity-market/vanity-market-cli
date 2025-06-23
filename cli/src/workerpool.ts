@@ -8,19 +8,13 @@ import {
 import { AppContext } from "./app_context";
 import { filter, map, switchMap, take } from "rxjs";
 import { GenerationResults, GenerationParams } from "./scheduler";
-
-/**
- * Interface for task generation parameters
- */
-export interface WorkerPoolParams {
-  numberOfWorkers: number;
-  rentalDurationSeconds: number;
-  budgetGlm: number;
-}
+import { WorkerPoolParams, WorkerType, BaseWorker } from "./node_manager/types";
+import { createWorker } from "./node_manager/worker";
 
 export interface Worker {
   id: string;
   name: string;
+  workerImpl: BaseWorker;
   golem: {
     activity: Activity;
     aggreement: Agreement;
@@ -38,6 +32,8 @@ export class WorkerPool {
   private numberOfWorkers: number;
   private rentalDurationSeconds: number;
   private budgetGlm: number;
+  private workerType: WorkerType;
+  private workerImpl: BaseWorker;
   private golemNetwork?: GolemNetwork;
   private allocation?: Allocation;
 
@@ -45,6 +41,8 @@ export class WorkerPool {
     this.numberOfWorkers = params.numberOfWorkers;
     this.rentalDurationSeconds = params.rentalDurationSeconds;
     this.budgetGlm = params.budgetGlm;
+    this.workerType = params.workerType;
+    this.workerImpl = createWorker(params.workerType);
   }
 
   public getNumberOfWorkers(): number {
@@ -88,10 +86,9 @@ export class WorkerPool {
 
       const allocation = this.allocation;
 
-      const order = this.getOrder(
+      const order = this.workerImpl.getOrder(
         this.rentalDurationSeconds,
         this.allocation,
-        "prod-12.4.1",
       );
 
       // Convert the human-readable order to a protocol-level format that we will publish on the network
@@ -186,6 +183,7 @@ export class WorkerPool {
         workers.push({
           id: agreement.id,
           name: `worker ${i}: ${agreement.provider.name}`,
+          workerImpl: createWorker(this.workerType),
           golem: {
             activity,
             aggreement: agreement,
@@ -229,10 +227,9 @@ export class WorkerPool {
         ctx.L().info("Set profanity_cuda permissions:", res);
       });
 
-      // Check GPU availability
-      await exe.run("nvidia-smi").then((res) => {
-        ctx.L().info("GPU status:", res);
-      });
+      // Validate worker capabilities (CPU or GPU specific)
+      const capabilityInfo = await worker.workerImpl.validateCapabilities(exe);
+      ctx.L().info(`Worker capabilities validated: ${capabilityInfo}`);
 
       ctx
         .L()
@@ -253,10 +250,11 @@ export class WorkerPool {
             `Running pass ${passNo + 1}/${generationParams.numberOfPasses}`,
           );
 
+        const command = worker.workerImpl.generateCommand(generationParams);
+        ctx.L().info(`Executing command: ${command}`);
+        
         await exe
-          .run(
-            `profanity_cuda -k 64 -p ${generationParams.vanityAddressPrefix.toArg()} -b ${generationParams.singlePassSeconds} -z ${generationParams.publicKey}`,
-          )
+          .run(command)
           .then(async (res) => {
             let biggestCompute = 0;
             // @ts-expect-error descr
@@ -406,35 +404,6 @@ export class WorkerPool {
     }
   }
 
-  private getOrder(
-    rentalDurationSeconds: number,
-    allocation: Allocation,
-    cruncherVersion: string,
-  ): any /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
-    const rentalDurationHours = Math.ceil(rentalDurationSeconds / 3600);
-    const order = {
-      demand: {
-        workload: {
-          imageTag: `nvidia/cuda-x-crunch:${cruncherVersion}`,
-          capabilities: ["!exp:gpu"],
-          engine: "vm-nvidia",
-        },
-      },
-      market: {
-        rentHours: rentalDurationHours,
-        pricing: {
-          model: "linear",
-          maxStartPrice: 0.0,
-          maxCpuPerHourPrice: 0.0,
-          maxEnvPerHourPrice: 2.0,
-        },
-      },
-      payment: {
-        allocation,
-      },
-    };
-    return order;
-  }
 
   public async closeWorkers(ctx: AppContext, workers: Worker[]): Promise<void> {
     if (!this.golemNetwork) {
