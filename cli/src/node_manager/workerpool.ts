@@ -106,10 +106,12 @@ export class WorkerPool {
         switchMap((demand) => glm.market.collectMarketProposalEvents(demand)),
         filter((event) => event.type === "ProposalReceived"),
         map((event) => {
-          console.log(
-            "Received proposal from provider",
-            event.proposal.provider.name,
-          );
+          ctx
+            .L()
+            .info(
+              "Received proposal from provider",
+              event.proposal.provider.name,
+            );
           return event.proposal;
         }),
       );
@@ -120,7 +122,7 @@ export class WorkerPool {
           if (offerProposal.isInitial()) {
             glm.market
               .negotiateProposal(offerProposal, demandSpecification)
-              .catch(console.error);
+              .catch(ctx.L().error);
           } else if (offerProposal.isDraft()) {
             draftProposals.push(offerProposal);
           }
@@ -129,9 +131,11 @@ export class WorkerPool {
 
       // Wait for the required number of proposals
       while (draftProposals.length < numberOfWorkers) {
-        console.log(
-          `Waiting for proposals... (${draftProposals.length}/${numberOfWorkers})`,
-        );
+        ctx
+          .L()
+          .info(
+            `Waiting for proposals... (${draftProposals.length}/${numberOfWorkers})`,
+          );
         await new Promise((resolve) => setTimeout(resolve, 1000));
       }
 
@@ -141,10 +145,12 @@ export class WorkerPool {
       for (let i = 0; i < numberOfWorkers; i++) {
         const draftProposal = draftProposals[i];
         const agreement = await glm.market.proposeAgreement(draftProposal);
-        console.log(
-          `Agreement ${i + 1} signed with provider`,
-          agreement.provider.name,
-        );
+        ctx
+          .L()
+          .info(
+            `Agreement ${i + 1} signed with provider`,
+            agreement.provider.name,
+          );
 
         const activity = await glm.activity.createActivity(agreement);
 
@@ -156,28 +162,32 @@ export class WorkerPool {
             take(1),
           )
           .subscribe((invoice) => {
-            console.log(
-              "Received invoice for ",
-              invoice.getPreciseAmount().toFixed(4),
-              "GLM",
-            );
+            ctx
+              .L()
+              .info(
+                "Received invoice for ",
+                invoice.getPreciseAmount().toFixed(4),
+                "GLM",
+              );
             glm.payment
               .acceptInvoice(invoice, allocation, invoice.amount)
-              .catch(console.error);
+              .catch(ctx.L().error);
           });
 
         const debitNoteSubscription = glm.payment
           .observeDebitNotes()
           .pipe(filter((debitNote) => debitNote.agreementId === agreement.id))
           .subscribe((debitNote) => {
-            console.log(
-              "Received debit note for ",
-              debitNote.getPreciseAmount().toFixed(4),
-              "GLM",
-            );
+            ctx
+              .L()
+              .info(
+                "Received debit note for ",
+                debitNote.getPreciseAmount().toFixed(4),
+                "GLM",
+              );
             glm.payment
               .acceptDebitNote(debitNote, allocation, debitNote.totalAmountDue)
-              .catch(console.error);
+              .catch(ctx.L().error);
           });
 
         workers.push({
@@ -389,7 +399,7 @@ export class WorkerPool {
 
     if (this.allocation) {
       await this.golemNetwork.payment.releaseAllocation(this.allocation);
-      console.log("Released allocation");
+      ctx.L().info("Released allocation");
     }
 
     try {
