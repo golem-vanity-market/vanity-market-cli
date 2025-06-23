@@ -8,7 +8,7 @@ import { ethers, hexlify } from "ethers";
 import { GenerationParams } from "./scheduler";
 import { GenerationPrefix } from "./prefix";
 import { WorkerPoolParams, WorkerType } from "./node_manager/types";
-import { WorkerPool } from "./workerpool";
+import { WorkerPool } from "./node_manager/workerpool";
 import { AppContext } from "./app_context";
 import process from "process";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
