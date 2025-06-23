@@ -7,10 +7,12 @@ This plan outlines the implementation of CPU and GPU worker type support in the 
 ## Current Architecture Analysis
 
 ### Existing Systems
+
 - **Legacy**: `crunch.ts` - Single worker with CPU/GPU support via `USE_CPU` environment variable
 - **Current**: `node_manager.ts` - WorkerPool with GPU-only support, empty `worker.ts` placeholder
 
 ### Key Findings
+
 - CPU support already exists in `crunch.ts` but not integrated into WorkerPool
 - Different configurations needed for CPU vs GPU workers
 - Empty `worker.ts` indicates planned worker abstraction
@@ -21,8 +23,8 @@ This plan outlines the implementation of CPU and GPU worker type support in the 
 
 ```typescript
 enum WorkerType {
-  CPU = 'cpu',
-  GPU = 'gpu'
+  CPU = "cpu",
+  GPU = "gpu",
 }
 
 interface WorkerConfig {
@@ -74,39 +76,46 @@ interface WorkerPoolParams {
 ### Phase 1: Core Architecture (High Priority)
 
 #### Task 1: Design worker type abstraction and interfaces
+
 - Define `WorkerType` enum
-- Create `WorkerConfig` interface  
+- Create `WorkerConfig` interface
 - Design `BaseWorker` abstract class
 - Update `WorkerPoolParams` interface
 
 #### Task 2: Implement base Worker class with type support
+
 - Create abstract `BaseWorker` class in `src/worker.ts`
 - Define common methods: `getConfig()`, `generateCommand()`, `validateCapabilities()`
 - Add worker identification and lifecycle management
 
 #### Task 3: Create CPUWorker and GPUWorker implementations
+
 - Implement `CPUWorker` class with CPU-specific configuration
 - Implement `GPUWorker` class with GPU-specific configuration
 - Port CPU logic from `crunch.ts` to `CPUWorker`
 
 #### Task 4: Update WorkerPool to support worker types
+
 - Modify `WorkerPool` constructor to accept worker type
-- `getOrder()` in WorkerPool should call `getOrder()` method from worker, all order configurations except `rentalDuratioHours` and `allocation` should come from Worker specific implemetnation  
+- `getOrder()` in WorkerPool should call `getOrder()` method from worker, all order configurations except `rentalDuratioHours` and `allocation` should come from Worker specific implemetnation
 - Modify worker acquisition logic for different types
 
 ### Phase 2: Integration (Medium Priority)
 
 #### Task 5: Integrate CPU/GPU configuration logic from crunch.ts
+
 - Move CPU detection logic (`nproc` command) to `CPUWorker`
 - Migrate GPU validation logic (`nvidia-smi`) to `GPUWorker`
 - Update command generation for both worker types
 
 #### Task 6: Add worker type selection to CLI interface
+
 - Add `--worker-type` CLI option to generate command
 - Update CLI help documentation
 - Add validation for worker type parameter
 
 #### Task 7: Update command generation for worker types
+
 - Implement CPU parallel command generation
 - Implement GPU single-process command generation
 - Handle different parameter sets (kernel/group/round counts)
@@ -114,6 +123,7 @@ interface WorkerPoolParams {
 ### Phase 3: Testing and Documentation (Low Priority)
 
 #### Task 8: Add tests for worker type functionality
+
 - Unit tests for `CPUWorker` and `GPUWorker` classes
 - Integration tests for `WorkerPool` with different worker types
 - Command generation tests
@@ -121,17 +131,19 @@ interface WorkerPoolParams {
 ## Key Configuration Differences
 
 ### GPU Workers
+
 - **Image**: `nvidia/cuda-x-crunch:${version}`
 - **Capabilities**: `["!exp:gpu"]`
 - **Engine**: `vm-nvidia`
-- **Parameters**: 
+- **Parameters**:
   - Kernel count: 64
-  - Group count: 1000  
+  - Group count: 1000
   - Round count: 1000
 - **Command**: `profanity_cuda -k 64 -g 1000 -r 1000 -p {prefix} -b {budget} -z {pubkey}`
 - **Validation**: `nvidia-smi` command
 
 ### CPU Workers
+
 - **Image**: Same as GPU (contains both CPU and GPU binaries)
 - **Capabilities**: Standard VM capabilities (no GPU requirement)
 - **Engine**: `vm` (standard VM engine)
@@ -182,4 +194,3 @@ interface WorkerPoolParams {
 
 - `USE_CPU` - Maintain for backward compatibility, map to worker type selection
 - `CRUNCHER_VERSION` - Continue using for image version selection
-

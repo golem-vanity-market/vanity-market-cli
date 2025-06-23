@@ -27,14 +27,14 @@ export class CPUWorker extends BaseWorker {
     try {
       const result = await exe.run("nproc");
       const cpuCount = parseInt(result.stdout?.toString().trim() ?? "1");
-      
+
       if (cpuCount < 1) {
         throw new Error("CPU count cannot be smaller than 1");
       }
       if (cpuCount > 255) {
         throw new Error("CPU count cannot be greater than 255");
       }
-      
+
       // Update config with detected CPU count
       this.config.cpuCount = cpuCount;
       return cpuCount;
@@ -46,10 +46,10 @@ export class CPUWorker extends BaseWorker {
   public generateCommand(params: GenerationParams): string {
     const cpuCount = this.config.cpuCount || 1;
     const prefix = params.vanityAddressPrefix.toArg();
-    
+
     // Create multiple prefix instances for parallel processing
     const prefixes = ` ${prefix}`.repeat(cpuCount);
-    
+
     return `parallel profanity_cuda --cpu -k ${this.config.kernelCount} -g ${this.config.groupCount} -r ${this.config.roundCount} -b ${params.singlePassSeconds} -z ${params.publicKey} -p {} :::${prefixes}`;
   }
 }
@@ -82,7 +82,7 @@ export class GPUWorker extends BaseWorker {
 
   public generateCommand(params: GenerationParams): string {
     const prefix = params.vanityAddressPrefix.toArg();
-    
+
     return `profanity_cuda -k ${this.config.kernelCount} -g ${this.config.groupCount} -r ${this.config.roundCount} -p ${prefix} -b ${params.singlePassSeconds} -z ${params.publicKey}`;
   }
 }
@@ -90,7 +90,10 @@ export class GPUWorker extends BaseWorker {
 /**
  * Factory function to create workers based on type
  */
-export function createWorker(type: WorkerType, cruncherVersion?: string): BaseWorker {
+export function createWorker(
+  type: WorkerType,
+  cruncherVersion?: string,
+): BaseWorker {
   switch (type) {
     case WorkerType.CPU:
       return new CPUWorker(cruncherVersion);

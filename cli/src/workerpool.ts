@@ -252,79 +252,77 @@ export class WorkerPool {
 
         const command = worker.workerImpl.generateCommand(generationParams);
         ctx.L().info(`Executing command: ${command}`);
-        
-        await exe
-          .run(command)
-          .then(async (res) => {
-            let biggestCompute = 0;
-            // @ts-expect-error descr
-            for (const line of res.stderr.split("\n")) {
-              ctx.L().info(line);
-              if (line.includes("Total compute")) {
-                try {
-                  const totalCompute = line
-                    .split("Total compute ")[1]
-                    .trim()
-                    .split(" GH")[0];
-                  const totalComputeFloatGh = parseFloat(totalCompute);
-                  biggestCompute = totalComputeFloatGh * 1e9;
-                } catch (e) {
-                  ctx.L().error("Error parsing compute stats:", e);
-                }
-              }
-            }
 
-            if (biggestCompute > 0) {
-              ctx
-                .L()
-                .info(
-                  `Pass ${passNo + 1} compute performance: ${(biggestCompute / 1e9).toFixed(2)} GH/s`,
-                );
-            }
-
-            const stdout = res.stdout ? String(res.stdout) : "";
-            ctx.L().info("Received stdout bytes:", stdout.length);
-
-            // Parse results from stdout
-            for (let line of stdout.split("\n")) {
+        await exe.run(command).then(async (res) => {
+          let biggestCompute = 0;
+          // @ts-expect-error descr
+          for (const line of res.stderr.split("\n")) {
+            ctx.L().info(line);
+            if (line.includes("Total compute")) {
               try {
-                line = line.trim();
-                if (line.startsWith("0x")) {
-                  const salt = line.split(",")[0].trim();
-                  const addr = line.split(",")[1].trim();
-                  const pubKey = line.split(",")[2].trim();
-
-                  if (
-                    addr.startsWith(
-                      generationParams.vanityAddressPrefix
-                        .fullPrefix()
-                        .toLowerCase(),
-                    )
-                  ) {
-                    generationResults.entries.push({
-                      addr,
-                      salt,
-                      pubKey,
-                    });
-                    ctx
-                      .L()
-                      .info(
-                        "Found address:",
-                        addr,
-                        "with salt:",
-                        salt,
-                        "public address:",
-                        pubKey,
-                        "prefix:",
-                        generationParams.vanityAddressPrefix.toHex(),
-                      );
-                  }
-                }
+                const totalCompute = line
+                  .split("Total compute ")[1]
+                  .trim()
+                  .split(" GH")[0];
+                const totalComputeFloatGh = parseFloat(totalCompute);
+                biggestCompute = totalComputeFloatGh * 1e9;
               } catch (e) {
-                ctx.L().error("Error parsing result line:", e);
+                ctx.L().error("Error parsing compute stats:", e);
               }
             }
-          });
+          }
+
+          if (biggestCompute > 0) {
+            ctx
+              .L()
+              .info(
+                `Pass ${passNo + 1} compute performance: ${(biggestCompute / 1e9).toFixed(2)} GH/s`,
+              );
+          }
+
+          const stdout = res.stdout ? String(res.stdout) : "";
+          ctx.L().info("Received stdout bytes:", stdout.length);
+
+          // Parse results from stdout
+          for (let line of stdout.split("\n")) {
+            try {
+              line = line.trim();
+              if (line.startsWith("0x")) {
+                const salt = line.split(",")[0].trim();
+                const addr = line.split(",")[1].trim();
+                const pubKey = line.split(",")[2].trim();
+
+                if (
+                  addr.startsWith(
+                    generationParams.vanityAddressPrefix
+                      .fullPrefix()
+                      .toLowerCase(),
+                  )
+                ) {
+                  generationResults.entries.push({
+                    addr,
+                    salt,
+                    pubKey,
+                  });
+                  ctx
+                    .L()
+                    .info(
+                      "Found address:",
+                      addr,
+                      "with salt:",
+                      salt,
+                      "public address:",
+                      pubKey,
+                      "prefix:",
+                      generationParams.vanityAddressPrefix.toHex(),
+                    );
+                }
+              }
+            } catch (e) {
+              ctx.L().error("Error parsing result line:", e);
+            }
+          }
+        });
       }
 
       return generationResults;
@@ -403,7 +401,6 @@ export class WorkerPool {
       throw new Error("Disconnection from Golem Network failed");
     }
   }
-
 
   public async closeWorkers(ctx: AppContext, workers: Worker[]): Promise<void> {
     if (!this.golemNetwork) {
