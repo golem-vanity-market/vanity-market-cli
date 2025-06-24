@@ -1,4 +1,4 @@
-name: Check CLI code
+name: NPM - Checks and tests
 
 on:
   push:

@@ -1,4 +1,4 @@
-name: Check CLI code
+name: Bun - run tests
 
 on:
   push:

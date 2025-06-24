@@ -11,10 +11,18 @@ on:
         description: 'Max total action time (minutes)'
         required: false
         default: 10
-      use-cpu:
-        description: 'Use CPU for crunching'
+      worker-type:
+        description: 'cpu or gpu worker type'
         required: false
-        default: 'false'
+        default: 'gpu'
+      num-workers:
+        description: 'Number of providers to use at once'
+        required: false
+        default: '1'
+      num-results:
+        description: 'Minimum number of results to generate'
+        required: false
+        default: '1'
 
 concurrency:
   group: address-0x22446688
@@ -30,8 +38,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
       - name: Install bun
         uses: oven-sh/setup-bun@v2
+
       - name: Install deno
         uses: denoland/setup-deno@v2
 
@@ -51,10 +61,7 @@ jobs:
         run: |
           ./yagna service run&
 
-      - working-directory: cli
-        run: bun install
-
-      - name: Build cruncher client
+      - name: Install dependencies
         working-directory: cli
         run: |
           bun install
@@ -79,10 +86,12 @@ jobs:
             --public-key generated.pub \
             --vanity-address-prefix ${{ github.event.inputs.argument-prefix }} \
             --budget-glm 1 \
-            --number-of-passes 100 \
-            --results-file results.json
-        env:
-          USE_CPU: ${{ github.event.inputs.use-cpu }}
+            --number-of-passes 1000 \
+            --results-file results.json \
+            --num-workers ${{ github.event.inputs.num-workers }} \
+            --num-results ${{ github.event.inputs.num-results }} \
+            --worker-type ${{ github.event.inputs.worker-type }} \
+            --non-interactive
 
       - name: Show results
         working-directory: cli

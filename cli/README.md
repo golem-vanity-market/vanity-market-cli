@@ -179,3 +179,9 @@ The CLI provides helpful error messages for common issues:
 - **Empty file**: `Public key file is empty`
 - **Invalid budget**: `Budget must be a positive number`
 - **Prefix too long**: `Vanity address prefix too long. Maximum length is 20 characters`
+
+## Sample commands
+
+```
+bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x333333 --budget-glm 1 --results-file results.json --number-of-passes 1000 --worker-type cpu
+```

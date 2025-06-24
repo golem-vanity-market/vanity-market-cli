@@ -4,6 +4,7 @@
 
 import { ExeUnit, Allocation } from "@golem-sdk/golem-js";
 import { GenerationParams } from "../scheduler";
+import { Estimator, EstimatorInfo } from "../estimator";
 
 /**
  * Supported worker types
@@ -64,9 +65,35 @@ export interface WorkerPoolParams {
  */
 export abstract class BaseWorker {
   protected config: WorkerConfig;
+  private _estimator: Estimator | null = null;
 
   constructor(cruncherVersion: string = "prod-12.4.1") {
     this.config = this.createConfig(cruncherVersion);
+  }
+
+  public initEstimator(estimator: Estimator): void {
+    this._estimator = estimator;
+  }
+
+  public reportAttempts(attempts: number): void {
+    if (!this._estimator) {
+      throw "Estimator is not initialized";
+    }
+    this._estimator.reportAttempts(attempts);
+  }
+
+  public estimator(): Estimator {
+    if (!this._estimator) {
+      throw "Estimator is not initialized";
+    }
+    return this._estimator;
+  }
+
+  public estimatorInfo(): EstimatorInfo {
+    if (!this._estimator) {
+      throw "Estimator is not initialized";
+    }
+    return this._estimator.currentInfo();
   }
 
   /**

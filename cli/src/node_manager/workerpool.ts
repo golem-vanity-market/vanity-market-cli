@@ -10,6 +10,9 @@ import { filter, map, switchMap, take } from "rxjs";
 import { GenerationResults, GenerationParams } from "./../scheduler";
 import { WorkerPoolParams, WorkerType, BaseWorker } from "./types";
 import { createWorker } from "./worker";
+import { Estimator } from "../estimator";
+import { computePrefixDifficulty } from "../difficulty";
+import { displayDifficulty, displayTime } from "../utils/format";
 
 export interface Worker {
   id: string;
@@ -17,7 +20,7 @@ export interface Worker {
   workerImpl: BaseWorker;
   golem: {
     activity: Activity;
-    aggreement: Agreement;
+    agreement: Agreement;
 
     paymentsSubscriptions: {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -129,20 +132,27 @@ export class WorkerPool {
         },
       );
 
-      // Wait for the required number of proposals
-      while (draftProposals.length < numberOfWorkers) {
-        ctx
-          .L()
-          .info(
-            `Waiting for proposals... (${draftProposals.length}/${numberOfWorkers})`,
-          );
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-
-      offerProposalsSubscription.unsubscribe();
-
       // Create workers from the collected proposals
-      for (let i = 0; i < numberOfWorkers; i++) {
+      for (let i = 0; ; i++) {
+        const connectedNumberOfWorkers = workers.length;
+        if (connectedNumberOfWorkers >= numberOfWorkers) {
+          ctx
+            .L()
+            .info(
+              `All ${numberOfWorkers} workers connected, stopping proposal collection`,
+            );
+          break;
+        }
+        // Wait for the required number of proposals
+        while (draftProposals.length <= i) {
+          ctx
+            .L()
+            .info(
+              `Waiting for proposals... (${draftProposals.length}/${i + 1}/${numberOfWorkers})`,
+            );
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+        }
+
         const draftProposal = draftProposals[i];
         const agreement = await glm.market.proposeAgreement(draftProposal);
         ctx
@@ -152,7 +162,17 @@ export class WorkerPool {
             agreement.provider.name,
           );
 
-        const activity = await glm.activity.createActivity(agreement);
+        let activity;
+        try {
+          activity = await glm.activity.createActivity(agreement);
+        } catch (errWhenCreatingActivity) {
+          ctx
+            .L()
+            .warn(
+              `Activity creation failed, skipping proposal... ${errWhenCreatingActivity}`,
+            );
+          continue;
+        }
 
         // Setup payment subscriptions for this worker
         const invoiceSubscription = glm.payment
@@ -165,9 +185,7 @@ export class WorkerPool {
             ctx
               .L()
               .info(
-                "Received invoice for ",
-                invoice.getPreciseAmount().toFixed(4),
-                "GLM",
+                `Received invoice for ${invoice.getPreciseAmount().toFixed(4)} GLM`,
               );
             glm.payment
               .acceptInvoice(invoice, allocation, invoice.amount)
@@ -181,9 +199,7 @@ export class WorkerPool {
             ctx
               .L()
               .info(
-                "Received debit note for ",
-                debitNote.getPreciseAmount().toFixed(4),
-                "GLM",
+                `Received debit note for ${debitNote.getPreciseAmount().toFixed(4)} GLM`,
               );
             glm.payment
               .acceptDebitNote(debitNote, allocation, debitNote.totalAmountDue)
@@ -196,7 +212,7 @@ export class WorkerPool {
           workerImpl: createWorker(this.workerType),
           golem: {
             activity,
-            aggreement: agreement,
+            agreement: agreement,
             paymentsSubscriptions: {
               invoiceSubscription,
               debitNoteSubscription,
@@ -204,11 +220,12 @@ export class WorkerPool {
           },
         });
       }
+      offerProposalsSubscription.unsubscribe();
 
       return workers;
     } catch (error) {
       ctx.L().error("Failed to allocate workers:" + error);
-      throw new Error("Worker allocation failed");
+      throw error;
     }
   }
 
@@ -216,15 +233,19 @@ export class WorkerPool {
     ctx: AppContext,
     worker: Worker,
     generationParams: GenerationParams,
-  ): Promise<GenerationResults> {
+  ): Promise<void> {
     if (!this.golemNetwork) {
       ctx.L().error("Golem Network is not initialized.");
       throw new Error("Golem Network is not initialized");
     }
 
-    const generationResults: GenerationResults = {
-      entries: [],
-    };
+    worker.workerImpl.initEstimator(
+      new Estimator(
+        computePrefixDifficulty(
+          generationParams.vanityAddressPrefix.fullPrefix(),
+        ),
+      ),
+    );
 
     try {
       // Create ExeUnit from the worker's activity
@@ -232,25 +253,21 @@ export class WorkerPool {
         worker.golem.activity,
       );
 
-      // Set up profanity_cuda executable permissions
-      await exe.run("chmod +x /usr/local/bin/profanity_cuda").then((res) => {
-        ctx.L().info("Set profanity_cuda permissions:", res);
-      });
+      const provider = exe.provider;
 
       // Validate worker capabilities (CPU or GPU specific)
-      const capabilityInfo = await worker.workerImpl.validateCapabilities(exe);
-      ctx.L().info(`Worker capabilities validated: ${capabilityInfo}`);
+      const _capabilityInfo = await worker.workerImpl.validateCapabilities(exe);
+      //ctx.L().info(`Worker capabilities validated: ${capabilityInfo}`);
 
-      ctx
-        .L()
-        .info("Prefix value:", generationParams.vanityAddressPrefix.toArg());
-
+      let totalCompute = 0;
       // Run profanity_cuda for the specified number of passes
       for (let passNo = 0; passNo < generationParams.numberOfPasses; passNo++) {
-        if (generationResults.entries.length > 0) {
+        if (ctx.noResults >= generationParams.numResults) {
           ctx
             .L()
-            .info("Found addresses in previous pass, stopping further passes");
+            .info(
+              `Found ${ctx.noResults} results in previous pass, stopping further passes`,
+            );
           break;
         }
 
@@ -267,7 +284,7 @@ export class WorkerPool {
           let biggestCompute = 0;
           // @ts-expect-error descr
           for (const line of res.stderr.split("\n")) {
-            ctx.L().info(line);
+            //ctx.L().info(line);
             if (line.includes("Total compute")) {
               try {
                 const totalCompute = line
@@ -283,15 +300,66 @@ export class WorkerPool {
           }
 
           if (biggestCompute > 0) {
+            totalCompute += biggestCompute;
+            worker.workerImpl.reportAttempts(totalCompute);
             ctx
               .L()
               .info(
                 `Pass ${passNo + 1} compute performance: ${(biggestCompute / 1e9).toFixed(2)} GH/s`,
               );
+
+            const commonInfo = worker.workerImpl.estimatorInfo();
+            const unfortunateIteration = Math.floor(
+              commonInfo.attempts /
+                worker.workerImpl
+                  .estimator()
+                  .estimateAttemptsGivenProbability(0.5),
+            );
+            const partial =
+              commonInfo.attempts /
+                worker.workerImpl
+                  .estimator()
+                  .estimateAttemptsGivenProbability(0.5) -
+              unfortunateIteration;
+            const speed = commonInfo.estimatedSpeed;
+            const eta = commonInfo.remainingTimeSec;
+            const etaFormatted = eta !== null ? displayTime("", eta) : "N/A";
+            const speedFormatted =
+              speed !== null ? displayDifficulty(speed.speed) + "/s" : "N/A";
+            const bar = "#".repeat(Math.round(partial * 50)).padEnd(50, " ");
+            const attemptsCompleted = commonInfo.attempts;
+            const attemptsCompletedFormatted =
+              displayDifficulty(attemptsCompleted);
+
+            const ecstaticFace = "😃";
+            const smilingFace = "😊";
+            const neutralFace = "😐";
+            const sadFace = "😢";
+            const catastrophicFace = "😱";
+            const weepingFace = "😭";
+            let face;
+            if (commonInfo.luckFactor > 2) {
+              face = ecstaticFace;
+            } else if (unfortunateIteration == 0) {
+              face = smilingFace;
+            } else if (unfortunateIteration == 1) {
+              face = neutralFace;
+            } else if (unfortunateIteration == 2) {
+              face = sadFace;
+            } else if (unfortunateIteration == 3) {
+              face = catastrophicFace;
+            } else {
+              face = weepingFace;
+            }
+            console.log(
+              " --[" +
+                bar +
+                `]-- ${attemptsCompletedFormatted} ETA: ${etaFormatted} SPEED: ${speedFormatted} ITER: ${unfortunateIteration} LUCK: ${(commonInfo.luckFactor * 100).toFixed(1)}% ${face}`,
+            );
           }
 
           const stdout = res.stdout ? String(res.stdout) : "";
-          ctx.L().info("Received stdout bytes:", stdout.length);
+          //ctx.L().info("Received stdout bytes:", stdout.length);
 
           // Parse results from stdout
           for (let line of stdout.split("\n")) {
@@ -309,35 +377,27 @@ export class WorkerPool {
                       .toLowerCase(),
                   )
                 ) {
-                  generationResults.entries.push({
+                  ctx.addGenerationResult({
                     addr,
                     salt,
                     pubKey,
+                    provider,
                   });
                   ctx
                     .L()
                     .info(
-                      "Found address:",
-                      addr,
-                      "with salt:",
-                      salt,
-                      "public address:",
-                      pubKey,
-                      "prefix:",
-                      generationParams.vanityAddressPrefix.toHex(),
+                      `Found address: ${addr}, with salt: ${salt}, public key: ${pubKey}, prefix: ${generationParams.vanityAddressPrefix.toHex()}, provider: ${provider.name}`,
                     );
                 }
               }
             } catch (e) {
-              ctx.L().error("Error parsing result line:", e);
+              ctx.L().error(`Error parsing result line: ${e}`);
             }
           }
         });
       }
-
-      return generationResults;
     } catch (error) {
-      ctx.L().error("Error during profanity_cuda execution:", error);
+      ctx.L().error(`Error during profanity_cuda execution: ${error}`);
       throw new Error("Profanity execution failed");
     }
   }
@@ -349,42 +409,27 @@ export class WorkerPool {
   ): Promise<GenerationResults> {
     ctx.L().info(`Starting concurrent execution on ${workers.length} workers`);
 
-    const aggregatedResults: GenerationResults = {
-      entries: [],
-    };
-
     try {
       // Execute runCommand concurrently on all workers
       const promises = workers.map(async (worker, index) => {
         ctx.L().info(`Starting worker ${index + 1}/${workers.length}`);
         try {
-          const result = await this.runCommand(ctx, worker, generationParams);
-          ctx
-            .L()
-            .info(
-              `Worker ${index + 1} completed with ${result.entries.length} results`,
-            );
-          return result;
+          await this.runCommand(ctx, worker, generationParams);
         } catch (error) {
-          ctx.L().error(`Worker ${index + 1} failed:`, error);
+          ctx.L().error(`Worker ${index + 1} failed: ${error}`);
           return { entries: [] } as GenerationResults;
         }
       });
 
       // Wait for all workers to complete
-      const results = await Promise.all(promises);
-
-      // Aggregate results from all workers
-      for (const result of results) {
-        aggregatedResults.entries.push(...result.entries);
-      }
+      await Promise.all(promises);
 
       ctx
         .L()
         .info(
-          `Concurrent execution completed. Total results: ${aggregatedResults.entries.length}`,
+          `Concurrent execution completed. Total results: ${ctx.noResults}`,
         );
-      return aggregatedResults;
+      return ctx.results;
     } catch (error) {
       ctx.L().error("Error during concurrent execution:", error);
       throw new Error("Concurrent execution failed");
@@ -467,7 +512,7 @@ export class WorkerPool {
         workers.map(async (worker, index) => {
           try {
             await this.golemNetwork!.market.terminateAgreement(
-              worker.golem.aggreement,
+              worker.golem.agreement,
             );
             ctx
               .L()
@@ -572,9 +617,7 @@ export class WorkerPool {
       ctx.L().info("Activity destroyed for worker");
 
       // Terminate the agreement
-      await this.golemNetwork.market.terminateAgreement(
-        worker.golem.aggreement,
-      );
+      await this.golemNetwork.market.terminateAgreement(worker.golem.agreement);
       ctx.L().info("Agreement terminated for worker");
 
       // Wait a bit for final invoice and debit note processing

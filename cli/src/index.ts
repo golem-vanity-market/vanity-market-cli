@@ -13,6 +13,9 @@ import { AppContext } from "./app_context";
 import process from "process";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
 import pino from "pino";
+import { computePrefixDifficulty } from "./difficulty";
+import { displayDifficulty, displayTime } from "./utils/format";
+import { sleep } from "@golem-sdk/golem-js";
 
 /**
  * Custom error class for address generation validation errors
@@ -30,7 +33,7 @@ class ValidationError extends Error {
 /**
  * Interface for generate command options
  */
-interface GenerateCmdOptions {
+export interface GenerateCmdOptions {
   publicKey?: string; // The actual public key content
   publicKeyPath?: string; // Path to the public key file
   vanityAddressPrefix?: string;
@@ -38,6 +41,9 @@ interface GenerateCmdOptions {
   prefix?: string;
   resultsFile?: string; // Path to save results
   workerType?: string; // Worker type: 'cpu' or 'gpu'
+  numResults: bigint;
+  numWorkers: number;
+  nonInteractive: boolean; // Run in non-interactive mode
 }
 
 /**
@@ -262,9 +268,12 @@ async function handleGenerateCommand(options: any): Promise<void> {
       publicKey: publicKey,
       publicKeyPath: options.publicKey,
       vanityAddressPrefix: options.vanityAddressPrefix,
-      budgetGlm: parseInt(options.budgetGlm, 10),
+      budgetGlm: parseInt(options.budgetGlm),
       resultsFile: options.resultsFile,
       workerType: options.workerType,
+      numResults: BigInt(options.numResults),
+      numWorkers: parseInt(options.numWorkers), // Default to 1 worker
+      nonInteractive: options.nonInteractive,
     };
 
     // Validate all options
@@ -286,17 +295,35 @@ async function handleGenerateCommand(options: any): Promise<void> {
     console.log("✓ OpenTelemetry tracing enabled for generation process");
     console.log("");
 
+    const difficulty = computePrefixDifficulty(
+      validatedOptions.vanityAddressPrefix.fullPrefix(),
+    );
+
+    console.log(
+      `Difficulty of the prefix: ${displayDifficulty(difficulty)}, Estimation single Nvidia 3060 time: ${displayTime("GPU ", difficulty / 250000000)}`,
+    );
+    if (validatedOptions.workerType === WorkerType.CPU) {
+      console.log(
+        `Using CPU worker type. Estimated time: ${displayTime("CPU ", difficulty / 10000000)}`,
+      );
+    }
+    if (!generateOptions.nonInteractive) {
+      console.log("Continue in 10 seconds... Press Ctrl+C to cancel");
+      await sleep(10);
+    }
+
     const generationParams: GenerationParams = {
       publicKey: validatedOptions.publicKey.toTruncatedHex(),
       vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
       budgetGlm: validatedOptions.budgetGlm!,
-      numberOfWorkers: 2, // Default number of workers
+      numberOfWorkers: parseInt(options.numWorkers),
       singlePassSeconds: options.singlePassSec
         ? parseInt(options.singlePassSec, 10)
         : 20, // Default single pass duration
       numberOfPasses: options.numberOfPasses
         ? parseInt(options.numberOfPasses, 10)
         : 1, // Default number of passes
+      numResults: options.numResults,
     };
 
     // Initialize Scheduler for task management and subproblem generation
@@ -321,22 +348,18 @@ async function handleGenerateCommand(options: any): Promise<void> {
       const workers = await workerPool.getWorkers(ctx);
       console.log(`✅ Acquired ${workers.length} workers`);
 
-      const results = await workerPool.runCommandConcurrent(
-        ctx,
-        workers,
-        generationParams,
-      );
+      await workerPool.runCommandConcurrent(ctx, workers, generationParams);
       console.log("✅ Workers completed successfully");
-      console.log(`Found ${results.entries.length} vanity addresses`);
+      console.log(`Found ${ctx.noResults} vanity addresses`);
 
       if (generateOptions.resultsFile) {
         writeFileSync(
           generateOptions.resultsFile,
-          JSON.stringify(results, null, 2),
+          JSON.stringify(ctx.results, null, 2),
         );
         console.log(`✅ Results saved to ${generateOptions.resultsFile}`);
       } else {
-        console.log("Results:", results);
+        console.log("Results:", ctx.results);
       }
 
       // Clean up workers
@@ -465,6 +488,21 @@ function main(): void {
     .option(
       "--worker-type <type>",
       "Worker type to use: 'cpu' or 'gpu' (default: gpu)",
+    )
+    .option(
+      "--num-results <numResults>",
+      "Number of vanity addresses to find (default: 1)",
+      "1", // Default value
+    )
+    .option(
+      "--num-workers <numWorkers>",
+      "Number of workers to allocate (default: 1)",
+      "1", // Default value
+    )
+    .option(
+      "--non-interactive",
+      "Run in non-interactive mode without prompts",
+      false, // Default to false
     )
     .action(handleGenerateCommand);
 

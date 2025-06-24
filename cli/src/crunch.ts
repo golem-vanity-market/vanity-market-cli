@@ -186,6 +186,7 @@ export async function computeOnGolem(
     // Then let's create a ExeUnit, which is a set of utilities to interact with the
     // providers machine, like running commands, uploading files, etc.
 
+    const provider = activity.provider;
     const exe = await glm.activity.createExeUnit(activity);
 
     let cpuCount = 1;
@@ -282,6 +283,7 @@ export async function computeOnGolem(
                     addr,
                     salt,
                     pubKey,
+                    provider,
                   });
                   console.log(
                     "Found address: ",

@@ -1,12 +1,28 @@
 import * as otl from "@opentelemetry/api";
 import pino from "pino";
+import { GenerationEntryResult, GenerationResults } from "./scheduler";
 
 export class AppContext {
   private _activeContext: otl.Context;
   private logger?: pino.Logger;
+  private generationResults: GenerationResults;
 
   constructor(ctx: otl.Context) {
     this._activeContext = ctx;
+    this.generationResults = new GenerationResults();
+  }
+
+  public addGenerationResult(result: GenerationEntryResult): void {
+    this.generationResults.entries.push(result);
+  }
+
+  public get noResults(): number {
+    return this.generationResults.entries.length;
+  }
+
+  // Use as readonly
+  public get results(): GenerationResults {
+    return this.generationResults;
   }
 
   public WithLogger(logger: pino.Logger): AppContext {

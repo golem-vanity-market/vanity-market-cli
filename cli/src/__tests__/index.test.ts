@@ -1,7 +1,11 @@
 import { execSync, SpawnSyncReturns } from "child_process";
 import { join } from "path";
 import { writeFileSync, unlinkSync } from "fs";
-import { validateGenerateOptions, readPublicKeyFromFile } from "../index";
+import {
+  validateGenerateOptions,
+  readPublicKeyFromFile,
+  GenerateCmdOptions,
+} from "../index";
 
 describe("Vanity Address Generator CLI - Step 2", () => {
   const cliPath = join(__dirname, "../../dist/index.js");
@@ -183,7 +187,10 @@ describe("Unit Tests for Generate Command Functions", () => {
 
   describe("validateGenerateOptions", () => {
     it("should validate correct options successfully", () => {
-      const validOptions = {
+      const validOptions: GenerateCmdOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "0x" + "1".repeat(8),
@@ -195,6 +202,9 @@ describe("Unit Tests for Generate Command Functions", () => {
 
     it("should throw error for missing public key", () => {
       const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
         vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 100,
       };
@@ -206,6 +216,9 @@ describe("Unit Tests for Generate Command Functions", () => {
 
     it("should throw error for invalid public key format", () => {
       const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
         publicKey: "invalid-key",
         vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 100,
@@ -218,6 +231,9 @@ describe("Unit Tests for Generate Command Functions", () => {
 
     it("should throw error for missing vanity address prefix", () => {
       const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         budgetGlm: 100,
@@ -230,6 +246,9 @@ describe("Unit Tests for Generate Command Functions", () => {
 
     it("should throw error for empty vanity address prefix", () => {
       const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "",
@@ -243,6 +262,9 @@ describe("Unit Tests for Generate Command Functions", () => {
 
     it("should throw error for vanity address prefix that is too long", () => {
       const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "0x" + "a".repeat(17), // Maximum is 6 characters
@@ -256,6 +278,9 @@ describe("Unit Tests for Generate Command Functions", () => {
 
     it("should throw error for invalid budget", () => {
       const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "0x" + "1".repeat(8),
@@ -269,6 +294,9 @@ describe("Unit Tests for Generate Command Functions", () => {
 
     it("should throw error for budget exceeding maximum", () => {
       const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "0x" + "1".repeat(8),
