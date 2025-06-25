@@ -13,6 +13,7 @@ import { createWorker } from "./worker";
 import { Estimator } from "../estimator";
 import { computePrefixDifficulty } from "../difficulty";
 import { displayDifficulty, displayTime } from "../utils/format";
+import { withTimeout } from "../utils/timeout";
 
 export interface Worker {
   id: string;
@@ -349,6 +350,7 @@ export class WorkerPool {
   public async drainPool(
     ctx: AppContext,
     pool: ResourceRentalPool,
+    timeoutSeconds: number = 10,
   ): Promise<void> {
     if (!this.golemNetwork) {
       ctx.L().error("Golem Network is not initialized.");
@@ -356,7 +358,7 @@ export class WorkerPool {
     }
     try {
       ctx.L().info("Draining and clearing all rentals from the pool...");
-      await pool.drainAndClear();
+      await withTimeout(pool.drainAndClear(), timeoutSeconds * 1000);
       ctx.L().info("All rentals cleared from the pool");
     } catch (error) {
       ctx.L().error("Critical error during workers cleanup:", error);
