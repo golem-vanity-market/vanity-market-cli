@@ -55,7 +55,9 @@ export class WorkerPool {
   public async findAndInitializeWorkers(): Promise<void> {}
 
   public async connectToGolemNetwork(ctx: AppContext): Promise<void> {
-    this.golemNetwork = new GolemNetwork();
+    this.golemNetwork = new GolemNetwork({
+      logger: ctx.L(),
+    });
     try {
       await this.golemNetwork.connect();
       ctx.L().info("Connected to Golem Network successfully");
