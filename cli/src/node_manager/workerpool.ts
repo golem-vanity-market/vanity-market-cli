@@ -3,10 +3,10 @@ import {
   Agreement,
   Allocation,
   GolemNetwork,
-  OfferProposal,
+  ResourceRental,
+  ResourceRentalPool,
 } from "@golem-sdk/golem-js";
 import { AppContext } from "./../app_context";
-import { filter, map, switchMap, take } from "rxjs";
 import { GenerationParams } from "./../scheduler";
 import { WorkerPoolParams, WorkerType, BaseWorker } from "./types";
 import { createWorker } from "./worker";
@@ -65,7 +65,9 @@ export class WorkerPool {
     }
   }
 
-  public async getWorkers(ctx: AppContext): Promise<Worker[]> {
+  public async initializeRentalPool(
+    ctx: AppContext,
+  ): Promise<ResourceRentalPool> {
     if (!this.golemNetwork) {
       ctx
         .L()
@@ -77,7 +79,6 @@ export class WorkerPool {
 
     const glm = this.golemNetwork;
     const rentalDurationWithPaymentsSeconds = this.rentalDurationSeconds + 360;
-    const workers: Worker[] = [];
     const numberOfWorkers = this.numberOfWorkers;
 
     try {
@@ -87,159 +88,27 @@ export class WorkerPool {
         paymentPlatform: "erc20-polygon-glm",
       });
 
-      const allocation = this.allocation;
-
-      const order = this.workerImpl.getOrder(
-        this.rentalDurationSeconds,
-        this.allocation,
-      );
-
-      // Convert the human-readable order to a protocol-level format that we will publish on the network
-      const demandSpecification = await glm.market.buildDemandDetails(
-        order.demand,
-        order.market,
-        this.allocation,
-      );
-
-      // Publish the order on the market
-      const demand$ = glm.market.publishAndRefreshDemand(demandSpecification);
-
-      // Now, for each created demand, let's listen to proposals from providers
-      const offerProposal$ = demand$.pipe(
-        switchMap((demand) => glm.market.collectMarketProposalEvents(demand)),
-        filter((event) => event.type === "ProposalReceived"),
-        map((event) => {
-          ctx
-            .L()
-            .info(
-              "Received proposal from provider",
-              event.proposal.provider.name,
-            );
-          return event.proposal;
-        }),
-      );
-
-      const draftProposals: OfferProposal[] = [];
-      const offerProposalsSubscription = offerProposal$.subscribe(
-        (offerProposal) => {
-          if (offerProposal.isInitial()) {
-            glm.market
-              .negotiateProposal(offerProposal, demandSpecification)
-              .catch(ctx.L().error);
-          } else if (offerProposal.isDraft()) {
-            draftProposals.push(offerProposal);
-          }
-        },
-      );
-
-      // Create workers from the collected proposals
-      for (let i = 0; ; i++) {
-        const connectedNumberOfWorkers = workers.length;
-        if (connectedNumberOfWorkers >= numberOfWorkers) {
-          ctx
-            .L()
-            .info(
-              `All ${numberOfWorkers} workers connected, stopping proposal collection`,
-            );
-          break;
-        }
-        // Wait for the required number of proposals
-        while (draftProposals.length <= i) {
-          ctx
-            .L()
-            .info(
-              `Waiting for proposals... (${draftProposals.length}/${i + 1}/${numberOfWorkers})`,
-            );
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-        }
-
-        const draftProposal = draftProposals[i];
-        const agreement = await glm.market.proposeAgreement(draftProposal);
-        ctx
-          .L()
-          .info(
-            `Agreement ${i + 1} signed with provider`,
-            agreement.provider.name,
-          );
-
-        let activity;
-        try {
-          activity = await glm.activity.createActivity(agreement);
-        } catch (errWhenCreatingActivity) {
-          ctx
-            .L()
-            .warn(
-              `Activity creation failed, skipping proposal... ${errWhenCreatingActivity}`,
-            );
-          continue;
-        }
-
-        // Setup payment subscriptions for this worker
-        const invoiceSubscription = glm.payment
-          .observeInvoices()
-          .pipe(
-            filter((invoice) => invoice.agreementId === agreement.id),
-            take(1),
-          )
-          .subscribe((invoice) => {
-            ctx
-              .L()
-              .info(
-                `Received invoice for ${invoice.getPreciseAmount().toFixed(4)} GLM`,
-              );
-            glm.payment
-              .acceptInvoice(invoice, allocation, invoice.amount)
-              .catch(ctx.L().error);
-          });
-
-        const debitNoteSubscription = glm.payment
-          .observeDebitNotes()
-          .pipe(filter((debitNote) => debitNote.agreementId === agreement.id))
-          .subscribe((debitNote) => {
-            ctx
-              .L()
-              .info(
-                `Received debit note for ${debitNote.getPreciseAmount().toFixed(4)} GLM`,
-              );
-            glm.payment
-              .acceptDebitNote(debitNote, allocation, debitNote.totalAmountDue)
-              .catch(ctx.L().error);
-          });
-
-        workers.push({
-          id: agreement.id,
-          name: `worker ${i}: ${agreement.provider.name}`,
-          workerImpl: createWorker(this.workerType),
-          golem: {
-            activity,
-            agreement: agreement,
-            paymentsSubscriptions: {
-              invoiceSubscription,
-              debitNoteSubscription,
-            },
-          },
-        });
-      }
-      offerProposalsSubscription.unsubscribe();
-
-      return workers;
+      const pool = await glm.manyOf({
+        poolSize: numberOfWorkers,
+        order: this.workerImpl.getOrder(
+          this.rentalDurationSeconds,
+          this.allocation,
+        ),
+      });
+      return pool;
     } catch (error) {
       ctx.L().error("Failed to allocate workers:" + error);
       throw error;
     }
   }
 
-  public async runCommand(
+  private async runCommand(
     ctx: AppContext,
-    worker: Worker,
+    rental: ResourceRental,
     generationParams: GenerationParams,
+    worker: BaseWorker,
   ): Promise<void> {
-    if (!this.golemNetwork) {
-      ctx.L().error("Golem Network is not initialized.");
-      throw new Error("Golem Network is not initialized");
-    }
-
-    worker.workerImpl.initEstimator(
+    worker.initEstimator(
       new Estimator(
         computePrefixDifficulty(
           generationParams.vanityAddressPrefix.fullPrefix(),
@@ -249,14 +118,12 @@ export class WorkerPool {
 
     try {
       // Create ExeUnit from the worker's activity
-      const exe = await this.golemNetwork.activity.createExeUnit(
-        worker.golem.activity,
-      );
+      const exe = await rental.getExeUnit();
 
       const provider = exe.provider;
 
       // Validate worker capabilities (CPU or GPU specific)
-      const _capabilityInfo = await worker.workerImpl.validateCapabilities(exe);
+      const _capabilityInfo = await worker.validateCapabilities(exe);
       //ctx.L().info(`Worker capabilities validated: ${capabilityInfo}`);
 
       let totalCompute = 0;
@@ -277,13 +144,13 @@ export class WorkerPool {
             `Running pass ${passNo + 1}/${generationParams.numberOfPasses}`,
           );
 
-        const command = worker.workerImpl.generateCommand(generationParams);
+        const command = worker.generateCommand(generationParams);
         ctx.L().info(`Executing command: ${command}`);
 
         await exe.run(command).then(async (res) => {
           let biggestCompute = 0;
-          // @ts-expect-error descr
-          for (const line of res.stderr.split("\n")) {
+          const stderr = res.stderr ? String(res.stderr) : "";
+          for (const line of stderr.split("\n")) {
             //ctx.L().info(line);
             if (line.includes("Total compute")) {
               try {
@@ -301,7 +168,7 @@ export class WorkerPool {
 
           if (biggestCompute > 0) {
             totalCompute += biggestCompute;
-            worker.workerImpl.reportAttempts(totalCompute);
+            worker.reportAttempts(totalCompute);
           }
 
           const stdout = res.stdout ? String(res.stdout) : "";
@@ -350,18 +217,14 @@ export class WorkerPool {
                 `Pass ${passNo + 1} computed: ${displayDifficulty(biggestCompute)}`,
               );
 
-            const commonInfo = worker.workerImpl.estimatorInfo();
+            const commonInfo = worker.estimatorInfo();
             const unfortunateIteration = Math.floor(
               commonInfo.attempts /
-                worker.workerImpl
-                  .estimator()
-                  .estimateAttemptsGivenProbability(0.5),
+                worker.estimator().estimateAttemptsGivenProbability(0.5),
             );
             const partial =
               commonInfo.attempts /
-                worker.workerImpl
-                  .estimator()
-                  .estimateAttemptsGivenProbability(0.5) -
+                worker.estimator().estimateAttemptsGivenProbability(0.5) -
               unfortunateIteration;
             const speed = commonInfo.estimatedSpeed;
             const eta = commonInfo.remainingTimeSec;
@@ -406,7 +269,7 @@ export class WorkerPool {
               );
             //reset the worker's estimator after finding addresses
             totalCompute = 0;
-            this.workerImpl.initEstimator(
+            worker.initEstimator(
               new Estimator(
                 computePrefixDifficulty(
                   generationParams.vanityAddressPrefix.fullPrefix(),
@@ -424,27 +287,30 @@ export class WorkerPool {
 
   public async runCommandConcurrent(
     ctx: AppContext,
-    workers: Worker[],
+    pool: ResourceRentalPool,
     generationParams: GenerationParams,
   ): Promise<void> {
-    ctx.L().info(`Starting concurrent execution on ${workers.length} workers`);
+    const numberOfWorkers = this.numberOfWorkers;
+    ctx.L().info(`Starting concurrent execution on ${numberOfWorkers} workers`);
 
     try {
-      // Execute runCommand concurrently on all workers
-      const promises = workers.map(async (worker, index) => {
-        ctx.L().info(`Starting worker ${index + 1}/${workers.length}`);
-
-        await this.runCommand(ctx, worker, generationParams);
-      });
-
-      // Wait for all workers to complete
-      await Promise.all(promises);
-
-      ctx
-        .L()
-        .info(
-          `Concurrent execution completed. Total results: ${ctx.noResults}`,
-        );
+      const workingProviders = new Array(numberOfWorkers).fill(null).map(() =>
+        pool.withRental(async (rental) => {
+          const worker = createWorker(this.workerType);
+          return await this.runCommand(ctx, rental, generationParams, worker);
+        }),
+      );
+      const settledWork = await Promise.allSettled(workingProviders);
+      const failedWork = settledWork.filter(
+        (result) => result.status === "rejected",
+      );
+      const successfulWork = settledWork.filter(
+        (result) => result.status === "fulfilled",
+      );
+      console.log(
+        `✅ Completed ${successfulWork.length} passes successfully (${failedWork.length} failed)`,
+      );
+      console.log(`Found ${ctx.noResults} vanity addresses`);
     } catch (error) {
       ctx.L().error("Error during concurrent execution:", error);
       throw new Error("Concurrent execution failed");
@@ -472,182 +338,21 @@ export class WorkerPool {
     }
   }
 
-  public async closeWorkers(ctx: AppContext, workers: Worker[]): Promise<void> {
+  public async drainPool(
+    ctx: AppContext,
+    pool: ResourceRentalPool,
+  ): Promise<void> {
     if (!this.golemNetwork) {
       ctx.L().error("Golem Network is not initialized.");
       throw new Error("Golem Network is not initialized");
     }
-
-    if (workers.length === 0) {
-      ctx.L().info("No workers to close");
-      return;
-    }
-
-    ctx.L().info(`Starting cleanup of ${workers.length} workers`);
-    const errors: Error[] = [];
-
     try {
-      // Phase 1: Destroy all activities
-      ctx.L().info("Phase 1: Destroying activities");
-      const activityResults = await Promise.allSettled(
-        workers.map(async (worker, index) => {
-          try {
-            await this.golemNetwork!.activity.destroyActivity(
-              worker.golem.activity,
-            );
-            ctx
-              .L()
-              .info(`Activity destroyed for worker ${index} ${worker.name}`);
-          } catch (error) {
-            ctx
-              .L()
-              .error(
-                `Failed to destroy activity for worker ${index} ${worker.name}:`,
-                error,
-              );
-            throw error;
-          }
-        }),
-      );
-
-      // Collect phase 1 errors
-      activityResults.forEach((result, index) => {
-        if (result.status === "rejected") {
-          errors.push(
-            new Error(
-              `Worker ${index} (${workers[index].name}) activity cleanup failed: ${result.reason}`,
-            ),
-          );
-        }
-      });
-
-      // Phase 2: Terminate all agreements
-      ctx.L().info("Phase 2: Terminating agreements");
-      const agreementResults = await Promise.allSettled(
-        workers.map(async (worker, index) => {
-          try {
-            await this.golemNetwork!.market.terminateAgreement(
-              worker.golem.agreement,
-            );
-            ctx
-              .L()
-              .info(
-                `Agreement terminated for worker ${index} - ${worker.name}`,
-              );
-          } catch (error) {
-            ctx
-              .L()
-              .error(
-                `Failed to terminate agreement for worker ${index} - ${worker.name}:`,
-                error,
-              );
-            throw error;
-          }
-        }),
-      );
-
-      // Collect phase 2 errors
-      agreementResults.forEach((result, index) => {
-        if (result.status === "rejected") {
-          errors.push(
-            new Error(
-              `Worker ${index} (${workers[index].name}) agreement cleanup failed: ${result.reason}`,
-            ),
-          );
-        }
-      });
-
-      // Wait for final invoice and debit note processing
-      ctx.L().info("Waiting for payment processing...");
-      await new Promise((resolve) => setTimeout(resolve, 10000));
-
-      // Phase 3: Unsubscribe from payment subscriptions
-      ctx.L().info("Phase 3: Unsubscribing payment subscriptions");
-      const subscriptionResults = await Promise.allSettled(
-        workers.map(async (worker, index) => {
-          try {
-            worker.golem.paymentsSubscriptions.invoiceSubscription.unsubscribe();
-            worker.golem.paymentsSubscriptions.debitNoteSubscription.unsubscribe();
-            ctx
-              .L()
-              .info(
-                `Payment subscriptions unsubscribed for worker ${index} ${worker.name}`,
-              );
-          } catch (error) {
-            ctx
-              .L()
-              .error(
-                `Failed to unsubscribe payments for worker ${index} ${worker.name}:`,
-                error,
-              );
-            throw error;
-          }
-        }),
-      );
-
-      // Collect phase 3 errors
-      subscriptionResults.forEach((result, index) => {
-        if (result.status === "rejected") {
-          errors.push(
-            new Error(
-              `Worker ${index} (${workers[index].name}) subscription cleanup failed: ${result.reason}`,
-            ),
-          );
-        }
-      });
-
-      // Report results
-      const successfulCleanups = workers.length * 4 - errors.length;
-      const totalOperations = workers.length * 4;
-      ctx
-        .L()
-        .info(
-          `Cleanup completed: ${successfulCleanups}/${totalOperations} operations successful`,
-        );
-
-      if (errors.length > 0) {
-        ctx.L().error(`${errors.length} cleanup operations failed`);
-        errors.forEach((error, index) => {
-          ctx.L().error(`Error ${index + 1}: ${error.message}`);
-        });
-        throw new Error(
-          `Worker cleanup partially failed: ${errors.length}/${totalOperations} operations failed`,
-        );
-      }
+      ctx.L().info("Draining and clearing all rentals from the pool...");
+      await pool.drainAndClear();
+      ctx.L().info("All rentals cleared from the pool");
     } catch (error) {
       ctx.L().error("Critical error during workers cleanup:", error);
       throw new Error("Workers cleanup failed");
-    }
-  }
-
-  public async closeWorker(ctx: AppContext, worker: Worker): Promise<void> {
-    if (!this.golemNetwork) {
-      ctx.L().error("Golem Network is not initialized.");
-      throw new Error("Golem Network is not initialized");
-    }
-
-    try {
-      // Destroy the activity first
-      await this.golemNetwork.activity.destroyActivity(worker.golem.activity);
-      ctx.L().info("Activity destroyed for worker");
-
-      // Terminate the agreement
-      await this.golemNetwork.market.terminateAgreement(worker.golem.agreement);
-      ctx.L().info("Agreement terminated for worker");
-
-      // Wait a bit for final invoice and debit note processing
-      await new Promise((resolve) => setTimeout(resolve, 10000));
-
-      // Unsubscribe from payment subscriptions
-      worker.golem.paymentsSubscriptions.invoiceSubscription.unsubscribe();
-      worker.golem.paymentsSubscriptions.debitNoteSubscription.unsubscribe();
-      ctx.L().info("Payment subscriptions unsubscribed for worker");
-
-      ctx.L().info("Allocation released for worker");
-    } catch (error) {
-      ctx.L().error("Error during worker cleanup:", error);
-      // Still try to release allocation even if other cleanup failed
-      throw new Error("Worker cleanup failed");
     }
   }
 }
