@@ -124,6 +124,12 @@ export class WorkerPool {
 
       const provider = exe.provider;
 
+      ctx
+        .L()
+        .info(
+          `Running command on provider: ${provider.name}, type: ${worker.getType()}`,
+        );
+
       // Validate worker capabilities (CPU or GPU specific)
       const _capabilityInfo = await worker.validateCapabilities(exe);
       //ctx.L().info(`Worker capabilities validated: ${capabilityInfo}`);
