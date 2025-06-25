@@ -7,7 +7,7 @@ import {
 } from "@golem-sdk/golem-js";
 import { AppContext } from "./../app_context";
 import { filter, map, switchMap, take } from "rxjs";
-import { GenerationResults, GenerationParams } from "./../scheduler";
+import { GenerationParams } from "./../scheduler";
 import { WorkerPoolParams, WorkerType, BaseWorker } from "./types";
 import { createWorker } from "./worker";
 import { Estimator } from "../estimator";
@@ -302,10 +302,52 @@ export class WorkerPool {
           if (biggestCompute > 0) {
             totalCompute += biggestCompute;
             worker.workerImpl.reportAttempts(totalCompute);
+          }
+
+          const stdout = res.stdout ? String(res.stdout) : "";
+          //ctx.L().info("Received stdout bytes:", stdout.length);
+
+          let noAddressesFound = 0;
+          // Parse results from stdout
+          for (let line of stdout.split("\n")) {
+            try {
+              line = line.trim();
+              if (line.startsWith("0x")) {
+                const salt = line.split(",")[0].trim();
+                const addr = line.split(",")[1].trim();
+                const pubKey = line.split(",")[2].trim();
+
+                if (
+                  addr.startsWith(
+                    generationParams.vanityAddressPrefix
+                      .fullPrefix()
+                      .toLowerCase(),
+                  )
+                ) {
+                  ctx.addGenerationResult({
+                    addr,
+                    salt,
+                    pubKey,
+                    provider,
+                  });
+                  noAddressesFound += 1;
+                  ctx
+                    .L()
+                    .info(
+                      `Found address: ${addr}, with salt: ${salt}, public key: ${pubKey}, prefix: ${generationParams.vanityAddressPrefix.toHex()}, provider: ${provider.name}`,
+                    );
+                }
+              }
+            } catch (e) {
+              ctx.L().error(`Error parsing result line: ${e}`);
+            }
+          }
+
+          if (noAddressesFound == 0) {
             ctx
               .L()
               .info(
-                `Pass ${passNo + 1} compute performance: ${(biggestCompute / 1e9).toFixed(2)} GH/s`,
+                `Pass ${passNo + 1} computed: ${displayDifficulty(biggestCompute)}`,
               );
 
             const commonInfo = worker.workerImpl.estimatorInfo();
@@ -356,43 +398,21 @@ export class WorkerPool {
                 bar +
                 `]-- ${attemptsCompletedFormatted} ETA: ${etaFormatted} SPEED: ${speedFormatted} ITER: ${unfortunateIteration} LUCK: ${(commonInfo.luckFactor * 100).toFixed(1)}% ${face}`,
             );
-          }
-
-          const stdout = res.stdout ? String(res.stdout) : "";
-          //ctx.L().info("Received stdout bytes:", stdout.length);
-
-          // Parse results from stdout
-          for (let line of stdout.split("\n")) {
-            try {
-              line = line.trim();
-              if (line.startsWith("0x")) {
-                const salt = line.split(",")[0].trim();
-                const addr = line.split(",")[1].trim();
-                const pubKey = line.split(",")[2].trim();
-
-                if (
-                  addr.startsWith(
-                    generationParams.vanityAddressPrefix
-                      .fullPrefix()
-                      .toLowerCase(),
-                  )
-                ) {
-                  ctx.addGenerationResult({
-                    addr,
-                    salt,
-                    pubKey,
-                    provider,
-                  });
-                  ctx
-                    .L()
-                    .info(
-                      `Found address: ${addr}, with salt: ${salt}, public key: ${pubKey}, prefix: ${generationParams.vanityAddressPrefix.toHex()}, provider: ${provider.name}`,
-                    );
-                }
-              }
-            } catch (e) {
-              ctx.L().error(`Error parsing result line: ${e}`);
-            }
+          } else {
+            ctx
+              .L()
+              .info(
+                `Pass ${passNo + 1} found ${noAddressesFound} addresses, total results: ${ctx.noResults}`,
+              );
+            //reset the worker's estimator after finding addresses
+            totalCompute = 0;
+            this.workerImpl.initEstimator(
+              new Estimator(
+                computePrefixDifficulty(
+                  generationParams.vanityAddressPrefix.fullPrefix(),
+                ),
+              ),
+            );
           }
         });
       }
@@ -406,19 +426,15 @@ export class WorkerPool {
     ctx: AppContext,
     workers: Worker[],
     generationParams: GenerationParams,
-  ): Promise<GenerationResults> {
+  ): Promise<void> {
     ctx.L().info(`Starting concurrent execution on ${workers.length} workers`);
 
     try {
       // Execute runCommand concurrently on all workers
       const promises = workers.map(async (worker, index) => {
         ctx.L().info(`Starting worker ${index + 1}/${workers.length}`);
-        try {
-          await this.runCommand(ctx, worker, generationParams);
-        } catch (error) {
-          ctx.L().error(`Worker ${index + 1} failed: ${error}`);
-          return { entries: [] } as GenerationResults;
-        }
+
+        await this.runCommand(ctx, worker, generationParams);
       });
 
       // Wait for all workers to complete
@@ -429,7 +445,6 @@ export class WorkerPool {
         .info(
           `Concurrent execution completed. Total results: ${ctx.noResults}`,
         );
-      return ctx.results;
     } catch (error) {
       ctx.L().error("Error during concurrent execution:", error);
       throw new Error("Concurrent execution failed");

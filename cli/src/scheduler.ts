@@ -1,6 +1,5 @@
 import { EventEmitter } from "events";
 import { GenerationPrefix } from "./prefix";
-import { ProviderInfo } from "@golem-sdk/golem-js";
 
 /**
  * Status types for vanity address generation tasks
@@ -25,20 +24,6 @@ export interface GenerationParams {
   singlePassSeconds: number;
   numberOfPasses: number;
   numResults: bigint;
-}
-export interface GenerationEntryResult {
-  addr: string;
-  salt: string;
-  pubKey: string;
-  provider: ProviderInfo;
-}
-
-export class GenerationResults {
-  entries: GenerationEntryResult[];
-
-  constructor() {
-    this.entries = [];
-  }
 }
 
 /**

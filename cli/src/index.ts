@@ -261,190 +261,171 @@ function validateGenerateOptions(
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerateCommand(options: any): Promise<void> {
+  const publicKey = readPublicKeyFromFile(options.publicKey);
+
+  // Extract and validate options
+  const generateOptions: GenerateCmdOptions = {
+    publicKey: publicKey,
+    publicKeyPath: options.publicKey,
+    vanityAddressPrefix: options.vanityAddressPrefix,
+    budgetGlm: parseInt(options.budgetGlm),
+    resultsFile: options.resultsFile,
+    workerType: options.workerType,
+    numResults: BigInt(options.numResults),
+    numWorkers: parseInt(options.numWorkers), // Default to 1 worker
+    nonInteractive: options.nonInteractive,
+  };
+
+  // Validate all options
+  const validatedOptions = validateGenerateOptions(generateOptions);
+
+  // Display generation parameters
+  console.log(
+    "🚀 Starting vanity address generation with the following parameters:",
+  );
+  console.log(`   Public Key File: ${generateOptions.publicKeyPath}`);
+  console.log(`   Public Key: ${validatedOptions.publicKey.toHex()}`);
+  console.log(
+    `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}`,
+  );
+  console.log(`   Budget (GLM): ${validatedOptions.budgetGlm}`);
+  console.log(`   Worker Type: ${validatedOptions.workerType}`);
+  console.log("");
+  console.log("✓ All parameters validated successfully");
+  console.log("✓ OpenTelemetry tracing enabled for generation process");
+  console.log("");
+
+  const difficulty = computePrefixDifficulty(
+    validatedOptions.vanityAddressPrefix.fullPrefix(),
+  );
+
+  console.log(
+    `Difficulty of the prefix: ${displayDifficulty(difficulty)}, Estimation single Nvidia 3060 time: ${displayTime("GPU ", difficulty / 250000000)}`,
+  );
+  if (validatedOptions.workerType === WorkerType.CPU) {
+    console.log(
+      `Using CPU worker type. Estimated time: ${displayTime("CPU ", difficulty / 10000000)}`,
+    );
+  }
+  if (!generateOptions.nonInteractive) {
+    console.log("Continue in 10 seconds... Press Ctrl+C to cancel");
+    await sleep(10);
+  }
+
+  const generationParams: GenerationParams = {
+    publicKey: validatedOptions.publicKey.toTruncatedHex(),
+    vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
+    budgetGlm: validatedOptions.budgetGlm!,
+    numberOfWorkers: parseInt(options.numWorkers),
+    singlePassSeconds: options.singlePassSec
+      ? parseInt(options.singlePassSec, 10)
+      : 20, // Default single pass duration
+    numberOfPasses: options.numberOfPasses
+      ? parseInt(options.numberOfPasses, 10)
+      : 1, // Default number of passes
+    numResults: options.numResults,
+  };
+
+  // Initialize Scheduler for task management and subproblem generation
+  const workerPoolParams: WorkerPoolParams = {
+    numberOfWorkers: generationParams.numberOfWorkers,
+    rentalDurationSeconds:
+      generationParams.singlePassSeconds * generationParams.numberOfPasses,
+    budgetGlm: generationParams.budgetGlm,
+    workerType: validatedOptions.workerType,
+  };
+
+  const logger = pinoLogger({
+    level: "info",
+    name: "golem-vaddr-cli",
+  });
+
+  const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
+
+  const glm = new GolemNetwork({
+    logger: ctx.L(),
+  });
+
+  let processExitCode = 0;
   try {
-    // Read public key from file first
-    const publicKey = readPublicKeyFromFile(options.publicKey);
+    await glm.connect();
+    console.log("✅ Connected to Golem network successfully");
 
-    // Extract and validate options
-    const generateOptions: GenerateCmdOptions = {
-      publicKey: publicKey,
-      publicKeyPath: options.publicKey,
-      vanityAddressPrefix: options.vanityAddressPrefix,
-      budgetGlm: parseInt(options.budgetGlm),
-      resultsFile: options.resultsFile,
-      workerType: options.workerType,
-      numResults: BigInt(options.numResults),
-      numWorkers: parseInt(options.numWorkers), // Default to 1 worker
-      nonInteractive: options.nonInteractive,
-    };
+    const rentalDurationWithPaymentsSeconds =
+      workerPoolParams.rentalDurationSeconds + 360;
 
-    // Validate all options
-    const validatedOptions = validateGenerateOptions(generateOptions);
-
-    // Display generation parameters
-    console.log(
-      "🚀 Starting vanity address generation with the following parameters:",
-    );
-    console.log(`   Public Key File: ${generateOptions.publicKeyPath}`);
-    console.log(`   Public Key: ${validatedOptions.publicKey.toHex()}`);
-    console.log(
-      `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}`,
-    );
-    console.log(`   Budget (GLM): ${validatedOptions.budgetGlm}`);
-    console.log(`   Worker Type: ${validatedOptions.workerType}`);
-    console.log("");
-    console.log("✓ All parameters validated successfully");
-    console.log("✓ OpenTelemetry tracing enabled for generation process");
-    console.log("");
-
-    const difficulty = computePrefixDifficulty(
-      validatedOptions.vanityAddressPrefix.fullPrefix(),
-    );
-
-    console.log(
-      `Difficulty of the prefix: ${displayDifficulty(difficulty)}, Estimation single Nvidia 3060 time: ${displayTime("GPU ", difficulty / 250000000)}`,
-    );
-    if (validatedOptions.workerType === WorkerType.CPU) {
-      console.log(
-        `Using CPU worker type. Estimated time: ${displayTime("CPU ", difficulty / 10000000)}`,
-      );
-    }
-    if (!generateOptions.nonInteractive) {
-      console.log("Continue in 10 seconds... Press Ctrl+C to cancel");
-      await sleep(10);
-    }
-
-    const generationParams: GenerationParams = {
-      publicKey: validatedOptions.publicKey.toTruncatedHex(),
-      vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
-      budgetGlm: validatedOptions.budgetGlm!,
-      numberOfWorkers: parseInt(options.numWorkers),
-      singlePassSeconds: options.singlePassSec
-        ? parseInt(options.singlePassSec, 10)
-        : 20, // Default single pass duration
-      numberOfPasses: options.numberOfPasses
-        ? parseInt(options.numberOfPasses, 10)
-        : 1, // Default number of passes
-      numResults: options.numResults,
-    };
-
-    // Initialize Scheduler for task management and subproblem generation
-    const workerPoolParams: WorkerPoolParams = {
-      numberOfWorkers: generationParams.numberOfWorkers,
-      rentalDurationSeconds:
-        generationParams.singlePassSeconds * generationParams.numberOfPasses,
-      budgetGlm: generationParams.budgetGlm,
-      workerType: validatedOptions.workerType,
-    };
-
-    const logger = pinoLogger({
-      level: "info",
-      name: "golem-vaddr-cli",
+    const allocation = await glm.payment.createAllocation({
+      budget: workerPoolParams.budgetGlm,
+      expirationSec: Math.round(rentalDurationWithPaymentsSeconds),
+      paymentPlatform: "erc20-polygon-glm",
     });
 
-    const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
-
-    const glm = new GolemNetwork({
-      logger: ctx.L(),
+    const pool = await glm.manyOf({
+      poolSize: workerPoolParams.numberOfWorkers,
+      order: getOrderSpec({
+        engine: validatedOptions.workerType,
+        allocation,
+        rentalDurationSeconds: workerPoolParams.rentalDurationSeconds,
+      }),
     });
+    console.log(workerPoolParams);
+    await pool.ready(); // Wait for workers to be ready
+    console.log(`✅ Rented ${pool.getSize()} providers`);
 
-    try {
-      await glm.connect();
-      console.log("✅ Connected to Golem network successfully");
+    // await workerPool.runCommandConcurrent(ctx, workers, generationParams);
+    const workingProviders = new Array(pool.getSize()).fill(null).map(() =>
+      pool.withRental(async (rental) => {
+        const worker = createWorker(validatedOptions.workerType);
+        return await runOnRental(ctx, rental, generationParams, worker);
+      }),
+    );
+    const settledWork = await Promise.allSettled(workingProviders);
+    const failedWork = settledWork.filter(
+      (result) => result.status === "rejected",
+    );
+    const successfulWork = settledWork.filter(
+      (result) => result.status === "fulfilled",
+    );
+    console.log(
+      `✅ Completed ${successfulWork.length} passes successfully (${failedWork.length} failed)`,
+    );
+    console.log(`Found ${ctx.noResults} vanity addresses`);
 
-      const rentalDurationWithPaymentsSeconds =
-        workerPoolParams.rentalDurationSeconds + 360;
-
-      const allocation = await glm.payment.createAllocation({
-        budget: workerPoolParams.budgetGlm,
-        expirationSec: Math.round(rentalDurationWithPaymentsSeconds),
-        paymentPlatform: "erc20-polygon-glm",
-      });
-
-      const pool = await glm.manyOf({
-        poolSize: workerPoolParams.numberOfWorkers,
-        order: getOrderSpec({
-          engine: validatedOptions.workerType,
-          allocation,
-          rentalDurationSeconds: workerPoolParams.rentalDurationSeconds,
-        }),
-      });
-      console.log(workerPoolParams);
-      await pool.ready(); // Wait for workers to be ready
-      console.log(`✅ Rented ${pool.getSize()} providers`);
-
-      // await workerPool.runCommandConcurrent(ctx, workers, generationParams);
-      const workingProviders = new Array(pool.getSize()).fill(null).map(() =>
-        pool.withRental(async (rental) => {
-          const worker = createWorker(validatedOptions.workerType);
-          return await runOnRental(ctx, rental, generationParams, worker);
-        }),
+    if (generateOptions.resultsFile) {
+      const results = await ctx.results();
+      writeFileSync(
+        generateOptions.resultsFile,
+        JSON.stringify(
+          {
+            entries: results,
+          },
+          null,
+          2,
+        ),
       );
-      const settledWork = await Promise.allSettled(workingProviders);
-      const failedWork = settledWork.filter(
-        (result) => result.status === "rejected",
-      );
-      const successfulWork = settledWork.filter(
-        (result) => result.status === "fulfilled",
-      );
-      console.log(
-        `✅ Completed ${successfulWork.length} passes successfully (${failedWork.length} failed)`,
-      );
-      console.log(`Found ${ctx.noResults} vanity addresses`);
-
-      if (generateOptions.resultsFile) {
-        writeFileSync(
-          generateOptions.resultsFile,
-          JSON.stringify(ctx.results, null, 2),
-        );
-        console.log(`✅ Results saved to ${generateOptions.resultsFile}`);
-      } else {
-        console.log("Results:", ctx.results);
-      }
-    } catch (error) {
-      console.error("❌ Failed during execution:", error);
-    } finally {
-      // Clean up (disconnecting from network will drain and finalize the pool automatically)
-      try {
-        await glm.disconnect();
-        console.log("✅ Disconnected from Golem network");
-      } catch (disconnectError) {
-        console.error(
-          "❌ Error disconnecting from Golem network:",
-          disconnectError,
-        );
-      }
-    }
-
-    // const scheduler = new Scheduler();
-    // scheduler.setWorkerPool(workerPool);
-    // scheduler.startGenerating(generationParams);
-
-    // to wrap the computeOnGolen with Scheduler/Subproblem gen
-    // computeOnGolem(generationParams)
-    //   .then((res) => {
-    //     const fileContent = JSON.stringify(res, null, 2);
-    //     console.log(
-    //       `✅ Golem computation completed successfully. Results saved to ${generateOptions.resultsFile ?? "results.json"}`,
-    //     );
-    //     writeFileSync(
-    //       generateOptions.resultsFile ?? "results.json",
-    //       fileContent,
-    //     );
-    //   })
-    //   .catch((error) => {
-    //     console.error("❌ Golem computation failed:", error);
-    //     process.exit(1);
-    //   });
-  } catch (error) {
-    if (error instanceof ValidationError) {
-      console.error(`❌ Validation Error: ${error.message}`);
-      process.exit(1);
+      console.log(`✅ Results saved to ${generateOptions.resultsFile}`);
     } else {
-      console.error(`❌ Unexpected Error: ${error}`);
-      process.exit(1);
+      console.log("Results:", ctx.results);
+    }
+  } catch (error) {
+    processExitCode = 1;
+    console.error("❌ Failed during execution:", error);
+  } finally {
+    try {
+      await glm.disconnect();
+      console.log("✅ Disconnected from Golem network");
+    } catch (disconnectError) {
+      processExitCode = 1;
+      console.error(
+        "❌ Error disconnecting from Golem network:",
+        disconnectError,
+      );
     }
   }
+
+  ctx.stopServices();
+  await ctx.waitUntilFinished();
+  process.exit(processExitCode);
 }
 
 function setUpSignalHandlers() {
