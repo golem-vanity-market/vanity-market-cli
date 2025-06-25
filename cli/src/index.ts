@@ -12,10 +12,10 @@ import { WorkerPool } from "./node_manager/workerpool";
 import { AppContext } from "./app_context";
 import process from "process";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
-import pino from "pino";
 import { computePrefixDifficulty } from "./difficulty";
 import { displayDifficulty, displayTime } from "./utils/format";
 import { sleep } from "@golem-sdk/golem-js";
+import { pinoLogger } from "@golem-sdk/pino-logger";
 
 /**
  * Custom error class for address generation validation errors
@@ -333,9 +333,12 @@ async function handleGenerateCommand(options: any): Promise<void> {
     workerType: validatedOptions.workerType,
   };
 
-  const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(
-    pino({ level: "info" }),
-  );
+  const logger = pinoLogger({
+    level: "info",
+    name: "golem-vaddr-cli",
+  });
+
+  const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
 
   const workerPool = new WorkerPool(workerPoolParams);
 
@@ -344,11 +347,13 @@ async function handleGenerateCommand(options: any): Promise<void> {
     await workerPool.connectToGolemNetwork(ctx);
     console.log("✅ Connected to Golem network successfully");
 
-    const workers = await workerPool.getWorkers(ctx);
-    console.log(`✅ Acquired ${workers.length} workers`);
+    const rentalPool = await workerPool.initializeRentalPool(ctx);
+    console.log(
+      `✅ Initialized pool of ${generationParams.numberOfWorkers} rentals`,
+    );
 
-    await workerPool.runCommandConcurrent(ctx, workers, generationParams);
-    console.log("✅ Workers completed successfully");
+    await workerPool.runCommandConcurrent(ctx, rentalPool, generationParams);
+    console.log("✅ Work completed successfully");
     console.log(`Found ${ctx.noResults} vanity addresses`);
 
     if (generateOptions.resultsFile) {
@@ -368,18 +373,17 @@ async function handleGenerateCommand(options: any): Promise<void> {
       console.log("Results:", ctx.results);
     }
 
-    // Clean up workers
     try {
-      await workerPool.closeWorkers(ctx, workers);
-      console.log("✅ All workers cleaned up");
-    } catch (workerCleanupError) {
-      console.error("❌ Error during worker cleanup:", workerCleanupError);
+      await workerPool.drainPool(ctx, rentalPool);
+      console.log("✅ All rentals cleaned up successfully");
+    } catch (error) {
+      console.error("❌ Error during rental cleanup:", error);
     }
   } catch (error) {
     processExitCode = 1;
     console.error("❌ Failed during execution:", error);
   }
-  // Always disconnect from Golem network, even if worker cleanup failed
+  // Always disconnect from Golem network, even if rental cleanup failed
   try {
     await workerPool.disconnectFromGolemNetwork(ctx);
     console.log("✅ Disconnected from Golem network");

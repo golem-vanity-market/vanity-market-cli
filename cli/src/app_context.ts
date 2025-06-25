@@ -1,14 +1,14 @@
 import * as otl from "@opentelemetry/api";
-import pino from "pino";
 import {
   defaultResultsServiceOptions,
   GenerationEntryResult,
   ResultsService,
 } from "./results";
+import { Logger } from "@golem-sdk/golem-js";
 
 export class AppContext {
   private _activeContext: otl.Context;
-  private logger?: pino.Logger;
+  private logger?: Logger;
   private generationResults: ResultsService;
 
   constructor(ctx: otl.Context) {
@@ -40,13 +40,13 @@ export class AppContext {
     return await this.generationResults.results();
   }
 
-  public WithLogger(logger: pino.Logger): AppContext {
+  public WithLogger(logger: Logger): AppContext {
     const newCtx = new AppContext(this._activeContext);
     newCtx.logger = logger;
     return newCtx;
   }
 
-  public L(): pino.Logger {
+  public L(): Logger {
     if (!this.logger) {
       throw new Error("Logger is not set in the AppContext");
     }
