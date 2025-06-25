@@ -2,7 +2,7 @@
  * Worker type system for CPU and GPU vanity address generation
  */
 
-import { ExeUnit, Allocation } from "@golem-sdk/golem-js";
+import { ExeUnit, Allocation, MarketOrderSpec } from "@golem-sdk/golem-js";
 import { GenerationParams } from "../scheduler";
 import { Estimator, EstimatorInfo } from "../estimator";
 
@@ -125,7 +125,7 @@ export abstract class BaseWorker {
   public getOrder(
     rentalDurationSeconds: number,
     allocation: Allocation,
-  ): any /* eslint-disable-line @typescript-eslint/no-explicit-any */ {
+  ): MarketOrderSpec {
     const rentalDurationHours = Math.ceil(rentalDurationSeconds / 3600);
 
     return {

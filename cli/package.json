@@ -42,6 +42,7 @@
   },
   "dependencies": {
     "@golem-sdk/golem-js": "git://github.com/golemfactory/golem-js.git#3f33d82d5d512b21ee91cb1d90cb863c2caa4b27",
+    "@golem-sdk/pino-logger": "^1.1.0",
     "@opentelemetry/api": "~1",
     "@opentelemetry/auto-instrumentations-node": "~0.57",
     "@opentelemetry/sdk-logs": "~0.57",

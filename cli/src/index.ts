@@ -8,14 +8,16 @@ import { ethers, hexlify } from "ethers";
 import { GenerationParams } from "./scheduler";
 import { GenerationPrefix } from "./prefix";
 import { WorkerPoolParams, WorkerType } from "./node_manager/types";
-import { WorkerPool } from "./node_manager/workerpool";
 import { AppContext } from "./app_context";
 import process from "process";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
-import pino from "pino";
 import { computePrefixDifficulty } from "./difficulty";
 import { displayDifficulty, displayTime } from "./utils/format";
-import { sleep } from "@golem-sdk/golem-js";
+import { GolemNetwork, sleep } from "@golem-sdk/golem-js";
+import { pinoLogger } from "@golem-sdk/pino-logger";
+import { getOrderSpec } from "./order";
+import { createWorker } from "./node_manager/worker";
+import { runOnRental } from "./node_manager/run";
 
 /**
  * Custom error class for address generation validation errors
@@ -335,21 +337,59 @@ async function handleGenerateCommand(options: any): Promise<void> {
       workerType: validatedOptions.workerType,
     };
 
-    const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(
-      pino({ level: "info" }),
-    );
+    const logger = pinoLogger({
+      level: "info",
+      name: "golem-vaddr-cli",
+    });
 
-    const workerPool = new WorkerPool(workerPoolParams);
+    const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
+
+    const glm = new GolemNetwork({
+      logger: ctx.L(),
+    });
 
     try {
-      await workerPool.connectToGolemNetwork(ctx);
+      await glm.connect();
       console.log("✅ Connected to Golem network successfully");
 
-      const workers = await workerPool.getWorkers(ctx);
-      console.log(`✅ Acquired ${workers.length} workers`);
+      const rentalDurationWithPaymentsSeconds =
+        workerPoolParams.rentalDurationSeconds + 360;
 
-      await workerPool.runCommandConcurrent(ctx, workers, generationParams);
-      console.log("✅ Workers completed successfully");
+      const allocation = await glm.payment.createAllocation({
+        budget: workerPoolParams.budgetGlm,
+        expirationSec: Math.round(rentalDurationWithPaymentsSeconds),
+        paymentPlatform: "erc20-polygon-glm",
+      });
+
+      const pool = await glm.manyOf({
+        poolSize: workerPoolParams.numberOfWorkers,
+        order: getOrderSpec({
+          engine: validatedOptions.workerType,
+          allocation,
+          rentalDurationSeconds: workerPoolParams.rentalDurationSeconds,
+        }),
+      });
+      console.log(workerPoolParams);
+      await pool.ready(); // Wait for workers to be ready
+      console.log(`✅ Rented ${pool.getSize()} providers`);
+
+      // await workerPool.runCommandConcurrent(ctx, workers, generationParams);
+      const workingProviders = new Array(pool.getSize()).fill(null).map(() =>
+        pool.withRental(async (rental) => {
+          const worker = createWorker(validatedOptions.workerType);
+          return await runOnRental(ctx, rental, generationParams, worker);
+        }),
+      );
+      const settledWork = await Promise.allSettled(workingProviders);
+      const failedWork = settledWork.filter(
+        (result) => result.status === "rejected",
+      );
+      const successfulWork = settledWork.filter(
+        (result) => result.status === "fulfilled",
+      );
+      console.log(
+        `✅ Completed ${successfulWork.length} passes successfully (${failedWork.length} failed)`,
+      );
       console.log(`Found ${ctx.noResults} vanity addresses`);
 
       if (generateOptions.resultsFile) {
@@ -361,38 +401,19 @@ async function handleGenerateCommand(options: any): Promise<void> {
       } else {
         console.log("Results:", ctx.results);
       }
-
-      // Clean up workers
-      try {
-        await workerPool.closeWorkers(ctx, workers);
-        console.log("✅ All workers cleaned up");
-      } catch (workerCleanupError) {
-        console.error("❌ Error during worker cleanup:", workerCleanupError);
-      } finally {
-        // Always disconnect from Golem network, even if worker cleanup failed
-        try {
-          await workerPool.disconnectFromGolemNetwork(ctx);
-          console.log("✅ Disconnected from Golem network");
-        } catch (disconnectError) {
-          console.error(
-            "❌ Error disconnecting from Golem network:",
-            disconnectError,
-          );
-        }
-      }
     } catch (error) {
       console.error("❌ Failed during execution:", error);
-      // Ensure disconnection even if main execution failed
+    } finally {
+      // Clean up (disconnecting from network will drain and finalize the pool automatically)
       try {
-        await workerPool.disconnectFromGolemNetwork(ctx);
-        console.log("✅ Disconnected from Golem network (cleanup)");
+        await glm.disconnect();
+        console.log("✅ Disconnected from Golem network");
       } catch (disconnectError) {
         console.error(
-          "❌ Error disconnecting from Golem network during cleanup:",
+          "❌ Error disconnecting from Golem network:",
           disconnectError,
         );
       }
-      process.exit(1);
     }
 
     // const scheduler = new Scheduler();
