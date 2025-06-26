@@ -5,6 +5,7 @@
 import { ExeUnit, Allocation, MarketOrderSpec } from "@golem-sdk/golem-js";
 import { GenerationParams } from "../scheduler";
 import { Estimator, EstimatorInfo } from "../estimator";
+import { selectCheapestProvider } from "./selector";
 
 /**
  * Supported worker types
@@ -157,6 +158,7 @@ export abstract class BaseWorker {
           maxCpuPerHourPrice: this._config.maxCpuPerHourPrice ?? 0.0,
           maxEnvPerHourPrice: this._config.maxEnvPricePerHour,
         },
+        offerProposalSelector: selectCheapestProvider(rentalDurationHours),
       },
       payment: {
         allocation,
