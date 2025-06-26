@@ -44,6 +44,8 @@ export interface GenerateCmdOptions {
   numResults: bigint;
   numWorkers: number;
   nonInteractive: boolean; // Run in non-interactive mode
+  minOffers: number; // Minimum offers to wait for
+  minOffersTimeoutSec: number; // Timeout for waiting for enough offers (`minOffers`)
 }
 
 /**
@@ -272,6 +274,8 @@ async function handleGenerateCommand(options: any): Promise<void> {
     numResults: BigInt(options.numResults),
     numWorkers: parseInt(options.numWorkers), // Default to 1 worker
     nonInteractive: options.nonInteractive,
+    minOffers: parseInt(options.minOffers),
+    minOffersTimeoutSec: parseInt(options.minOffersTimeoutSec),
   };
 
   // Validate all options
@@ -352,9 +356,15 @@ async function handleGenerateCommand(options: any): Promise<void> {
       `✅ Initialized pool of ${generationParams.numberOfWorkers} rentals`,
     );
 
-    console.log("🔍 Scanning the market for the best offers");
-    await sleep(5); // Wait for a couple seconds to allow the pool to collect some proposals
-    // otherwise we'd just pick the first one that comes in (not necessary the cheapest)
+    console.log(
+      `🔍 Looking for the best offer (waiting for at least ${generateOptions.minOffers} proposals with a ${generateOptions.minOffersTimeoutSec} second timeout)`,
+    );
+    await workerPool.waitForEnoughOffers(
+      ctx,
+      rentalPool,
+      generateOptions.minOffers,
+      generateOptions.minOffersTimeoutSec,
+    );
 
     console.log(
       "🔨 Starting work on vanity address generation, this may take a while",
@@ -481,6 +491,16 @@ function main(): void {
       "--non-interactive",
       "Run in non-interactive mode without prompts",
       false, // Default to false
+    )
+    .option(
+      "--min-offers <minOffers>",
+      "Minimum number of offers to wait for before starting (default: 5)",
+      "5", // Default value
+    )
+    .option(
+      "--min-offers-timeout-sec <minOffersTimeoutSec>",
+      "Timeout in seconds for waiting for enough offers (default: 30)",
+      "30", // Default value
     )
     .action(handleGenerateCommand);
 

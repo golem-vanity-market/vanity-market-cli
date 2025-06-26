@@ -2,6 +2,7 @@ import {
   Activity,
   Agreement,
   Allocation,
+  DraftOfferProposalPool,
   GolemNetwork,
   ResourceRental,
   ResourceRentalPool,
@@ -103,6 +104,63 @@ export class WorkerPool {
       ctx.L().error("Failed to allocate workers:" + error);
       throw error;
     }
+  }
+
+  public async waitForEnoughOffers(
+    ctx: AppContext,
+    rentalPool: ResourceRentalPool,
+    numOffers: number,
+    timeoutSec: number,
+  ): Promise<void> {
+    const proposalPool: DraftOfferProposalPool = rentalPool["proposalPool"];
+    const isEnough = () => proposalPool.availableCount() >= numOffers;
+
+    if (isEnough()) {
+      ctx
+        .L()
+        .info(
+          `Found enough offers immediately: ${proposalPool.availableCount()} >= ${numOffers}`,
+        );
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      const cleanup = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+        proposalPool.events.off("added", onProposalAdded);
+      };
+
+      const onProposalAdded = () => {
+        if (isEnough()) {
+          ctx
+            .L()
+            .info(
+              `Found enough offers: ${proposalPool.availableCount()} >= ${numOffers}`,
+            );
+          cleanup();
+          resolve();
+          return;
+        }
+        ctx
+          .L()
+          .info(
+            `Current offers: ${proposalPool.availableCount()}, waiting for ${numOffers} offers...`,
+          );
+      };
+      const timeoutId = setTimeout(() => {
+        cleanup();
+        ctx
+          .L()
+          .warn(
+            `Timeout reached: ${timeoutSec} seconds, current offers: ${proposalPool.availableCount()}`,
+          );
+        resolve();
+      }, timeoutSec * 1000);
+
+      proposalPool.events.on("added", onProposalAdded);
+    });
   }
 
   private async runCommand(
