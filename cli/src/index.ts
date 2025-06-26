@@ -352,10 +352,14 @@ async function handleGenerateCommand(options: any): Promise<void> {
       `✅ Initialized pool of ${generationParams.numberOfWorkers} rentals`,
     );
 
-    await workerPool.runCommandConcurrent(ctx, rentalPool, generationParams);
-    console.log("✅ Work completed successfully");
-    console.log(`Found ${ctx.noResults} vanity addresses`);
+    console.log("🔍 Scanning the market for the best offers");
+    await sleep(5); // Wait for a couple seconds to allow the pool to collect some proposals
+    // otherwise we'd just pick the first one that comes in (not necessary the cheapest)
 
+    console.log(
+      "🔨 Starting work on vanity address generation, this may take a while",
+    );
+    await workerPool.runCommandConcurrent(ctx, rentalPool, generationParams);
     if (generateOptions.resultsFile) {
       const results = await ctx.results();
       writeFileSync(

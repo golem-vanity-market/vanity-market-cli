@@ -317,7 +317,7 @@ export class WorkerPool {
         (result) => result.status === "fulfilled",
       );
       console.log(
-        `✅ Completed ${successfulWork.length} passes successfully (${failedWork.length} failed)`,
+        `✅ ${successfulWork.length} providers completed work successfully (${failedWork.length} failed)`,
       );
       console.log(`Found ${ctx.noResults} vanity addresses`);
     } catch (error) {
