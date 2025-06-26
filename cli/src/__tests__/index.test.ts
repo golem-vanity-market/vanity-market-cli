@@ -195,6 +195,8 @@ describe("Unit Tests for Generate Command Functions", () => {
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 100,
+        minOffers: 5,
+        minOffersTimeoutSec: 30,
       };
 
       expect(() => validateGenerateOptions(validOptions)).not.toThrow();
@@ -207,6 +209,8 @@ describe("Unit Tests for Generate Command Functions", () => {
         numWorkers: 1,
         vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 100,
+        minOffers: 5,
+        minOffersTimeoutSec: 30,
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -222,6 +226,8 @@ describe("Unit Tests for Generate Command Functions", () => {
         publicKey: "invalid-key",
         vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 100,
+        minOffers: 5,
+        minOffersTimeoutSec: 30,
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -237,6 +243,8 @@ describe("Unit Tests for Generate Command Functions", () => {
         publicKey:
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         budgetGlm: 100,
+        minOffers: 5,
+        minOffersTimeoutSec: 30,
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -253,6 +261,8 @@ describe("Unit Tests for Generate Command Functions", () => {
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "",
         budgetGlm: 100,
+        minOffers: 5,
+        minOffersTimeoutSec: 30,
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -269,6 +279,8 @@ describe("Unit Tests for Generate Command Functions", () => {
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "0x" + "a".repeat(17), // Maximum is 6 characters
         budgetGlm: 100,
+        minOffers: 5,
+        minOffersTimeoutSec: 30,
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -285,6 +297,8 @@ describe("Unit Tests for Generate Command Functions", () => {
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: -1,
+        minOffers: 5,
+        minOffersTimeoutSec: 30,
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -301,10 +315,46 @@ describe("Unit Tests for Generate Command Functions", () => {
           "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
         vanityAddressPrefix: "0x" + "1".repeat(8),
         budgetGlm: 1001, // Maximum is 1000
+        minOffers: 5,
+        minOffersTimeoutSec: 30,
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
         "Budget exceeds maximum allowed",
+      );
+    });
+    it("should throw error for invalid minOffers", () => {
+      const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
+        publicKey:
+          "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
+        vanityAddressPrefix: "0x" + "1".repeat(8),
+        budgetGlm: 100,
+        minOffers: -1, // Invalid
+        minOffersTimeoutSec: 30,
+      };
+
+      expect(() => validateGenerateOptions(invalidOptions)).toThrow(
+        "Minimum offers must be a non-negative number",
+      );
+    });
+    it("should throw error for invalid minOffersTimeoutSec", () => {
+      const invalidOptions = {
+        nonInteractive: true,
+        numResults: 1n,
+        numWorkers: 1,
+        publicKey:
+          "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
+        vanityAddressPrefix: "0x" + "1".repeat(8),
+        budgetGlm: 100,
+        minOffers: 5,
+        minOffersTimeoutSec: -10, // Invalid
+      };
+
+      expect(() => validateGenerateOptions(invalidOptions)).toThrow(
+        "Minimum offers timeout must be a non-negative number",
       );
     });
   });

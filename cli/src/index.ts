@@ -244,6 +244,20 @@ function validateGenerateOptions(
     );
   }
 
+  if (options.minOffers < 0 || isNaN(options.minOffers)) {
+    throw new ValidationError(
+      "Minimum offers must be a non-negative number",
+      "minOffers",
+    );
+  }
+
+  if (isNaN(options.minOffersTimeoutSec) || options.minOffersTimeoutSec < 0) {
+    throw new ValidationError(
+      "Minimum offers timeout must be a non-negative number",
+      "minOffersTimeoutSec",
+    );
+  }
+
   // Validate worker type
   const workerType = validateWorkerType(options.workerType);
 
