@@ -380,12 +380,13 @@ async function handleGenerateCommand(options: any): Promise<void> {
       generateOptions.minOffersTimeoutSec,
     );
 
+
     console.log(
       "🔨 Starting work on vanity address generation, this may take a while",
     );
     await workerPool.runCommandConcurrent(ctx, rentalPool, generationParams);
     if (generateOptions.resultsFile) {
-      const results = await ctx.results();
+      const results = await workerPool.results();
       writeFileSync(
         generateOptions.resultsFile,
         JSON.stringify(
@@ -398,7 +399,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       );
       console.log(`✅ Results saved to ${generateOptions.resultsFile}`);
     } else {
-      console.log("Results:", ctx.results);
+      console.log("Results:", workerPool.results);
     }
 
     try {
@@ -423,8 +424,8 @@ async function handleGenerateCommand(options: any): Promise<void> {
     );
   }
 
-  ctx.stopServices();
-  await ctx.waitUntilFinished();
+  await workerPool.stopServices(ctx);
+  console.log("✅ Stopped all services");
   process.exit(processExitCode);
 }
 

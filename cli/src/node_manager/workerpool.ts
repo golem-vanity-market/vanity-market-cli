@@ -1,6 +1,4 @@
 import {
-  Activity,
-  Agreement,
   Allocation,
   DraftOfferProposalPool,
   GolemNetwork,
@@ -15,23 +13,11 @@ import { Estimator } from "../estimator";
 import { computePrefixDifficulty } from "../difficulty";
 import { displayDifficulty, displayTime } from "../utils/format";
 import { withTimeout } from "../utils/timeout";
-
-export interface Worker {
-  id: string;
-  name: string;
-  workerImpl: BaseWorker;
-  golem: {
-    activity: Activity;
-    agreement: Agreement;
-
-    paymentsSubscriptions: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      invoiceSubscription: any;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      debitNoteSubscription: any;
-    };
-  };
-}
+import {
+  defaultResultsServiceOptions,
+  GenerationEntryResult,
+  ResultsService,
+} from "../results";
 
 export class WorkerPool {
   private numberOfWorkers: number;
@@ -41,6 +27,7 @@ export class WorkerPool {
   private workerImpl: BaseWorker;
   private golemNetwork?: GolemNetwork;
   private allocation?: Allocation;
+  private generationResults: ResultsService;
 
   constructor(params: WorkerPoolParams) {
     this.numberOfWorkers = params.numberOfWorkers;
@@ -48,6 +35,19 @@ export class WorkerPool {
     this.budgetGlm = params.budgetGlm;
     this.workerType = params.workerType;
     this.workerImpl = createWorker(params.workerType);
+    this.generationResults = new ResultsService(defaultResultsServiceOptions());
+  }
+
+  public addGenerationResult(result: GenerationEntryResult): void {
+    this.generationResults.addResult(result);
+  }
+
+  public get noResults(): number {
+    return this.generationResults.numberOfResults;
+  }
+
+  public async results(): Promise<GenerationEntryResult[]> {
+    return await this.generationResults.results();
   }
 
   public getNumberOfWorkers(): number {
@@ -196,11 +196,11 @@ export class WorkerPool {
       let totalCompute = 0;
       // Run profanity_cuda for the specified number of passes
       for (let passNo = 0; passNo < generationParams.numberOfPasses; passNo++) {
-        if (ctx.noResults >= generationParams.numResults) {
+        if (this.noResults >= generationParams.numResults) {
           ctx
             .L()
             .info(
-              `Found ${ctx.noResults} results in previous pass, stopping further passes`,
+              `Found ${this.noResults} results in previous pass, stopping further passes`,
             );
           break;
         }
@@ -258,7 +258,7 @@ export class WorkerPool {
                       .toLowerCase(),
                   )
                 ) {
-                  ctx.addGenerationResult({
+                  this.addGenerationResult({
                     addr,
                     salt,
                     pubKey,
@@ -332,7 +332,7 @@ export class WorkerPool {
             ctx
               .L()
               .info(
-                `Pass ${passNo + 1} found ${noAddressesFound} addresses, total results: ${ctx.noResults}`,
+                `Pass ${passNo + 1} found ${noAddressesFound} addresses, total results: ${this.noResults}`,
               );
             //reset the worker's estimator after finding addresses
             totalCompute = 0;
@@ -377,7 +377,7 @@ export class WorkerPool {
       console.log(
         `✅ ${successfulWork.length} providers completed work successfully (${failedWork.length} failed)`,
       );
-      console.log(`Found ${ctx.noResults} vanity addresses`);
+      console.log(`Found ${this.noResults} vanity addresses`);
     } catch (error) {
       ctx.L().error("Error during concurrent execution:", error);
       throw new Error("Concurrent execution failed");
@@ -422,5 +422,12 @@ export class WorkerPool {
       ctx.L().error("Critical error during workers cleanup:", error);
       throw new Error("Workers cleanup failed");
     }
+  }
+
+  public async stopServices(ctx: AppContext): Promise<void> {
+    ctx.L().debug("Stopping results service...");
+    this.generationResults.stop();
+    await this.generationResults.waitForFinish();
+    ctx.L().debug("Results service stopped...");
   }
 }

@@ -1,43 +1,12 @@
 import * as otl from "@opentelemetry/api";
-import {
-  defaultResultsServiceOptions,
-  GenerationEntryResult,
-  ResultsService,
-} from "./results";
 import { Logger } from "@golem-sdk/golem-js";
 
 export class AppContext {
   private _activeContext: otl.Context;
   private logger?: Logger;
-  private generationResults: ResultsService;
 
   constructor(ctx: otl.Context) {
     this._activeContext = ctx;
-    this.generationResults = new ResultsService(defaultResultsServiceOptions());
-  }
-
-  public stopServices(): void {
-    this.L().debug("Stopping result service...");
-    this.generationResults.stop();
-  }
-
-  public async waitUntilFinished(): Promise<void> {
-    this.L().debug("Waiting for result service stopped...");
-    await this.generationResults.waitForFinish();
-    this.L().debug("Results service stopped...");
-  }
-
-  public addGenerationResult(result: GenerationEntryResult): void {
-    this.generationResults.addResult(result);
-  }
-
-  public get noResults(): number {
-    return this.generationResults.numberOfResults;
-  }
-
-  // Use as readonly
-  public async results(): Promise<GenerationEntryResult[]> {
-    return await this.generationResults.results();
   }
 
   public WithLogger(logger: Logger): AppContext {

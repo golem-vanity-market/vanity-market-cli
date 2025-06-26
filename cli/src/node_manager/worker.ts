@@ -68,7 +68,7 @@ export class GPUWorker extends BaseWorker {
       imageTag: `nvidia/cuda-x-crunch:${cruncherVersion}`,
       engine: "vm-nvidia",
       maxCpuPerHourPrice: 0.0,
-      maxEnvPricePerHour: 0.2, // Default price per hour in GLM tokens
+      maxEnvPricePerHour: 2.0,
     };
   }
 
