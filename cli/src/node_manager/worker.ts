@@ -20,10 +20,12 @@ export class CPUWorker extends BaseWorker {
       imageTag: `nvidia/cuda-x-crunch:${cruncherVersion}`,
       engine: "vm",
       cpuCount: 1, // Will be updated after detection
+      maxEnvPricePerHour: 0.1, // Default price per hour in GLM tokens
+      maxCpuPerHourPrice: 0.025, // Default price per CPU thread in GLM tokens
     };
   }
 
-  public async validateCapabilities(exe: ExeUnit): Promise<number> {
+  public async checkAndSetCapabilities(exe: ExeUnit): Promise<void> {
     try {
       const result = await exe.run("nproc");
       const cpuCount = parseInt(result.stdout?.toString().trim() ?? "1");
@@ -35,9 +37,7 @@ export class CPUWorker extends BaseWorker {
         throw new Error("CPU count cannot be greater than 255");
       }
 
-      // Update config with detected CPU count
-      this.config.cpuCount = cpuCount;
-      return cpuCount;
+      this.updateConfigCpuCount(cpuCount);
     } catch (error) {
       throw new Error(`Failed to detect CPU capabilities: ${error}`);
     }
@@ -67,14 +67,14 @@ export class GPUWorker extends BaseWorker {
       capabilities: ["!exp:gpu"],
       imageTag: `nvidia/cuda-x-crunch:${cruncherVersion}`,
       engine: "vm-nvidia",
+      maxCpuPerHourPrice: 0.0,
+      maxEnvPricePerHour: 0.2, // Default price per hour in GLM tokens
     };
   }
 
-  public async validateCapabilities(exe: ExeUnit): Promise<number> {
+  public async checkAndSetCapabilities(exe: ExeUnit): Promise<void> {
     try {
       await exe.run("nvidia-smi");
-      // For GPU workers, we return 1 to indicate successful validation
-      return 1;
     } catch (error) {
       throw new Error(`Failed to validate GPU capabilities: ${error}`);
     }

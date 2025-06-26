@@ -71,7 +71,7 @@ export function estimatorLuckHistogram(silent = false, printHist = true) {
 
   const binSize = 10; // e.g., 1.0 unit per bin
   const minLuck = Math.floor(Math.min(...lucks));
-  const maxLuck = Math.ceil(Math.max(...lucks));
+  const maxLuck = Math.min(Math.ceil(Math.max(...lucks)), 5000); // Cap at 5000 for histogram
   const numBins = Math.ceil((maxLuck - minLuck) / binSize);
 
   // Create bins

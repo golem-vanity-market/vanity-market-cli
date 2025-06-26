@@ -132,7 +132,7 @@ export class WorkerPool {
         );
 
       // Validate worker capabilities (CPU or GPU specific)
-      const _capabilityInfo = await worker.validateCapabilities(exe);
+      await worker.checkAndSetCapabilities(exe);
       //ctx.L().info(`Worker capabilities validated: ${capabilityInfo}`);
 
       let totalCompute = 0;

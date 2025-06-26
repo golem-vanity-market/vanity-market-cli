@@ -47,7 +47,7 @@ abstract class BaseWorker {
   protected config: WorkerConfig;
   abstract getConfig(): WorkerConfig;
   abstract generateCommand(params: GenerationParams): string;
-  abstract validateCapabilities(exe: ExeUnit): Promise<number>; // Returns CPU count or GPU info
+  abstract checkAndSetCapabilities(exe: ExeUnit): Promise<number>; // Returns CPU count or GPU info
 }
 
 // Concrete implementations
@@ -85,7 +85,7 @@ interface WorkerPoolParams {
 #### Task 2: Implement base Worker class with type support
 
 - Create abstract `BaseWorker` class in `src/worker.ts`
-- Define common methods: `getConfig()`, `generateCommand()`, `validateCapabilities()`
+- Define common methods: `getConfig()`, `generateCommand()`, `checkAndSetCapabilities()`
 - Add worker identification and lifecycle management
 
 #### Task 3: Create CPUWorker and GPUWorker implementations

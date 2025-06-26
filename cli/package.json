@@ -17,7 +17,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint --fix .",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "list-cpu-offers": "node forward.js golem-sdk market scan",
+    "list-gpu-offers": "node forward.js golem-sdk market scan --engine vm-nvidia"
   },
   "keywords": [
     "vanity",
@@ -29,6 +31,7 @@
   "license": "MIT",
   "devDependencies": {
     "@eslint/js": "^9.28.0",
+    "@golem-sdk/cli": "^2.11",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
     "@types/ws": "^8.18.1",

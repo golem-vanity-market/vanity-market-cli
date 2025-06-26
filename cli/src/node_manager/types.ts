@@ -41,6 +41,12 @@ export interface WorkerConfig {
 
   /** CPU count for parallel processing (CPU workers only) */
   cpuCount?: number;
+
+  /** Maximum price per hour in GLM tokens */
+  maxEnvPricePerHour: number;
+
+  /** Maximum price per CPU thread (CPU workers only) - added to env price */
+  maxCpuPerHourPrice?: number; // Maximum CPU price per hour in GLM tokens
 }
 
 /**
@@ -64,11 +70,11 @@ export interface WorkerPoolParams {
  * Abstract base class for worker implementations
  */
 export abstract class BaseWorker {
-  protected config: WorkerConfig;
+  private _config: WorkerConfig;
   private _estimator: Estimator | null = null;
 
   constructor(cruncherVersion: string = "prod-12.4.1") {
-    this.config = this.createConfig(cruncherVersion);
+    this._config = this.createConfig(cruncherVersion);
   }
 
   public initEstimator(estimator: Estimator): void {
@@ -99,8 +105,15 @@ export abstract class BaseWorker {
   /**
    * Get the configuration for this worker type
    */
-  public getConfig(): WorkerConfig {
-    return { ...this.config };
+  public get config(): WorkerConfig {
+    return { ...this._config };
+  }
+
+  protected updateConfigCpuCount(count: number) {
+    if (count < 1 || count > 255) {
+      throw new Error("CPU count must be between 1 and 255");
+    }
+    this._config.cpuCount = count;
   }
 
   /**
@@ -117,7 +130,7 @@ export abstract class BaseWorker {
    * Validate worker capabilities and return relevant info
    * @returns CPU count for CPU workers, or 1 for GPU workers
    */
-  public abstract validateCapabilities(exe: ExeUnit): Promise<number>;
+  public abstract checkAndSetCapabilities(exe: ExeUnit): Promise<void>;
 
   /**
    * Get the Golem order configuration for this worker type
@@ -131,9 +144,9 @@ export abstract class BaseWorker {
     return {
       demand: {
         workload: {
-          imageTag: this.config.imageTag,
-          capabilities: this.config.capabilities,
-          engine: this.config.engine,
+          imageTag: this._config.imageTag,
+          capabilities: this._config.capabilities,
+          engine: this._config.engine,
         },
       },
       market: {
@@ -141,8 +154,8 @@ export abstract class BaseWorker {
         pricing: {
           model: "linear",
           maxStartPrice: 0.0,
-          maxCpuPerHourPrice: 0.0,
-          maxEnvPerHourPrice: 2.0,
+          maxCpuPerHourPrice: this._config.maxCpuPerHourPrice ?? 0.0,
+          maxEnvPerHourPrice: this._config.maxEnvPricePerHour,
         },
       },
       payment: {
@@ -155,20 +168,20 @@ export abstract class BaseWorker {
    * Get the worker type
    */
   public getType(): WorkerType {
-    return this.config.type;
+    return this._config.type;
   }
 
   /**
    * Check if this is a CPU worker
    */
   public isCPU(): boolean {
-    return this.config.type === WorkerType.CPU;
+    return this._config.type === WorkerType.CPU;
   }
 
   /**
    * Check if this is a GPU worker
    */
   public isGPU(): boolean {
-    return this.config.type === WorkerType.GPU;
+    return this._config.type === WorkerType.GPU;
   }
 }
