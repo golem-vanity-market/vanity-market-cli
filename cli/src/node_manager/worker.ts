@@ -21,7 +21,7 @@ export class CPUWorker extends BaseWorker {
       engine: "vm",
       cpuCount: 1, // Will be updated after detection
       maxEnvPricePerHour: 0.1, // Default price per hour in GLM tokens
-      maxCpuPerHourPrice: 0.025, // Default price per CPU thread in GLM tokens
+      maxCpuPerHourPrice: 0.01, // Default price per CPU thread in GLM tokens
     };
   }
 
