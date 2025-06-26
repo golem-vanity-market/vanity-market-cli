@@ -380,7 +380,6 @@ async function handleGenerateCommand(options: any): Promise<void> {
       generateOptions.minOffersTimeoutSec,
     );
 
-
     console.log(
       "🔨 Starting work on vanity address generation, this may take a while",
     );
