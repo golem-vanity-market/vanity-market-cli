@@ -14,7 +14,7 @@ import process from "process";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
 import { computePrefixDifficulty } from "./difficulty";
 import { displayDifficulty, displayTime } from "./utils/format";
-import { sleep } from "@golem-sdk/golem-js";
+import { ResourceRentalPool, sleep } from "@golem-sdk/golem-js";
 import { pinoLogger } from "@golem-sdk/pino-logger";
 
 /**
@@ -275,97 +275,181 @@ function validateGenerateOptions(
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerateCommand(options: any): Promise<void> {
-  const publicKey = readPublicKeyFromFile(options.publicKey);
+  // State variables accessible to the shutdown handler via closure
+  let workerPool: WorkerPool | null = null;
+  let rentalPool: ResourceRentalPool | null = null;
+  let appContext: AppContext | null = null;
+  let isShuttingDown = false;
 
-  // Extract and validate options
-  const generateOptions: GenerateCmdOptions = {
-    publicKey: publicKey,
-    publicKeyPath: options.publicKey,
-    vanityAddressPrefix: options.vanityAddressPrefix,
-    budgetGlm: parseInt(options.budgetGlm),
-    resultsFile: options.resultsFile,
-    workerType: options.workerType,
-    numResults: BigInt(options.numResults),
-    numWorkers: parseInt(options.numWorkers), // Default to 1 worker
-    nonInteractive: options.nonInteractive,
-    minOffers: parseInt(options.minOffers),
-    minOffersTimeoutSec: parseInt(options.minOffersTimeoutSec),
+  const gracefulShutdown = async (exitCode: number) => {
+    if (isShuttingDown) {
+      return;
+    }
+    isShuttingDown = true;
+    console.log("\nGracefully shutting down...");
+
+    // first save results to a file (or stdout)
+    if (workerPool && options.resultsFile) {
+      try {
+        const results = await workerPool.results();
+        writeFileSync(
+          options.resultsFile,
+          JSON.stringify({ entries: results }, null, 2),
+        );
+        console.log(`✅ Results saved to ${options.resultsFile}`);
+      } catch (error) {
+        console.error("❌ Failed to save results:", error);
+      }
+    } else if (workerPool) {
+      try {
+        const results = await workerPool.results();
+        console.log("Results:", results);
+      } catch (error) {
+        console.error("❌ Failed to retrieve results:", error);
+      }
+    }
+
+    // then clean up rentals (which gives us the chance to pay for the work done)
+    if (workerPool && rentalPool && appContext) {
+      try {
+        await workerPool.drainPool(appContext, rentalPool);
+        console.log("✅ All rentals cleaned up successfully");
+      } catch (error) {
+        console.error("❌ Error during rental cleanup:", error);
+      }
+    }
+
+    // only then we can safely disconnect from the Golem network and release the allocation
+    if (workerPool && appContext) {
+      try {
+        await workerPool.disconnectFromGolemNetwork(appContext);
+        console.log("✅ Disconnected from Golem network");
+      } catch (disconnectError) {
+        console.error(
+          "❌ Error disconnecting from Golem network:",
+          disconnectError,
+        );
+      }
+    }
+
+    // finally, stop all services in the worker pool
+    if (workerPool && appContext) {
+      try {
+        await workerPool.stopServices(appContext);
+        console.log("✅ Stopped all services");
+      } catch (error) {
+        console.error("❌ Error stopping services:", error);
+      }
+    }
+
+    // and shut down OpenTelemetry
+    try {
+      await shutdownOpenTelemetry();
+      console.log("✅ OpenTelemetry shut down successfully");
+    } catch (err) {
+      console.error("❌ Error shutting down OpenTelemetry", err);
+    }
+
+    process.exit(exitCode);
   };
 
-  // Validate all options
-  const validatedOptions = validateGenerateOptions(generateOptions);
+  // Register signal handlers to initiate graceful shutdown
+  process.on("SIGINT", () => gracefulShutdown(0));
+  process.on("SIGTERM", () => gracefulShutdown(0));
 
-  // Display generation parameters
-  console.log(
-    "🚀 Starting vanity address generation with the following parameters:",
-  );
-  console.log(`   Public Key File: ${generateOptions.publicKeyPath}`);
-  console.log(`   Public Key: ${validatedOptions.publicKey.toHex()}`);
-  console.log(
-    `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}`,
-  );
-  console.log(`   Budget (GLM): ${validatedOptions.budgetGlm}`);
-  console.log(`   Worker Type: ${validatedOptions.workerType}`);
-  console.log("");
-  console.log("✓ All parameters validated successfully");
-  console.log("✓ OpenTelemetry tracing enabled for generation process");
-  console.log("");
-
-  const difficulty = computePrefixDifficulty(
-    validatedOptions.vanityAddressPrefix.fullPrefix(),
-  );
-
-  console.log(
-    `Difficulty of the prefix: ${displayDifficulty(difficulty)}, Estimation single Nvidia 3060 time: ${displayTime("GPU ", difficulty / 250000000)}`,
-  );
-  if (validatedOptions.workerType === WorkerType.CPU) {
-    console.log(
-      `Using CPU worker type. Estimated time: ${displayTime("CPU ", difficulty / 10000000)}`,
-    );
-  }
-  if (!generateOptions.nonInteractive) {
-    console.log("Continue in 10 seconds... Press Ctrl+C to cancel");
-    await sleep(10);
-  }
-
-  const generationParams: GenerationParams = {
-    publicKey: validatedOptions.publicKey.toTruncatedHex(),
-    vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
-    budgetGlm: validatedOptions.budgetGlm!,
-    numberOfWorkers: parseInt(options.numWorkers),
-    singlePassSeconds: options.singlePassSec
-      ? parseInt(options.singlePassSec, 10)
-      : 20, // Default single pass duration
-    numberOfPasses: options.numberOfPasses
-      ? parseInt(options.numberOfPasses, 10)
-      : 1, // Default number of passes
-    numResults: options.numResults,
-  };
-
-  // Initialize Scheduler for task management and subproblem generation
-  const workerPoolParams: WorkerPoolParams = {
-    numberOfWorkers: generationParams.numberOfWorkers,
-    rentalDurationSeconds:
-      generationParams.singlePassSeconds * generationParams.numberOfPasses,
-    budgetGlm: generationParams.budgetGlm,
-    workerType: validatedOptions.workerType,
-  };
-
-  const logger = pinoLogger({
-    level: "info",
-    name: "golem-vaddr-cli",
-  });
-
-  const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
-
-  const workerPool = new WorkerPool(workerPoolParams);
-
-  let processExitCode = 0;
   try {
-    await workerPool.connectToGolemNetwork(ctx);
+    const publicKey = readPublicKeyFromFile(options.publicKey);
+
+    const generateOptions: GenerateCmdOptions = {
+      publicKey: publicKey,
+      publicKeyPath: options.publicKey,
+      vanityAddressPrefix: options.vanityAddressPrefix,
+      budgetGlm: parseFloat(options.budgetGlm),
+      resultsFile: options.resultsFile,
+      workerType: options.workerType,
+      numResults: BigInt(options.numResults),
+      numWorkers: parseInt(options.numWorkers),
+      nonInteractive: options.nonInteractive,
+      minOffers: parseInt(options.minOffers),
+      minOffersTimeoutSec: parseInt(options.minOffersTimeoutSec),
+    };
+
+    const validatedOptions = validateGenerateOptions(generateOptions);
+
+    console.log(
+      "🚀 Starting vanity address generation with the following parameters:",
+    );
+    console.log(`   Public Key File: ${generateOptions.publicKeyPath}`);
+    console.log(`   Public Key: ${validatedOptions.publicKey.toHex()}`);
+    console.log(
+      `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}`,
+    );
+    console.log(`   Budget (GLM): ${validatedOptions.budgetGlm}`);
+    console.log(`   Worker Type: ${validatedOptions.workerType}`);
+    console.log("");
+    console.log("✓ All parameters validated successfully");
+    console.log("✓ OpenTelemetry tracing enabled for generation process");
+    console.log("");
+
+    const difficulty = computePrefixDifficulty(
+      validatedOptions.vanityAddressPrefix.fullPrefix(),
+    );
+    const estimatedSecondsToFindOneAddress =
+      validatedOptions.workerType === WorkerType.CPU
+        ? difficulty / 10000000
+        : difficulty / 250000000;
+
+    console.log(`Difficulty of the prefix: ${displayDifficulty(difficulty)}`);
+    if (validatedOptions.workerType === WorkerType.GPU) {
+      console.log(
+        `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime("GPU ", estimatedSecondsToFindOneAddress)}`,
+      );
+    } else {
+      console.log(
+        `Using CPU worker type. Estimated time: ${displayTime("CPU ", estimatedSecondsToFindOneAddress)}`,
+      );
+    }
+    if (!generateOptions.nonInteractive) {
+      console.log("Continue in 10 seconds... Press Ctrl+C to cancel");
+      await sleep(10);
+    }
+
+    const generationParams: GenerationParams = {
+      publicKey: validatedOptions.publicKey.toTruncatedHex(),
+      vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
+      budgetGlm: validatedOptions.budgetGlm!,
+      numberOfWorkers: parseInt(options.numWorkers),
+      singlePassSeconds: options.singlePassSec
+        ? parseInt(options.singlePassSec, 10)
+        : 20, // Default single pass duration
+      numResults: options.numResults,
+    };
+
+    const estimatedRentalDurationSeconds = Math.max(
+      15 * 60, // minimum rental duration on golem is 15 minutes, otherwise providers won't even consider the offer
+      (Number(generationParams.numResults) * estimatedSecondsToFindOneAddress) /
+        generationParams.numberOfWorkers,
+    );
+
+    const workerPoolParams: WorkerPoolParams = {
+      numberOfWorkers: generationParams.numberOfWorkers,
+      rentalDurationSeconds: estimatedRentalDurationSeconds,
+      budgetGlm: generationParams.budgetGlm,
+      workerType: validatedOptions.workerType,
+    };
+
+    const logger = pinoLogger({
+      level: "info",
+      name: "golem-vaddr-cli",
+    });
+
+    appContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
+    workerPool = new WorkerPool(workerPoolParams);
+
+    await workerPool.connectToGolemNetwork(appContext);
     console.log("✅ Connected to Golem network successfully");
 
-    const rentalPool = await workerPool.initializeRentalPool(ctx);
+    rentalPool = await workerPool.initializeRentalPool(appContext);
     console.log(
       `✅ Initialized pool of ${generationParams.numberOfWorkers} rentals`,
     );
@@ -374,7 +458,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       `🔍 Looking for the best offer (waiting for at least ${generateOptions.minOffers} proposals with a ${generateOptions.minOffersTimeoutSec} second timeout)`,
     );
     await workerPool.waitForEnoughOffers(
-      ctx,
+      appContext,
       rentalPool,
       generateOptions.minOffers,
       generateOptions.minOffersTimeoutSec,
@@ -383,64 +467,21 @@ async function handleGenerateCommand(options: any): Promise<void> {
     console.log(
       "🔨 Starting work on vanity address generation, this may take a while",
     );
-    await workerPool.runCommandConcurrent(ctx, rentalPool, generationParams);
-    if (generateOptions.resultsFile) {
-      const results = await workerPool.results();
-      writeFileSync(
-        generateOptions.resultsFile,
-        JSON.stringify(
-          {
-            entries: results,
-          },
-          null,
-          2,
-        ),
-      );
-      console.log(`✅ Results saved to ${generateOptions.resultsFile}`);
-    } else {
-      console.log("Results:", workerPool.results);
-    }
-
-    try {
-      await workerPool.drainPool(ctx, rentalPool);
-      console.log("✅ All rentals cleaned up successfully");
-    } catch (error) {
-      console.error("❌ Error during rental cleanup:", error);
-    }
-  } catch (error) {
-    processExitCode = 1;
-    console.error("❌ Failed during execution:", error);
-  }
-  // Always disconnect from Golem network, even if rental cleanup failed
-  try {
-    await workerPool.disconnectFromGolemNetwork(ctx);
-    console.log("✅ Disconnected from Golem network");
-  } catch (disconnectError) {
-    processExitCode = 1;
-    console.error(
-      "❌ Error disconnecting from Golem network:",
-      disconnectError,
+    await workerPool.runCommandConcurrent(
+      appContext,
+      rentalPool,
+      generationParams,
     );
+
+    // Normal completion, initiate shutdown.
+    await gracefulShutdown(0);
+  } catch (error) {
+    // Avoid logging error if shutdown was user-initiated via Ctrl+C
+    if (!isShuttingDown) {
+      console.error("❌ Failed during execution:", error);
+    }
+    await gracefulShutdown(1);
   }
-
-  await workerPool.stopServices(ctx);
-  console.log("✅ Stopped all services");
-  process.exit(processExitCode);
-}
-
-function setUpSignalHandlers() {
-  // We'd prefer to do it on 'exit', but the docs claim that async operations are forbidden in 'exit' listeners.
-  // Note that this solution does not work on Windows.
-  ["SIGTERM", "SIGINT"].forEach((event) =>
-    process.on(event, () => {
-      shutdownOpenTelemetry()
-        .then(
-          () => console.log("OpenTelemetry shut down successfully"),
-          (err) => console.log("Error shutting down OpenTelemetry", err),
-        )
-        .finally(() => process.exit(0));
-    }),
-  );
 }
 
 /**
@@ -449,8 +490,6 @@ function setUpSignalHandlers() {
  * Following TDD principles and professional development standards
  */
 function main(): void {
-  setUpSignalHandlers();
-
   // Create CLI program using commander.js with proper configuration
   const program = new Command();
 
@@ -478,10 +517,6 @@ function main(): void {
     .option(
       "--single-pass-sec <singlePassSec>",
       "How long single pass should take in seconds (default: 20)",
-    )
-    .option(
-      "--number-of-passes <numberOfPasses>",
-      "Number of passes to perform (default: 1)",
     )
     .option(
       "--results-file <file>",

@@ -22,7 +22,6 @@ export interface GenerationParams {
   budgetGlm: number;
   numberOfWorkers: number;
   singlePassSeconds: number;
-  numberOfPasses: number;
   numResults: bigint;
 }
 

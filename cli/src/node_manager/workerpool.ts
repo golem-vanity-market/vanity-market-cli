@@ -18,6 +18,7 @@ import {
   GenerationEntryResult,
   ResultsService,
 } from "../results";
+import { BudgetMonitor } from "../budget";
 
 export class WorkerPool {
   private numberOfWorkers: number;
@@ -28,6 +29,8 @@ export class WorkerPool {
   private golemNetwork?: GolemNetwork;
   private allocation?: Allocation;
   private generationResults: ResultsService;
+  private budgetMonitor: BudgetMonitor = new BudgetMonitor();
+  private stopWorkAC: AbortController = new AbortController();
 
   constructor(params: WorkerPoolParams) {
     this.numberOfWorkers = params.numberOfWorkers;
@@ -194,159 +197,154 @@ export class WorkerPool {
       //ctx.L().info(`Worker capabilities validated: ${capabilityInfo}`);
 
       let totalCompute = 0;
-      // Run profanity_cuda for the specified number of passes
-      for (let passNo = 0; passNo < generationParams.numberOfPasses; passNo++) {
-        if (this.noResults >= generationParams.numResults) {
-          ctx
-            .L()
-            .info(
-              `Found ${this.noResults} results in previous pass, stopping further passes`,
-            );
+      // Run profanity_cuda in a loop until we find enough results
+      while (this.noResults < generationParams.numResults) {
+        if (this.stopWorkAC.signal.aborted) {
+          ctx.L().info("Work was stopped by user");
           break;
         }
-
-        ctx
-          .L()
-          .info(
-            `Running pass ${passNo + 1}/${generationParams.numberOfPasses}`,
-          );
-
         const command = worker.generateCommand(generationParams);
         ctx.L().info(`Executing command: ${command}`);
 
-        await exe.run(command).then(async (res) => {
-          let biggestCompute = 0;
-          const stderr = res.stderr ? String(res.stderr) : "";
-          for (const line of stderr.split("\n")) {
-            //ctx.L().info(line);
-            if (line.includes("Total compute")) {
-              try {
-                const totalCompute = line
-                  .split("Total compute ")[1]
-                  .trim()
-                  .split(" GH")[0];
-                const totalComputeFloatGh = parseFloat(totalCompute);
-                biggestCompute = totalComputeFloatGh * 1e9;
-              } catch (e) {
-                ctx.L().error("Error parsing compute stats:", e);
-              }
-            }
-          }
-
-          if (biggestCompute > 0) {
-            totalCompute += biggestCompute;
-            worker.reportAttempts(totalCompute);
-          }
-
-          const stdout = res.stdout ? String(res.stdout) : "";
-          //ctx.L().info("Received stdout bytes:", stdout.length);
-
-          let noAddressesFound = 0;
-          // Parse results from stdout
-          for (let line of stdout.split("\n")) {
-            try {
-              line = line.trim();
-              if (line.startsWith("0x")) {
-                const salt = line.split(",")[0].trim();
-                const addr = line.split(",")[1].trim();
-                const pubKey = line.split(",")[2].trim();
-
-                if (
-                  addr.startsWith(
-                    generationParams.vanityAddressPrefix
-                      .fullPrefix()
-                      .toLowerCase(),
-                  )
-                ) {
-                  this.addGenerationResult({
-                    addr,
-                    salt,
-                    pubKey,
-                    provider,
-                  });
-                  noAddressesFound += 1;
-                  ctx
-                    .L()
-                    .info(
-                      `Found address: ${addr}, with salt: ${salt}, public key: ${pubKey}, prefix: ${generationParams.vanityAddressPrefix.toHex()}, provider: ${provider.name}`,
-                    );
+        await exe
+          .run(command, { signalOrTimeout: this.stopWorkAC.signal })
+          .then(async (res) => {
+            let biggestCompute = 0;
+            const stderr = res.stderr ? String(res.stderr) : "";
+            for (const line of stderr.split("\n")) {
+              //ctx.L().info(line);
+              if (line.includes("Total compute")) {
+                try {
+                  const totalCompute = line
+                    .split("Total compute ")[1]
+                    .trim()
+                    .split(" GH")[0];
+                  const totalComputeFloatGh = parseFloat(totalCompute);
+                  biggestCompute = totalComputeFloatGh * 1e9;
+                } catch (e) {
+                  ctx.L().error("Error parsing compute stats:", e);
                 }
               }
-            } catch (e) {
-              ctx.L().error(`Error parsing result line: ${e}`);
             }
-          }
 
-          if (noAddressesFound == 0) {
-            ctx
-              .L()
-              .info(
-                `Pass ${passNo + 1} computed: ${displayDifficulty(biggestCompute)}`,
+            if (biggestCompute > 0) {
+              totalCompute += biggestCompute;
+              worker.reportAttempts(totalCompute);
+            }
+
+            const stdout = res.stdout ? String(res.stdout) : "";
+            //ctx.L().info("Received stdout bytes:", stdout.length);
+
+            let noAddressesFound = 0;
+            // Parse results from stdout
+            for (let line of stdout.split("\n")) {
+              try {
+                line = line.trim();
+                if (line.startsWith("0x")) {
+                  const salt = line.split(",")[0].trim();
+                  const addr = line.split(",")[1].trim();
+                  const pubKey = line.split(",")[2].trim();
+
+                  if (
+                    addr.startsWith(
+                      generationParams.vanityAddressPrefix
+                        .fullPrefix()
+                        .toLowerCase(),
+                    )
+                  ) {
+                    this.addGenerationResult({
+                      addr,
+                      salt,
+                      pubKey,
+                      provider,
+                    });
+                    noAddressesFound += 1;
+                    ctx
+                      .L()
+                      .info(
+                        `Found address: ${addr}, with salt: ${salt}, public key: ${pubKey}, prefix: ${generationParams.vanityAddressPrefix.toHex()}, provider: ${provider.name}`,
+                      );
+                  }
+                }
+              } catch (e) {
+                ctx.L().error(`Error parsing result line: ${e}`);
+              }
+            }
+
+            if (noAddressesFound == 0) {
+              ctx
+                .L()
+                .info(
+                  `Couldn't find any address, difficulty: ${displayDifficulty(biggestCompute)}`,
+                );
+
+              const commonInfo = worker.estimatorInfo();
+              const unfortunateIteration = Math.floor(
+                commonInfo.attempts /
+                  worker.estimator().estimateAttemptsGivenProbability(0.5),
               );
+              const partial =
+                commonInfo.attempts /
+                  worker.estimator().estimateAttemptsGivenProbability(0.5) -
+                unfortunateIteration;
+              const speed = commonInfo.estimatedSpeed;
+              const eta = commonInfo.remainingTimeSec;
+              const etaFormatted = eta !== null ? displayTime("", eta) : "N/A";
+              const speedFormatted =
+                speed !== null ? displayDifficulty(speed.speed) + "/s" : "N/A";
+              const bar = "#".repeat(Math.round(partial * 50)).padEnd(50, " ");
+              const attemptsCompleted = commonInfo.attempts;
+              const attemptsCompletedFormatted =
+                displayDifficulty(attemptsCompleted);
 
-            const commonInfo = worker.estimatorInfo();
-            const unfortunateIteration = Math.floor(
-              commonInfo.attempts /
-                worker.estimator().estimateAttemptsGivenProbability(0.5),
-            );
-            const partial =
-              commonInfo.attempts /
-                worker.estimator().estimateAttemptsGivenProbability(0.5) -
-              unfortunateIteration;
-            const speed = commonInfo.estimatedSpeed;
-            const eta = commonInfo.remainingTimeSec;
-            const etaFormatted = eta !== null ? displayTime("", eta) : "N/A";
-            const speedFormatted =
-              speed !== null ? displayDifficulty(speed.speed) + "/s" : "N/A";
-            const bar = "#".repeat(Math.round(partial * 50)).padEnd(50, " ");
-            const attemptsCompleted = commonInfo.attempts;
-            const attemptsCompletedFormatted =
-              displayDifficulty(attemptsCompleted);
-
-            const ecstaticFace = "😃";
-            const smilingFace = "😊";
-            const neutralFace = "😐";
-            const sadFace = "😢";
-            const catastrophicFace = "😱";
-            const weepingFace = "😭";
-            let face;
-            if (commonInfo.luckFactor > 2) {
-              face = ecstaticFace;
-            } else if (unfortunateIteration == 0) {
-              face = smilingFace;
-            } else if (unfortunateIteration == 1) {
-              face = neutralFace;
-            } else if (unfortunateIteration == 2) {
-              face = sadFace;
-            } else if (unfortunateIteration == 3) {
-              face = catastrophicFace;
+              const ecstaticFace = "😃";
+              const smilingFace = "😊";
+              const neutralFace = "😐";
+              const sadFace = "😢";
+              const catastrophicFace = "😱";
+              const weepingFace = "😭";
+              let face;
+              if (commonInfo.luckFactor > 2) {
+                face = ecstaticFace;
+              } else if (unfortunateIteration == 0) {
+                face = smilingFace;
+              } else if (unfortunateIteration == 1) {
+                face = neutralFace;
+              } else if (unfortunateIteration == 2) {
+                face = sadFace;
+              } else if (unfortunateIteration == 3) {
+                face = catastrophicFace;
+              } else {
+                face = weepingFace;
+              }
+              console.log(
+                " --[" +
+                  bar +
+                  `]-- ${attemptsCompletedFormatted} ETA: ${etaFormatted} SPEED: ${speedFormatted} ITER: ${unfortunateIteration} LUCK: ${(commonInfo.luckFactor * 100).toFixed(1)}% ${face}`,
+              );
             } else {
-              face = weepingFace;
-            }
-            console.log(
-              " --[" +
-                bar +
-                `]-- ${attemptsCompletedFormatted} ETA: ${etaFormatted} SPEED: ${speedFormatted} ITER: ${unfortunateIteration} LUCK: ${(commonInfo.luckFactor * 100).toFixed(1)}% ${face}`,
-            );
-          } else {
-            ctx
-              .L()
-              .info(
-                `Pass ${passNo + 1} found ${noAddressesFound} addresses, total results: ${this.noResults}`,
-              );
-            //reset the worker's estimator after finding addresses
-            totalCompute = 0;
-            worker.initEstimator(
-              new Estimator(
-                computePrefixDifficulty(
-                  generationParams.vanityAddressPrefix.fullPrefix(),
+              ctx
+                .L()
+                .info(
+                  `Found ${noAddressesFound} addresses, total results: ${this.noResults}`,
+                );
+              //reset the worker's estimator after finding addresses
+              totalCompute = 0;
+              worker.initEstimator(
+                new Estimator(
+                  computePrefixDifficulty(
+                    generationParams.vanityAddressPrefix.fullPrefix(),
+                  ),
                 ),
-              ),
-            );
-          }
-        });
+              );
+            }
+          });
       }
     } catch (error) {
+      if (this.stopWorkAC.signal.aborted) {
+        ctx.L().info("Work was stopped by user");
+        return;
+      }
       ctx.L().error(`Error during profanity_cuda execution: ${error}`);
       throw new Error("Profanity execution failed");
     }
@@ -357,8 +355,26 @@ export class WorkerPool {
     pool: ResourceRentalPool,
     generationParams: GenerationParams,
   ): Promise<void> {
+    if (!this.golemNetwork || !this.allocation) {
+      ctx
+        .L()
+        .error(
+          "Cannot start work without a valid Golem Network connection and an allocation.",
+        );
+      throw new Error("Golem Network or allocation is not initialized");
+    }
     const numberOfWorkers = this.numberOfWorkers;
     ctx.L().info(`Starting concurrent execution on ${numberOfWorkers} workers`);
+
+    this.stopWorkAC = new AbortController();
+    this.budgetMonitor.startMonitoring(this.allocation.id, this.golemNetwork);
+    this.budgetMonitor.setOnLowBudgetHandler(() => {
+      console.warn(
+        "⚠️ Budget is low, stopping further work to prevent overspending.",
+      );
+      this.stopWorkAC.abort("Low budget reached");
+      ctx.L().warn("Work stopped due to low budget");
+    });
 
     try {
       const workingProviders = new Array(numberOfWorkers).fill(null).map(() =>
@@ -381,6 +397,8 @@ export class WorkerPool {
     } catch (error) {
       ctx.L().error("Error during concurrent execution:", error);
       throw new Error("Concurrent execution failed");
+    } finally {
+      this.budgetMonitor.stopMonitoring();
     }
   }
 
@@ -425,9 +443,9 @@ export class WorkerPool {
   }
 
   public async stopServices(ctx: AppContext): Promise<void> {
-    ctx.L().debug("Stopping results service...");
+    ctx.L().debug("Stopping services...");
     this.generationResults.stop();
     await this.generationResults.waitForFinish();
-    ctx.L().debug("Results service stopped...");
+    ctx.L().debug("All services stopped...");
   }
 }
