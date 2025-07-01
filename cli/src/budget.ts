@@ -1,64 +1,31 @@
-import {
-  Allocation,
-  DebitNote,
-  GolemNetwork,
-  Invoice,
-} from "@golem-sdk/golem-js";
-
-const NOP = () => {};
+import { GolemSessionManager } from "./node_manager/golem_session";
 
 export class BudgetMonitor {
-  private onLowBudget: () => void = NOP;
   private budgetAlertThreshold: number = 0.1; // Default threshold for low budget alert (10% of total budget)
 
-  public setOnLowBudgetHandler(handler: () => void): void {
-    this.onLowBudget = handler;
+  constructor(private readonly sessionManager: GolemSessionManager) {}
+
+  /**
+   * Return `true` if the budget is sufficient to continue work, `false` otherwise.
+   */
+  public async hasSufficientBudget(): Promise<boolean> {
+    const allocationId = this.sessionManager.getAllocationId();
+    const allocation = await this.sessionManager
+      .getGolemNetwork()
+      .payment.getAllocation(allocationId);
+    return (
+      Number(allocation.remainingAmount) / Number(allocation.totalAmount) >
+      this.budgetAlertThreshold
+    );
   }
 
-  private cleanup = NOP;
-
-  constructor() {}
-
-  public startMonitoring(
-    allocationId: Allocation["id"],
-    glm: GolemNetwork,
-  ): void {
-    const debitNoteCb = async ({ debitNote }: { debitNote: DebitNote }) => {
-      const { remainingAmount, totalAmount } =
-        await glm.payment.getAllocation(allocationId);
-      const message = `Budget Monitor: Debit Note from ${debitNote.provider.name} accepted. Remaining allocation: ${Number(remainingAmount).toFixed(3)} GLM (${Number(totalAmount).toFixed(3)} GLM total)`;
-
-      console.log(message);
-      if (
-        Number(remainingAmount) / Number(totalAmount) <
-        this.budgetAlertThreshold
-      ) {
-        this.onLowBudget();
-      }
-    };
-    const invoiceCb = async ({ invoice }: { invoice: Invoice }) => {
-      const { remainingAmount, totalAmount } =
-        await glm.payment.getAllocation(allocationId);
-      const message = `Budget Monitor: Invoice from ${invoice.provider.name} accepted. Remaining allocation: ${Number(remainingAmount).toFixed(3)} GLM (${Number(totalAmount).toFixed(3)} GLM total)`;
-      console.log(message);
-      if (
-        Number(remainingAmount) / Number(totalAmount) <
-        this.budgetAlertThreshold
-      ) {
-        this.onLowBudget();
-      }
-    };
-
-    glm.payment.events.on("debitNoteAccepted", debitNoteCb);
-    glm.payment.events.on("invoiceAccepted", invoiceCb);
-    this.cleanup = () => {
-      glm.payment.events.off("debitNoteAccepted", debitNoteCb);
-      glm.payment.events.off("invoiceAccepted", invoiceCb);
-    };
-  }
-
-  public stopMonitoring(): void {
-    this.cleanup();
-    this.onLowBudget = NOP;
+  public async displayBudgetInfo(): Promise<void> {
+    const allocationId = this.sessionManager.getAllocationId();
+    const allocation = await this.sessionManager
+      .getGolemNetwork()
+      .payment.getAllocation(allocationId);
+    console.log(
+      `Remaining budget: ${Number(allocation.remainingAmount).toFixed(3)} GLM (out of ${Number(allocation.totalAmount).toFixed(3)} GLM)`,
+    );
   }
 }

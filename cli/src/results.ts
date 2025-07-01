@@ -47,9 +47,6 @@ export class ResultsService {
   }
   private async process(): Promise<void> {
     for (const entry of this.inQueue) {
-      console.log(
-        `Added entry: ${entry.addr}, Salt: ${entry.salt}, PubKey: ${entry.pubKey}`,
-      );
       this.savedAddr.push(entry);
       if (this.options.csvOutput) {
         const csvLine = `${entry.addr},${entry.salt},${entry.pubKey},${entry.provider.id},${entry.provider.name},${entry.provider.walletAddress}\n`;

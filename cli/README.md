@@ -183,5 +183,5 @@ The CLI provides helpful error messages for common issues:
 ## Sample commands
 
 ```
-bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x333333 --budget-glm 1 --results-file results.json --number-of-passes 1000 --worker-type cpu
+bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x333333 --budget-glm 1 --results-file results.json --number-of-passes 1000 --processing-unit cpu
 ```

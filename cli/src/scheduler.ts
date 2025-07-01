@@ -1,17 +1,11 @@
-import { EventEmitter } from "events";
 import { GenerationPrefix } from "./prefix";
-
-/**
- * Status types for vanity address generation tasks
- */
-export enum JobStatus {
-  PENDING = "pending",
-  INITIALIZING = "initializing",
-  RUNNING = "running",
-  COMPLETED = "completed",
-  FAILED = "failed",
-  CANCELLED = "cancelled",
-}
+import { BudgetMonitor } from "./budget";
+import {
+  GolemSessionManager,
+  OnErrorHandler,
+  OnResultHandler,
+} from "./node_manager/golem_session";
+import { AppContext } from "./app_context";
 
 /**
  * Interface for task generation parameters
@@ -26,69 +20,83 @@ export interface GenerationParams {
 }
 
 /**
- * Interface for task status updates
+ * The purpose of the Scheduler is to continuously generate tasks until either enough addresses are found or the budget is exhausted.
  */
-export interface JobUpdate {
-  status: JobStatus;
-  message: string;
-  numOfGeneratedAddresses?: string;
-  foundPrivateKey?: string;
-  error?: string;
-  activeWorkers?: number;
-}
+export class Scheduler {
+  constructor(private readonly sessionManager: GolemSessionManager) {}
 
-/**
- * TaskManager handles vanity address generation using Golem workers
- * Provides real-time status updates and progress tracking
- */
-export class Scheduler extends EventEmitter {
-  private taskId: string;
-  private status: JobStatus;
-  private generationParams: GenerationParams | null;
-  private workers: Set<string>;
-  private startTime: number;
-  private totalAttempts: number;
-  private isRunning: boolean;
+  public async runGenerationProcess(
+    ctx: AppContext,
+    params: GenerationParams,
+  ): Promise<void> {
+    const onResult: OnResultHandler = async ({ results, provider }) => {
+      ctx
+        .L()
+        .info(
+          `Provider ${provider.name} found ${results.length} results. Returning them to the pool for further processing.`,
+        );
+      // Determine if the results are satisfactory and update reputation here
+      return true; // Keep the rental for further work
+    };
+    const onError: OnErrorHandler = async ({ error, provider }) => {
+      ctx
+        .L()
+        .info(
+          `Provider ${provider.name} encountered an error: ${error.message}. Removing them from the pool.`,
+        );
+      // Determine if the error is recoverable and update reputation here
+      return false; // Destroy the rental
+    };
 
-  constructor() {
-    super();
-    this.taskId = "keygen-" + Date.now();
-    this.status = JobStatus.PENDING;
-    this.generationParams = null;
-    this.workers = new Set();
-    this.startTime = 0;
-    this.totalAttempts = 0;
-    this.isRunning = false;
-  }
+    const budgetMonitor = new BudgetMonitor(this.sessionManager);
 
-  /**
-   * Start the vanity address generation process
-   */
-  public startGenerating(params: GenerationParams): void {
-    if (this.isRunning) {
-      throw new Error("Generation is already running");
+    // loop until enough addresses are found or budget is exhausted
+    while (this.sessionManager.noResults < params.numResults) {
+      // first check if the budget is sufficient to continue
+      const hasSufficientBudget = await budgetMonitor.hasSufficientBudget();
+      if (!hasSufficientBudget) {
+        ctx.L().warn("Insufficient budget to continue work. Stopping.");
+        console.warn("⚠️ Insufficient budget to continue work. Stopping.");
+        this.sessionManager.stopWork("Insufficient budget");
+        break;
+      }
+
+      // display budget info at the start of each iteration
+      await budgetMonitor.displayBudgetInfo();
+
+      console.log(
+        `🔨 Scheduling work to ${params.numberOfWorkers} providers. This should take around ${params.singlePassSeconds} seconds.`,
+      );
+      try {
+        const currentWorkers: Promise<void>[] = [];
+        for (let i = 0; i < params.numberOfWorkers; i++) {
+          const worker = this.sessionManager.runSingleIteration(
+            ctx,
+            params,
+            onResult,
+            onError,
+          );
+          currentWorkers.push(worker);
+        }
+        const settledWork = await Promise.allSettled(currentWorkers);
+        const successfulWork = settledWork.filter(
+          (result) => result.status === "fulfilled",
+        ).length;
+        if (this.sessionManager.isWorkStopped()) {
+          ctx.L().info("Work was stopped by user");
+          break;
+        }
+        console.log(
+          `Iteration completed. ${successfulWork}/${params.numberOfWorkers} providers successfully finished their work. Found ${this.sessionManager.noResults}/${params.numResults} results so far.`,
+        );
+      } catch (error) {
+        ctx.L().error("Error during generation process:", error);
+        console.error("Error during generation process:", error);
+        continue;
+      }
     }
-
-    this.generationParams = params;
-    this.isRunning = true;
-    this.startTime = Date.now();
-    this.totalAttempts = 0;
-    this.status = JobStatus.INITIALIZING;
-
-    this.emit("update", {
-      status: this.status,
-      message: "Initializing vanity address generation...",
-      activeWorkers: 0,
-    } as JobUpdate);
-
-    // Simulate initialization and start workers
-    setTimeout(() => {
-      this.status = JobStatus.RUNNING;
-      this.emit("update", {
-        status: this.status,
-        message: `Started generation for prefix "${params.vanityAddressPrefix}"`,
-        activeWorkers: params.numberOfWorkers,
-      } as JobUpdate);
-    }, 1000);
+    console.log(
+      `✅ Generation process completed. Found ${this.sessionManager.noResults}/${params.numResults} addresses.`,
+    );
   }
 }

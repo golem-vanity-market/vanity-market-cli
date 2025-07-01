@@ -4,29 +4,29 @@ on:
   workflow_dispatch:
     inputs:
       argument-prefix:
-        description: 'Prefix argument'
+        description: "Prefix argument"
         required: false
-        default: '0xabcd1234'
+        default: "0xabcd1234"
       test-timeout:
-        description: 'Max total action time (minutes)'
+        description: "Max total action time (minutes)"
         required: false
         default: 10
-      worker-type:
-        description: 'cpu or gpu worker type'
+      processing-unit:
+        description: "Processing unit to use (cpu or gpu)"
         required: false
-        default: 'gpu'
+        default: "gpu"
       num-workers:
-        description: 'Number of providers to use at once'
+        description: "Number of providers to use at once"
         required: false
-        default: '1'
+        default: "1"
       num-results:
-        description: 'Minimum number of results to generate'
+        description: "Minimum number of results to generate"
         required: false
-        default: '1'
+        default: "1"
       use-glm-base:
-        description: 'Use Golem base'
+        description: "Use Golem base"
         required: false
-        default: 'false'
+        default: "false"
 
 concurrency:
   group: address-0x22446688
@@ -107,7 +107,7 @@ jobs:
             --results-file results.json \
             --num-workers ${{ github.event.inputs.num-workers }} \
             --num-results ${{ github.event.inputs.num-results }} \
-            --worker-type ${{ github.event.inputs.worker-type }} \
+            --processing-unit ${{ github.event.inputs.processing-unit }} \
             --non-interactive
         env:
           MAX_CPU_CPU_PER_HOUR: 0.06
@@ -143,11 +143,11 @@ jobs:
         run: |
           echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
           ./yagna payment status --network polygon
-          
+
           echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
           ./yagna payment process now --network polygon
           sleep 2
-          
+
           echo "Next command time: $(date -u '+%Y-%m-%dT%H:%M:%S') UTC"
           ./yagna payment status --network polygon
           sleep 30
@@ -167,4 +167,3 @@ jobs:
         working-directory: sandbox/yagna
         run: |
           ./yagna service shutdown
-

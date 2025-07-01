@@ -3,19 +3,21 @@ import { shutdownOpenTelemetry } from "./instrumentation";
 import { Command } from "commander";
 import { readFileSync, existsSync, writeFileSync } from "fs";
 import { join, resolve } from "path";
-//import { Scheduler } from "./scheduler";
 import { ethers, hexlify } from "ethers";
-import { GenerationParams } from "./scheduler";
+import { GenerationParams, Scheduler } from "./scheduler";
 import { GenerationPrefix } from "./prefix";
-import { WorkerPoolParams, WorkerType } from "./node_manager/types";
-import { WorkerPool } from "./node_manager/workerpool";
+import {
+  GolemSessionManager,
+  SessionManagerParams,
+} from "./node_manager/golem_session";
 import { AppContext } from "./app_context";
 import process from "process";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
 import { computePrefixDifficulty } from "./difficulty";
 import { displayDifficulty, displayTime } from "./utils/format";
-import { ResourceRentalPool, sleep } from "@golem-sdk/golem-js";
+import { sleep } from "@golem-sdk/golem-js";
 import { pinoLogger } from "@golem-sdk/pino-logger";
+import { ProcessingUnitType } from "./node_manager/config";
 
 /**
  * Custom error class for address generation validation errors
@@ -40,7 +42,8 @@ export interface GenerateCmdOptions {
   budgetGlm?: number;
   prefix?: string;
   resultsFile?: string; // Path to save results
-  workerType?: string; // Worker type: 'cpu' or 'gpu'
+  processingUnit?: string; // Processing unit type ('cpu' or 'gpu')
+  singlePassSec?: string; // Duration of a single pass in seconds
   numResults: bigint;
   numWorkers: number;
   nonInteractive: boolean; // Run in non-interactive mode
@@ -55,7 +58,7 @@ interface GenerateOptionsValidated {
   publicKey: PublicKey; // The actual public key content
   budgetGlm?: number;
   vanityAddressPrefix: GenerationPrefix;
-  workerType: WorkerType;
+  processingUnitType: ProcessingUnitType;
 }
 
 /**
@@ -162,32 +165,34 @@ class PublicKey {
 }
 
 /**
- * Validates worker type parameter
- * @param workerType - Worker type string ('cpu' or 'gpu')
- * @returns WorkerType enum value
- * @throws {ValidationError} When worker type is invalid
+ * Validates the processing unit type
+ * @param processingUnitType - Processing unit type string ('cpu' or 'gpu')
+ * @returns ProcessingUnitType enum value
+ * @throws {ValidationError} When processing unit type is invalid
  */
-function validateWorkerType(workerType?: string): WorkerType {
-  if (!workerType) {
-    return WorkerType.GPU; // Default to GPU for backward compatibility
+function validateProcessingUnit(
+  processingUnitType?: string,
+): ProcessingUnitType {
+  if (!processingUnitType) {
+    return ProcessingUnitType.GPU; // Default to GPU for backward compatibility
   }
 
-  const normalizedType = workerType.toLowerCase();
+  const normalizedType = processingUnitType.toLowerCase();
   if (normalizedType === "cpu") {
-    return WorkerType.CPU;
+    return ProcessingUnitType.CPU;
   } else if (normalizedType === "gpu") {
-    return WorkerType.GPU;
+    return ProcessingUnitType.GPU;
   } else {
     throw new ValidationError(
-      `Invalid worker type '${workerType}'. Must be 'cpu' or 'gpu'`,
-      "workerType",
+      `Invalid processing unit '${processingUnitType}'. Must be 'cpu' or 'gpu'`,
+      "processingUnit",
     );
   }
 }
 
 /**
  * Validates generate command options with comprehensive error checking
- * @param options - The options object containing publicKey, vanityAddressPrefix, budgetGlm, and workerType
+ * @param options - The options object containing publicKey, vanityAddressPrefix, budgetGlm, and processingUnitType
  * @throws {ValidationError} When validation fails
  */
 function validateGenerateOptions(
@@ -259,13 +264,13 @@ function validateGenerateOptions(
   }
 
   // Validate worker type
-  const workerType = validateWorkerType(options.workerType);
+  const processingUnitType = validateProcessingUnit(options.processingUnit);
 
   return {
     publicKey: publicKey,
     vanityAddressPrefix: new GenerationPrefix(options.vanityAddressPrefix),
     budgetGlm: options.budgetGlm,
-    workerType: workerType,
+    processingUnitType: processingUnitType,
   };
 }
 
@@ -276,8 +281,7 @@ function validateGenerateOptions(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerateCommand(options: any): Promise<void> {
   // State variables accessible to the shutdown handler via closure
-  let workerPool: WorkerPool | null = null;
-  let rentalPool: ResourceRentalPool | null = null;
+  let golemSessionManager: GolemSessionManager | null = null;
   let appContext: AppContext | null = null;
   let isShuttingDown = false;
 
@@ -288,10 +292,20 @@ async function handleGenerateCommand(options: any): Promise<void> {
     isShuttingDown = true;
     console.log("\nGracefully shutting down...");
 
-    // first save results to a file (or stdout)
-    if (workerPool && options.resultsFile) {
+    // first stop the generation process if it's still running
+    if (golemSessionManager && appContext) {
       try {
-        const results = await workerPool.results();
+        golemSessionManager.stopWork("User initiated shutdown");
+        console.log("✅ Generation process stopped successfully");
+      } catch (error) {
+        console.error("❌ Error stopping generation process:", error);
+      }
+    }
+
+    // save results to a file (or stdout)
+    if (golemSessionManager && options.resultsFile) {
+      try {
+        const results = await golemSessionManager.results();
         writeFileSync(
           options.resultsFile,
           JSON.stringify({ entries: results }, null, 2),
@@ -300,9 +314,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
       } catch (error) {
         console.error("❌ Failed to save results:", error);
       }
-    } else if (workerPool) {
+    } else if (golemSessionManager) {
       try {
-        const results = await workerPool.results();
+        const results = await golemSessionManager.results();
         console.log("Results:", results);
       } catch (error) {
         console.error("❌ Failed to retrieve results:", error);
@@ -310,9 +324,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
     }
 
     // then clean up rentals (which gives us the chance to pay for the work done)
-    if (workerPool && rentalPool && appContext) {
+    if (golemSessionManager && appContext) {
       try {
-        await workerPool.drainPool(appContext, rentalPool);
+        await golemSessionManager.drainPool(appContext);
         console.log("✅ All rentals cleaned up successfully");
       } catch (error) {
         console.error("❌ Error during rental cleanup:", error);
@@ -320,9 +334,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
     }
 
     // only then we can safely disconnect from the Golem network and release the allocation
-    if (workerPool && appContext) {
+    if (golemSessionManager && appContext) {
       try {
-        await workerPool.disconnectFromGolemNetwork(appContext);
+        await golemSessionManager.disconnectFromGolemNetwork(appContext);
         console.log("✅ Disconnected from Golem network");
       } catch (disconnectError) {
         console.error(
@@ -333,9 +347,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
     }
 
     // finally, stop all services in the worker pool
-    if (workerPool && appContext) {
+    if (golemSessionManager && appContext) {
       try {
-        await workerPool.stopServices(appContext);
+        await golemSessionManager.stopServices(appContext);
         console.log("✅ Stopped all services");
       } catch (error) {
         console.error("❌ Error stopping services:", error);
@@ -366,7 +380,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       vanityAddressPrefix: options.vanityAddressPrefix,
       budgetGlm: parseFloat(options.budgetGlm),
       resultsFile: options.resultsFile,
-      workerType: options.workerType,
+      processingUnit: options.processingUnit,
       numResults: BigInt(options.numResults),
       numWorkers: parseInt(options.numWorkers),
       nonInteractive: options.nonInteractive,
@@ -385,7 +399,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}`,
     );
     console.log(`   Budget (GLM): ${validatedOptions.budgetGlm}`);
-    console.log(`   Worker Type: ${validatedOptions.workerType}`);
+    console.log(`   Worker Type: ${validatedOptions.processingUnitType}`);
     console.log("");
     console.log("✓ All parameters validated successfully");
     console.log("✓ OpenTelemetry tracing enabled for generation process");
@@ -395,12 +409,12 @@ async function handleGenerateCommand(options: any): Promise<void> {
       validatedOptions.vanityAddressPrefix.fullPrefix(),
     );
     const estimatedSecondsToFindOneAddress =
-      validatedOptions.workerType === WorkerType.CPU
+      validatedOptions.processingUnitType === ProcessingUnitType.CPU
         ? difficulty / 10000000
         : difficulty / 250000000;
 
     console.log(`Difficulty of the prefix: ${displayDifficulty(difficulty)}`);
-    if (validatedOptions.workerType === WorkerType.GPU) {
+    if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
       console.log(
         `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime("GPU ", estimatedSecondsToFindOneAddress)}`,
       );
@@ -431,11 +445,11 @@ async function handleGenerateCommand(options: any): Promise<void> {
         generationParams.numberOfWorkers,
     );
 
-    const workerPoolParams: WorkerPoolParams = {
+    const workerPoolParams: SessionManagerParams = {
       numberOfWorkers: generationParams.numberOfWorkers,
       rentalDurationSeconds: estimatedRentalDurationSeconds,
       budgetGlm: generationParams.budgetGlm,
-      workerType: validatedOptions.workerType,
+      processingUnitType: validatedOptions.processingUnitType,
     };
 
     const logger = pinoLogger({
@@ -444,12 +458,12 @@ async function handleGenerateCommand(options: any): Promise<void> {
     });
 
     appContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
-    workerPool = new WorkerPool(workerPoolParams);
+    golemSessionManager = new GolemSessionManager(workerPoolParams);
 
-    await workerPool.connectToGolemNetwork(appContext);
+    await golemSessionManager.connectToGolemNetwork(appContext);
     console.log("✅ Connected to Golem network successfully");
 
-    rentalPool = await workerPool.initializeRentalPool(appContext);
+    await golemSessionManager.initializeRentalPool(appContext);
     console.log(
       `✅ Initialized pool of ${generationParams.numberOfWorkers} rentals`,
     );
@@ -457,21 +471,14 @@ async function handleGenerateCommand(options: any): Promise<void> {
     console.log(
       `🔍 Looking for the best offer (waiting for at least ${generateOptions.minOffers} proposals with a ${generateOptions.minOffersTimeoutSec} second timeout)`,
     );
-    await workerPool.waitForEnoughOffers(
+    await golemSessionManager.waitForEnoughOffers(
       appContext,
-      rentalPool,
       generateOptions.minOffers,
       generateOptions.minOffersTimeoutSec,
     );
 
-    console.log(
-      "🔨 Starting work on vanity address generation, this may take a while",
-    );
-    await workerPool.runCommandConcurrent(
-      appContext,
-      rentalPool,
-      generationParams,
-    );
+    const scheduler = new Scheduler(golemSessionManager);
+    await scheduler.runGenerationProcess(appContext, generationParams);
 
     // Normal completion, initiate shutdown.
     await gracefulShutdown(0);
@@ -523,8 +530,8 @@ function main(): void {
       "Path to save the generation results (default: golem_results.json)",
     )
     .option(
-      "--worker-type <type>",
-      "Worker type to use: 'cpu' or 'gpu' (default: gpu)",
+      "--processing-unit <type>",
+      "Processing unit to use: 'cpu' or 'gpu' (default: gpu)",
     )
     .option(
       "--num-results <numResults>",
@@ -567,6 +574,6 @@ export {
   main,
   getPackageVersion,
   validateGenerateOptions,
-  validateWorkerType,
+  validateProcessingUnit,
   readPublicKeyFromFile,
 };
