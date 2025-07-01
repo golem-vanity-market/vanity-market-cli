@@ -23,6 +23,10 @@ on:
         description: 'Minimum number of results to generate'
         required: false
         default: '1'
+      use-glm-base:
+        description: 'Use Golem base'
+        required: false
+        default: 'false'
 
 concurrency:
   group: address-0x22446688
@@ -47,8 +51,22 @@ jobs:
 
       - name: Run prepare
         working-directory: sandbox
+        if: ${{ inputs.use-glm-base != 'true' }}
         run: |
           python prepare.py
+          # get rid of 0x
+          STRIPPED_SECRET="${SECRET#0x}"
+          sed -i "s|%%YAGNA_AUTOCONF_ID_SECRET%%|$STRIPPED_SECRET|g" yagna/.env
+          tree
+        env:
+          SECRET: ${{ secrets.PRIVATE_KEY_FOR_0X0022446688BD156E6FDF114623D6B81C1FFD7DA6 }}
+
+      - name: Run prepare golem base
+        working-directory: sandbox
+        if: ${{ inputs.use-glm-base == 'true' }}
+        run: |
+          python prepare-glm-base.py
+          mv base yagna
           # get rid of 0x
           STRIPPED_SECRET="${SECRET#0x}"
           sed -i "s|%%YAGNA_AUTOCONF_ID_SECRET%%|$STRIPPED_SECRET|g" yagna/.env
@@ -86,12 +104,14 @@ jobs:
             --public-key generated.pub \
             --vanity-address-prefix ${{ github.event.inputs.argument-prefix }} \
             --budget-glm 1 \
-            --number-of-passes 1000 \
             --results-file results.json \
             --num-workers ${{ github.event.inputs.num-workers }} \
             --num-results ${{ github.event.inputs.num-results }} \
             --worker-type ${{ github.event.inputs.worker-type }} \
             --non-interactive
+        env:
+          MAX_CPU_CPU_PER_HOUR: 0.06
+          MAX_CPU_ENV_PER_HOUR: 0.4
 
       - name: Show results
         working-directory: cli

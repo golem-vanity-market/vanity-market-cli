@@ -6,16 +6,22 @@
 python prepare.py
 ```
 
-yagna folder should be created and binaries and .env files placed there.
+or for golem base
 
-### 2. Open terminal window 1 in folder yagna and run the following command
+```
+python prepare-glm-base.py
+```
+
+yagna (or base) folder should be created and binaries and .env files placed there.
+
+### 2. Open terminal window 1 in folder yagna (or base) and run the following command
 Make sure that no other yagna instance is running on your machine.
 
 ```
 ./yagna service run
 ```
 
-### 3. Open terminal window 2 in folder yagna and run the following command
+### 3. Open terminal window 2 in folder yagna (or base) and run the following command
 
 ```
 ./yagna payment status --network polygon

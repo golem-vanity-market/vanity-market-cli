@@ -20,8 +20,10 @@ export class CPUWorker extends BaseWorker {
       imageTag: `nvidia/cuda-x-crunch:${cruncherVersion}`,
       engine: "vm",
       cpuCount: 1, // Will be updated after detection
-      maxEnvPricePerHour: 0.1, // Default price per hour in GLM tokens
-      maxCpuPerHourPrice: 0.01, // Default price per CPU thread in GLM tokens
+      maxEnvPricePerHour: parseFloat(process.env.MAX_CPU_ENV_PER_HOUR || "0.1"), // Default price per hour in GLM tokens
+      maxCpuPerHourPrice: parseFloat(
+        process.env.MAX_CPU_CPU_PER_HOUR || "0.01",
+      ), // Default price per CPU thread in GLM tokens
     };
   }
 
@@ -68,7 +70,7 @@ export class GPUWorker extends BaseWorker {
       imageTag: `nvidia/cuda-x-crunch:${cruncherVersion}`,
       engine: "vm-nvidia",
       maxCpuPerHourPrice: 0.0,
-      maxEnvPricePerHour: 2.0,
+      maxEnvPricePerHour: parseFloat(process.env.MAX_GPU_ENV_PER_HOUR || "2.0"),
     };
   }
 

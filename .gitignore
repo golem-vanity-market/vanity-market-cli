@@ -53,9 +53,6 @@ temp/
 # cli generated keys
 /cli/generated.pub
 
-# Yagna sandbox
-sandbox/yagna/*
-
 .env
 results.csv
 results.json
