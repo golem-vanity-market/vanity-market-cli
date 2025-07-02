@@ -50,53 +50,78 @@ export class Scheduler {
 
     const budgetMonitor = new BudgetMonitor(this.sessionManager);
 
-    // loop until enough addresses are found or budget is exhausted
-    while (this.sessionManager.noResults < params.numResults) {
-      // first check if the budget is sufficient to continue
-      const hasSufficientBudget = await budgetMonitor.hasSufficientBudget();
-      if (!hasSufficientBudget) {
-        ctx.L().warn("Insufficient budget to continue work. Stopping.");
-        console.warn("⚠️ Insufficient budget to continue work. Stopping.");
-        this.sessionManager.stopWork("Insufficient budget");
-        break;
-      }
-
-      // display budget info at the start of each iteration
-      await budgetMonitor.displayBudgetInfo();
-
-      console.log(
-        `🔨 Scheduling work to ${params.numberOfWorkers} providers. This should take around ${params.singlePassSeconds} seconds.`,
-      );
-      try {
-        const currentWorkers: Promise<void>[] = [];
-        for (let i = 0; i < params.numberOfWorkers; i++) {
-          const worker = this.sessionManager.runSingleIteration(
-            ctx,
-            params,
-            onResult,
-            onError,
-          );
-          currentWorkers.push(worker);
-        }
-        const settledWork = await Promise.allSettled(currentWorkers);
-        const successfulWork = settledWork.filter(
-          (result) => result.status === "fulfilled",
-        ).length;
-        if (this.sessionManager.isWorkStopped()) {
-          ctx.L().info("Work was stopped by user");
-          break;
-        }
-        console.log(
-          `Iteration completed. ${successfulWork}/${params.numberOfWorkers} providers successfully finished their work. Found ${this.sessionManager.noResults}/${params.numResults} results so far.`,
-        );
-      } catch (error) {
-        ctx.L().error("Error during generation process:", error);
-        console.error("Error during generation process:", error);
-        continue;
-      }
+    if (!(await budgetMonitor.hasSufficientBudget())) {
+      ctx.L().warn("Insufficient budget to start the work. Stopping.");
+      console.warn("⚠️ Insufficient budget to start the work. Stopping.");
+      return;
     }
+
+    await budgetMonitor.displayBudgetInfo();
+    console.log(
+      `🔨 Starting work with ${params.numberOfWorkers} concurrent providers...`,
+    );
+
+    // Create and start multiple providers in parallel
+    const workerPromises = Array.from({ length: params.numberOfWorkers }, () =>
+      this.workInLoop(ctx, params, onResult, onError, budgetMonitor),
+    );
+
+    await Promise.allSettled(workerPromises);
+
     console.log(
       `✅ Generation process completed. Found ${this.sessionManager.noResults}/${params.numResults} addresses.`,
     );
+  }
+
+  /**
+   * Runs work continuously until the main generation goals are met or work is stopped.
+   * Note that `sessionManager.runSingleIteration` is _not_ guaranteed to run on the same
+   * provider each time.
+   */
+  private async workInLoop(
+    ctx: AppContext,
+    params: GenerationParams,
+    onResult: OnResultHandler,
+    onError: OnErrorHandler,
+    budgetMonitor: BudgetMonitor,
+  ): Promise<void> {
+    // This loop continues as long as the overall job is not done
+    while (!this.sessionManager.isWorkStopped()) {
+      // Check if the target number of results is reached
+      if (this.sessionManager.noResults >= params.numResults) {
+        ctx
+          .L()
+          .info(
+            `Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
+          );
+        console.log(
+          `🥳 Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
+        );
+        this.sessionManager.stopWork("Target number of results reached"); // Stop all other providers
+        break; // Exit the loop if the target is reached
+      }
+      // Check budget before this worker starts a new task
+      if (!(await budgetMonitor.hasSufficientBudget())) {
+        ctx.L().warn("Insufficient budget to continue work. Stopping.");
+        this.sessionManager.stopWork("Insufficient budget"); // Stop all other providers
+        break; // Exit this worker's loop
+      }
+
+      try {
+        // A single provider runs one iteration. When it's done, the loop
+        // will check conditions again and start another if needed.
+        await this.sessionManager.runSingleIteration(
+          ctx,
+          params,
+          onResult,
+          onError,
+        );
+      } catch (error) {
+        ctx.L().error("Unhandled error during a provider iteration:", error);
+        console.error("Error in provider, continuing if possible:", error);
+        // don't rethrow the error, just continue the loop, we'll get another provider
+        // next time we call `runSingleIteration`
+      }
+    }
   }
 }

@@ -463,9 +463,20 @@ export class GolemSessionManager {
     let wasSuccess = true;
 
     const rental = await this.rentalPool.acquire(5_000); // timeout if fail to acquire rental in 5 seconds
+    const providerName = rental.agreement.provider.name;
     let shouldKeepRental: boolean;
     try {
+      console.log(
+        `🔨 Acquired provider ${providerName} from the pool, running the generation command on them ...`,
+      );
       const results = await this.runCommand(ctx, rental, generationParams);
+
+      if (this.isWorkStopped()) {
+        ctx.L().info("Work was stopped by user, not processing results");
+        await this.rentalPool.release(rental);
+        return;
+      }
+
       ctx.L().info("Command executed successfully, results:", results);
       shouldKeepRental = await onResult({
         results,
@@ -502,6 +513,9 @@ export class GolemSessionManager {
           .info(
             `Keeping rental with provider: ${rental.agreement.provider.name}`,
           );
+        console.log(
+          `💡 Provider ${providerName} ran the command successfully, returning them to the pool of available workers`,
+        );
         await this.rentalPool.release(rental);
       } else {
         ctx
@@ -509,6 +523,9 @@ export class GolemSessionManager {
           .info(
             `Destroying rental with provider: ${rental.agreement.provider.name}`,
           );
+        console.log(
+          `💔 Provider ${providerName} did not run the command successfully, destroying the rental`,
+        );
         await this.rentalPool.destroy(rental);
       }
     } catch (error) {
