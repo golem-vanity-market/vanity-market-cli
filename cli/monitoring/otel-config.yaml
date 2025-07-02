@@ -1,0 +1,62 @@
+extensions:
+  health_check:
+
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  resource:
+    attributes:
+      - key: service.name
+        value: golem-vanity-cli
+        action: upsert
+      - key: service.version
+        value: "1.0.0"
+        action: upsert
+
+exporters:
+  # Send all telemetry to Alloy (OpenTelemetry Collector)
+  otlp/alloy:
+    endpoint: http://localhost:4317
+    tls:
+      insecure: true
+
+  # Write logs to file
+  file/logs:
+    path: ./logs/cli-logs.json
+    rotation:
+      max_megabytes: 100
+      max_days: 7
+      max_backups: 5
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlp/alloy]
+
+    metrics:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlp/alloy]
+
+    logs:
+      receivers: [otlp]
+      processors: [resource, batch]
+      exporters: [otlp/alloy, file/logs]
+
+  telemetry:
+    logs:
+      level: info

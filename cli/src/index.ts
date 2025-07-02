@@ -453,8 +453,27 @@ async function handleGenerateCommand(options: any): Promise<void> {
     };
 
     const logger = pinoLogger({
-      level: "info",
       name: "golem-vaddr-cli",
+      transport: {
+        targets: [
+          {
+            target: "pino-opentelemetry-transport",
+            level: "info",
+            options: {
+              severityNumberMap: {
+                trace: 1,
+                debug: 5,
+                info: 9,
+                warn: 13,
+                error: 17,
+                fatal: 21,
+              },
+            },
+          },
+          // overwrite it with GOLEM_PINO_LOG_LEVEL
+          { target: "pino-pretty", options: { colorize: true }, level: "info" },
+        ],
+      },
     });
 
     appContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);

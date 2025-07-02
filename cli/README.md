@@ -35,11 +35,17 @@ npx @unoperate/golem-vaddr-cli@1.0.1 --help
 
 export YAGNA_APP_KEY=
 
+# optional
+export OTEL_CONFIG_FILE=
+
 # Generate vanity address
 npx @unoperate/golem-vaddr-cli@1.0.1 generate \
-  --public-key my-public-key.txt \
-  --vanity-address-prefix vanity \
-  --budget-glm 1000
+  --public-key sample-key.pub \
+  --vanity-address-prefix 0x6666 \
+  --budget-glm 6 \
+  --processing-unit cpu \
+  --results-file results.json \
+  --num-workers 2
 ```
 
 ### Alternative: One-time authentication
@@ -50,8 +56,10 @@ You can also authenticate for a single command:
 # Set token and run in one command
 NPM_TOKEN=YOUR_GITHUB_TOKEN npx @unoperate/golem-vaddr-cli@1.0.1 generate \
   --public-key my-public-key.txt \
-  --vanity-address-prefix vanity \
-  --budget-glm 1000
+  --vanity-address-prefix 0xvanity \
+  --budget-glm 1000 \
+  --processing-unit cpu \
+  --results-file results.json
 ```
 
 ## Installation
@@ -81,7 +89,7 @@ npm run dev hello
 The `generate` command requires three arguments:
 
 ```bash
-npm run dev -- generate --public-key <path-to-key-file> --vanity-address-prefix <prefix> --budget-glm <amount>
+npm run dev -- generate --public-key <path-to-key-file> --vanity-address-prefix <prefix> --budget-glm <amount> --processing-unit <cpu|gpu> --results-file <output-file>
 ```
 
 #### Example Usage
@@ -97,8 +105,10 @@ echo "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab7
 ```bash
 npm run dev -- generate \
   --public-key my-public-key.txt \
-  --vanity-address-prefix vanity \
-  --budget-glm 1000
+  --vanity-address-prefix 0xvanity \
+  --budget-glm 1000 \
+  --processing-unit cpu \
+  --results-file results.json
 ```
 
 #### Using the built version:
@@ -110,8 +120,10 @@ npm run build
 # Then run directly
 node dist/index.js generate \
   --public-key my-public-key.txt \
-  --vanity-address-prefix vanity \
-  --budget-glm 1000
+  --vanity-address-prefix 0xvanity \
+  --budget-glm 1000 \
+  --processing-unit cpu \
+  --results-file results.json
 ```
 
 ## Arguments
@@ -180,8 +192,87 @@ The CLI provides helpful error messages for common issues:
 - **Invalid budget**: `Budget must be a positive number`
 - **Prefix too long**: `Vanity address prefix too long. Maximum length is 20 characters`
 
+## OpenTelemetry Monitoring
+
+The CLI includes OpenTelemetry observability support for tracing, metrics, and logging.
+
+### Running with OpenTelemetry Configuration
+
+To enable comprehensive monitoring with file-based telemetry export:
+
+```bash
+# Set the OpenTelemetry config file
+export OTEL_CONFIG_FILE=monitoring/otel-config.yaml
+
+# Run the CLI
+npm run dev -- generate \
+  --public-key sample-key.pub \
+  --vanity-address-prefix 0x6666 \
+  --budget-glm 6 \
+  --processing-unit cpu \
+  --results-file results.json \
+  --num-workers 2
+```
+
+### Monitoring Output
+
+When OpenTelemetry is enabled, telemetry data is exported to:
+
+- `./logs/traces.jsonl` - Distributed tracing data
+- `./logs/metrics.jsonl` - Performance metrics
+- `./logs/logs.jsonl` - Application logs
+
+### Monitoring Stack
+
+A complete monitoring stack is available in the `monitoring/` directory. See `monitoring/README.md` for setup instructions.
+
 ## Sample commands
 
-```
-bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x333333 --budget-glm 1 --results-file results.json --number-of-passes 1000 --processing-unit cpu
+```bash
+# Basic development usage
+npm run dev -- generate \
+  --public-key sample-key.pub \
+  --vanity-address-prefix 0x333333 \
+  --budget-glm 1 \
+  --results-file results.json \
+  --processing-unit cpu
+
+# GPU workers (higher performance)
+npm run dev -- generate \
+  --public-key sample-key.pub \
+  --vanity-address-prefix 0x12345678 \
+  --budget-glm 10 \
+  --processing-unit gpu \
+  --results-file results.json \
+  --num-workers 1
+
+# With custom worker settings
+npm run dev -- generate \
+  --public-key sample-key.pub \
+  --vanity-address-prefix 0x123456 \
+  --budget-glm 15 \
+  --processing-unit cpu \
+  --num-workers 4 \
+  --min-offers 3 \
+  --min-offers-timeout-sec 60
+
+# With OpenTelemetry monitoring
+# Windows
+set OTEL_CONFIG_FILE=monitoring/otel-config.yaml
+npm run dev -- generate \
+  --public-key sample-key.pub \
+  --vanity-address-prefix 0x666666 \
+  --budget-glm 6 \
+  --processing-unit cpu \
+  --results-file tmp_result.json \
+  --num-workers 2
+
+# Linux/macOS
+OTEL_CONFIG_FILE=monitoring/otel-config.yaml npm run dev -- generate \
+  --public-key sample-key.pub \
+  --vanity-address-prefix 0x666666 \
+  --budget-glm 6 \
+  --processing-unit cpu \
+  --results-file tmp_result.json \
+  --num-workers 2
 ```

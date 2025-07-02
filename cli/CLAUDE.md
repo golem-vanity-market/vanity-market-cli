@@ -8,6 +8,7 @@ This is a TypeScript CLI application for generating vanity cryptocurrency addres
 - `src/__tests__/` - Jest test files
 - `dist/` - Built JavaScript output
 - `package.json` - NPM dependencies and scripts
+- `monitoring/` - scripts for setting up the local monitoring stack
 
 ## Development Commands
 
@@ -30,6 +31,7 @@ npm run test:watch
 
 ## Key Features
 
+- **Golem**: golem SDK
 - **CLI Framework**: Commander.js for argument parsing
 - **Observability**: OpenTelemetry for tracing and telemetry
 - **Testing**: Jest with TypeScript support
@@ -44,6 +46,26 @@ npm run dev -- generate \
   --vanity-address-prefix vanity \
   --budget-glm 1000
 ```
+
+## Working with Git
+
+- Git branch name conventions:
+
+  - prefix: 'feature/' 'bugfix/'
+  - followed by descriptive name
+
+- Git commit messages:
+  - Use imperative mood (e.g., "Add feature" not "Added feature")
+  - Keep subject line concise (50 chars or less)
+  - Start with capital letter and don't end with period
+  - Separate subject from body with a blank line for detailed explanations
+  - NEVER ever mention a co-authored-by or similar aspects. In particular, never mention the tool used to create the commit message or PR.
+
+## Pull Requests
+
+- Create a detailed message of what changed. Focus on the high level description of the problem it tries to solve, and how it is solved. Don't go into the specifics of the code unless it adds clarity.
+
+- NEVER ever mention a co-authored-by or similar aspects. In particular, never mention the tool used to create the commit message or PR.
 
 ## Development Guidelines
 
@@ -73,7 +95,6 @@ npm run dev -- generate \
 ### Security Guidelines
 
 - Never store private keys in plaintext
-- Use established crypto libraries (crypto-js, elliptic, noble-secp256k1)
 - Implement proper input validation and sanitization
 - Follow cryptographic best practices
 - Avoid hardcoded secrets
