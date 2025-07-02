@@ -18,6 +18,7 @@ import { displayDifficulty, displayTime } from "./utils/format";
 import { sleep } from "@golem-sdk/golem-js";
 import { pinoLogger } from "@golem-sdk/pino-logger";
 import { ProcessingUnitType } from "./node_manager/config";
+import "dotenv/config";
 
 /**
  * Custom error class for address generation validation errors
