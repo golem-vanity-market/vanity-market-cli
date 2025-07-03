@@ -3,7 +3,9 @@
 export * from "./scheduler";
 export * from "./app_context";
 export * from "./budget";
-export * from "./instrumentation";
+// export * from "./instrumentation"; //TODO: Remove auto-initialization of OpenTelemetry on import
 export * from "./prefix";
 export * from "./results";
 export * from "./node_manager/golem_session";
+export * from "./node_manager/config";
+export { PublicKey } from "./index"; //TODO: move PublicKey to a separate file
