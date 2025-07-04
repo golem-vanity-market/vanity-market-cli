@@ -117,6 +117,11 @@ export class Scheduler {
           onError,
         );
       } catch (error) {
+        if (this.sessionManager.isWorkStopped()) {
+          // we can safely assume that the error is due to the work being stopped
+          ctx.L().info("Work was stopped, exiting the provider loop.");
+          break;
+        }
         ctx.L().error("Unhandled error during a provider iteration:", error);
         console.error("Error in provider, continuing if possible:", error);
         // don't rethrow the error, just continue the loop, we'll get another provider

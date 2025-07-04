@@ -462,7 +462,7 @@ export class GolemSessionManager {
 
     let wasSuccess = true;
 
-    const rental = await this.rentalPool.acquire(5_000); // timeout if fail to acquire rental in 5 seconds
+    const rental = await this.rentalPool.acquire(this.stopWorkAC.signal); // wait as long as needed to find a provider (cancelled by stopWorkAC)
     const providerName = rental.agreement.provider.name;
     let shouldKeepRental: boolean;
     try {
