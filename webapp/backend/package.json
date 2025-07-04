@@ -10,16 +10,21 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@golem-sdk/golem-js": "^3.5.0",
     "@golem-sdk/pino-logger": "^1.1.0",
+    "@libsql/client": "^0.15.9",
     "@opentelemetry/api": "^1.9.0",
     "@ts-rest/core": "^3.52.1",
     "@unoperate/golem-vaddr-cli": "file:../../cli",
     "dotenv": "^17.0.1",
+    "drizzle-orm": "^0.44.2",
     "fastify": "^5.4.0",
     "zod": "^3.25.73"
   },
   "devDependencies": {
     "@types/node": "^24.0.10",
-    "prettier": "^3.6.2"
+    "drizzle-kit": "^0.31.4",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.3"
   }
 }

@@ -56,3 +56,5 @@ temp/
 .env
 results.csv
 results.json
+
+*.sqlite
