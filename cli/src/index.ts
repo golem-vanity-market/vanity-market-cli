@@ -281,11 +281,34 @@ function validateGenerateOptions(
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerateCommand(options: any): Promise<void> {
-  // State variables accessible to the shutdown handler via closure
-  let golemSessionManager: GolemSessionManager | null = null;
-  let appContext: AppContext | null = null;
-  let isShuttingDown = false;
+  const logger = pinoLogger({
+    name: "golem-vaddr-cli",
+    transport: {
+      targets: [
+        {
+          target: "pino-opentelemetry-transport",
+          level: "info",
+          options: {
+            severityNumberMap: {
+              trace: 1,
+              debug: 5,
+              info: 9,
+              warn: 13,
+              error: 17,
+              fatal: 21,
+            },
+          },
+        },
+        // overwrite it with GOLEM_PINO_LOG_LEVEL
+        { target: "pino-pretty", options: { colorize: true }, level: "info" },
+      ],
+    },
+  });
 
+  const appContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
+
+  let golemSessionManager: GolemSessionManager | null = null;
+  let isShuttingDown = false;
   const gracefulShutdown = async (exitCode: number) => {
     if (isShuttingDown) {
       return;
@@ -293,49 +316,44 @@ async function handleGenerateCommand(options: any): Promise<void> {
     isShuttingDown = true;
     console.log("\nGracefully shutting down...");
 
-    // first stop the generation process if it's still running
-    if (golemSessionManager && appContext) {
+    if (golemSessionManager) {
+      // first stop the generation process if it's still running
       try {
         golemSessionManager.stopWork("User initiated shutdown");
         console.log("✅ Generation process stopped successfully");
       } catch (error) {
         console.error("❌ Error stopping generation process:", error);
       }
-    }
 
-    // save results to a file (or stdout)
-    if (golemSessionManager && options.resultsFile) {
-      try {
-        const results = await golemSessionManager.results();
-        writeFileSync(
-          options.resultsFile,
-          JSON.stringify({ entries: results }, null, 2),
-        );
-        console.log(`✅ Results saved to ${options.resultsFile}`);
-      } catch (error) {
-        console.error("❌ Failed to save results:", error);
+      if (options.resultsFile) {
+        try {
+          const results = await golemSessionManager.results();
+          writeFileSync(
+            options.resultsFile,
+            JSON.stringify({ entries: results }, null, 2),
+          );
+          console.log(`✅ Results saved to ${options.resultsFile}`);
+        } catch (error) {
+          console.error("❌ Failed to save results:", error);
+        }
+      } else {
+        try {
+          const results = await golemSessionManager.results();
+          console.log("Results:", results);
+        } catch (error) {
+          console.error("❌ Failed to retrieve results:", error);
+        }
       }
-    } else if (golemSessionManager) {
-      try {
-        const results = await golemSessionManager.results();
-        console.log("Results:", results);
-      } catch (error) {
-        console.error("❌ Failed to retrieve results:", error);
-      }
-    }
 
-    // then clean up rentals (which gives us the chance to pay for the work done)
-    if (golemSessionManager && appContext) {
+      // then clean up rentals (which gives us the chance to pay for the work done)
       try {
         await golemSessionManager.drainPool(appContext);
         console.log("✅ All rentals cleaned up successfully");
       } catch (error) {
         console.error("❌ Error during rental cleanup:", error);
       }
-    }
 
-    // only then we can safely disconnect from the Golem network and release the allocation
-    if (golemSessionManager && appContext) {
+      // only then we can safely disconnect from the Golem network and release the allocation
       try {
         await golemSessionManager.disconnectFromGolemNetwork(appContext);
         console.log("✅ Disconnected from Golem network");
@@ -345,10 +363,8 @@ async function handleGenerateCommand(options: any): Promise<void> {
           disconnectError,
         );
       }
-    }
 
-    // finally, stop all services in the worker pool
-    if (golemSessionManager && appContext) {
+      // finally, stop all services in the worker pool
       try {
         await golemSessionManager.stopServices(appContext);
         console.log("✅ Stopped all services");
@@ -453,31 +469,6 @@ async function handleGenerateCommand(options: any): Promise<void> {
       processingUnitType: validatedOptions.processingUnitType,
     };
 
-    const logger = pinoLogger({
-      name: "golem-vaddr-cli",
-      transport: {
-        targets: [
-          {
-            target: "pino-opentelemetry-transport",
-            level: "info",
-            options: {
-              severityNumberMap: {
-                trace: 1,
-                debug: 5,
-                info: 9,
-                warn: 13,
-                error: 17,
-                fatal: 21,
-              },
-            },
-          },
-          // overwrite it with GOLEM_PINO_LOG_LEVEL
-          { target: "pino-pretty", options: { colorize: true }, level: "info" },
-        ],
-      },
-    });
-
-    appContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
     golemSessionManager = new GolemSessionManager(workerPoolParams);
 
     await golemSessionManager.connectToGolemNetwork(appContext);
