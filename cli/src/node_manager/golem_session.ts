@@ -508,21 +508,13 @@ export class GolemSessionManager {
     }
     try {
       if (shouldKeepRental) {
-        ctx
-          .L()
-          .info(
-            `Keeping rental with provider: ${rental.agreement.provider.name}`,
-          );
+        ctx.L().info(`Keeping rental with provider: ${providerName}`);
         console.log(
           `💡 Provider ${providerName} ran the command successfully, returning them to the pool of available workers`,
         );
         await this.rentalPool.release(rental);
       } else {
-        ctx
-          .L()
-          .info(
-            `Destroying rental with provider: ${rental.agreement.provider.name}`,
-          );
+        ctx.L().info(`Destroying rental with provider: ${providerName}`);
         console.log(
           `💔 Provider ${providerName} did not run the command successfully, destroying the rental`,
         );
