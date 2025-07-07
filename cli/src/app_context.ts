@@ -20,7 +20,7 @@ export class AppContext {
   public WithTracker(tracer: otl.Tracer): AppContext {
     const newCtx = new AppContext(this._activeContext);
     newCtx.tracer = tracer;
-    newCtx.logger = this.logger
+    newCtx.logger = this.logger;
     return newCtx;
   }
 
