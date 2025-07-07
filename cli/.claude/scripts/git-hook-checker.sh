@@ -5,7 +5,9 @@
 input=$(cat)
 
 # Extract command from JSON
-command=$(echo "$input" | jq -r '.command // empty')
+command=$(echo "$input" | jq -r '.tool_input.command // empty')
+
+echo "🔍 Checking command: $command"
 
 # Check if it's a git command
 if [[ "$command" == git* ]]; then
