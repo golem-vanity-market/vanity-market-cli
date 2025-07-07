@@ -4,6 +4,7 @@ import { Logger } from "@golem-sdk/golem-js";
 export class AppContext {
   private _activeContext: otl.Context;
   private logger?: Logger;
+  private tracer?: otl.Tracer;
 
   constructor(ctx: otl.Context) {
     this._activeContext = ctx;
@@ -12,6 +13,14 @@ export class AppContext {
   public WithLogger(logger: Logger): AppContext {
     const newCtx = new AppContext(this._activeContext);
     newCtx.logger = logger;
+    newCtx.tracer = this.tracer;
+    return newCtx;
+  }
+
+  public WithTracker(tracer: otl.Tracer): AppContext {
+    const newCtx = new AppContext(this._activeContext);
+    newCtx.tracer = tracer;
+    newCtx.logger = this.logger
     return newCtx;
   }
 
