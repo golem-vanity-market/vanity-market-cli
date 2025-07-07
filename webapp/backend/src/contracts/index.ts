@@ -1,6 +1,6 @@
 import { initContract } from "@ts-rest/core";
-import { authContract } from "./auth.contract";
-import { jobsContract } from "./job.contract";
+import { authContract } from "./auth.contract.ts";
+import { jobsContract } from "./job.contract.ts";
 
 const c = initContract();
 

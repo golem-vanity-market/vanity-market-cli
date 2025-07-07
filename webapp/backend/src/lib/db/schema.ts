@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { int, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { int, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const usersTable = sqliteTable("user", {
   id: int("id").primaryKey({ autoIncrement: true }),
@@ -17,10 +17,14 @@ export const jobsTable = sqliteTable("job", {
   userId: int("user_id")
     .notNull()
     .references(() => usersTable.id, { onDelete: "cascade" }),
-  status: text("status").notNull(),
+  status: text("status", {
+    enum: ["pending", "processing", "completed", "failed", "cancelled"],
+  }).notNull(),
   publicKey: text("public_key").notNull(),
   vanityAddressPrefix: text("vanity_address_prefix").notNull(),
   numWorkers: int("num_workers").notNull(),
+  budgetGlm: real("budget_glm").notNull(),
+  processingUnit: text("processing_unit", { enum: ["cpu", "gpu"] }).notNull(),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(current_timestamp)`),

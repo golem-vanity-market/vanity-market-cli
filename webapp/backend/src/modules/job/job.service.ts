@@ -1,9 +1,9 @@
-import { db } from "../../lib/db";
 import { type Logger } from "@golem-sdk/golem-js";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
 import { validateProcessingUnit } from "@unoperate/golem-vaddr-cli";
 import {
   AppContext,
+  EstimatorService,
   GenerationPrefix,
   GolemSessionManager,
   PublicKey,
@@ -12,16 +12,17 @@ import {
   type GenerationParams,
   type SessionManagerParams,
 } from "@unoperate/golem-vaddr-cli/lib";
-import { jobResultsTable, jobsTable } from "../../lib/db/schema";
-import { desc, eq, inArray } from "drizzle-orm";
+import { jobResultsTable, jobsTable } from "../../lib/db/schema.ts";
+import { desc, eq } from "drizzle-orm";
 import {
   JobSchema,
   JobResultSchema,
-  JobInputSchema,
-} from "../../contracts/job.contract";
-import type z from "zod";
-import { fastifyLogger } from "../../lib/logger";
-import { EstimatorService } from "../../../../../cli/dist/estimator_service";
+  type JobInput,
+  type JobDetails,
+  type JobResult,
+} from "../../contracts/job.contract.ts";
+import { fastifyLogger } from "../../lib/logger.ts";
+import { db } from "../../lib/db/index.ts";
 
 // context of an active job stored in memory
 interface ActiveJobContext {
@@ -35,7 +36,7 @@ const activeJobs: Record<string, ActiveJobContext> = {};
  * Validates and transforms API input into the format required by the Golem logic.
  * This reuses the validation logic from your CLI.
  */
-function validateAndTransformInputs(input: z.infer<typeof JobInputSchema>) {
+function validateAndTransformInputs(input: JobInput) {
   if (!input.publicKey) throw new Error("Public key is required");
   if (!input.vanityAddressPrefix)
     throw new Error("Vanity address prefix is required");
@@ -60,7 +61,7 @@ function validateAndTransformInputs(input: z.infer<typeof JobInputSchema>) {
  */
 async function runJobInBackground(
   jobId: string,
-  input: z.infer<typeof JobInputSchema>,
+  input: JobInput,
   rootLogger: Logger
 ) {
   let golemSessionManager: GolemSessionManager | null = null;
@@ -191,8 +192,9 @@ async function runJobInBackground(
 }
 
 export async function createJob(
-  input: z.infer<typeof JobInputSchema>
-): Promise<z.infer<typeof JobSchema>> {
+  input: JobInput,
+  userId: number
+): Promise<JobDetails> {
   // Validate inputs before even creating the DB record
   validateAndTransformInputs(input);
 
@@ -201,11 +203,13 @@ export async function createJob(
     .insert(jobsTable)
     .values({
       id: jobId,
-      userId: 1, // TODO: Replace with actual user ID from context
+      userId,
       status: "pending",
       publicKey: input.publicKey,
       vanityAddressPrefix: input.vanityAddressPrefix,
       numWorkers: input.numWorkers,
+      budgetGlm: input.budgetGlm,
+      processingUnit: input.processingUnit,
     })
     .returning();
   if (!job) {
@@ -215,24 +219,24 @@ export async function createJob(
   // Start the long-running task but DO NOT await it.
   // This makes the API request return immediately.
   runJobInBackground(jobId, input, fastifyLogger);
-  return JobSchema.parse({
-    id: jobId,
-    userId: 1, // TODO: Replace with actual user ID from context
-    status: "pending",
+  const jobDetails: JobDetails = {
+    id: job.id,
+    status: job.status,
     publicKey: job.publicKey,
     vanityAddressPrefix: job.vanityAddressPrefix,
     numWorkers: job.numWorkers,
+    budgetGlm: job.budgetGlm,
+    processingUnit: job.processingUnit,
     createdAt: job.createdAt,
     updatedAt: job.updatedAt,
-  });
+  };
+  return JobSchema.parse(jobDetails);
 }
 
 /**
  * Cancels a running job.
  */
-export async function cancelJob(
-  jobId: string
-): Promise<z.infer<typeof JobSchema> | null> {
+export async function cancelJob(jobId: string): Promise<JobDetails | null> {
   const jobContext = activeJobs[jobId];
   const dbJob = await db
     .select()
@@ -248,14 +252,18 @@ export async function cancelJob(
 
   if (dbJob.status !== "processing" && dbJob.status !== "pending") {
     // Job is already finished or failed
-    return JobSchema.parse({
+    const jobDetails: JobDetails = {
       id: dbJob.id,
-      userId: dbJob.userId,
       status: dbJob.status,
       publicKey: dbJob.publicKey,
       vanityAddressPrefix: dbJob.vanityAddressPrefix,
       numWorkers: dbJob.numWorkers,
-    });
+      createdAt: dbJob.createdAt,
+      updatedAt: dbJob.updatedAt,
+      budgetGlm: dbJob.budgetGlm,
+      processingUnit: dbJob.processingUnit,
+    };
+    return JobSchema.parse(jobDetails);
   }
 
   console.log(`User initiated cancellation for job ${jobId}`);
@@ -272,23 +280,25 @@ export async function cancelJob(
       if (!updatedJob) {
         return null; // Job not found or update failed
       }
-      return JobSchema.parse({
+      const jobDetails: JobDetails = {
         id: updatedJob.id,
-        userId: updatedJob.userId,
         status: updatedJob.status,
         publicKey: updatedJob.publicKey,
         vanityAddressPrefix: updatedJob.vanityAddressPrefix,
         numWorkers: updatedJob.numWorkers,
-      });
+        createdAt: updatedJob.createdAt,
+        updatedAt: updatedJob.updatedAt,
+        budgetGlm: updatedJob.budgetGlm,
+        processingUnit: updatedJob.processingUnit,
+      };
+      return JobSchema.parse(jobDetails);
     });
 }
 
 /**
  * Finds a job by its ID.
  */
-export async function findJobById(
-  jobId: string
-): Promise<z.infer<typeof JobSchema> | null> {
+export async function findJobById(jobId: string): Promise<JobDetails | null> {
   const job = await db
     .select()
     .from(jobsTable)
@@ -300,22 +310,25 @@ export async function findJobById(
     return null; // Job not found
   }
 
-  return JobSchema.parse({
+  const jobDetails: JobDetails = {
     id: job.id,
-    userId: job.userId,
     status: job.status,
     publicKey: job.publicKey,
     vanityAddressPrefix: job.vanityAddressPrefix,
     numWorkers: job.numWorkers,
-  });
+    createdAt: job.createdAt,
+    updatedAt: job.updatedAt,
+    budgetGlm: job.budgetGlm,
+    processingUnit: job.processingUnit,
+  };
+
+  return JobSchema.parse(jobDetails);
 }
 
 /**
  * Finds all jobs for a specific user.
  */
-export async function findJobsByUserId(
-  userId: number
-): Promise<z.infer<typeof JobSchema>[]> {
+export async function findJobsByUserId(userId: number): Promise<JobDetails[]> {
   const jobs = await db
     .select()
     .from(jobsTable)
@@ -323,24 +336,26 @@ export async function findJobsByUserId(
     .orderBy(desc(jobsTable.createdAt))
     .then((rows) => rows);
 
-  return jobs.map((job) =>
-    JobSchema.parse({
+  return jobs.map((job) => {
+    const jobDetails: JobDetails = {
       id: job.id,
-      userId: job.userId,
       status: job.status,
       publicKey: job.publicKey,
       vanityAddressPrefix: job.vanityAddressPrefix,
       numWorkers: job.numWorkers,
-    })
-  );
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      budgetGlm: job.budgetGlm,
+      processingUnit: job.processingUnit,
+    };
+    return JobSchema.parse(jobDetails);
+  });
 }
 
 /**
  * Fetches the results for a completed job.
  */
-export async function getJobResults(
-  jobId: string
-): Promise<z.infer<typeof JobResultSchema>> {
+export async function getJobResult(jobId: string): Promise<JobResult> {
   const results = await db
     .select()
     .from(jobResultsTable)

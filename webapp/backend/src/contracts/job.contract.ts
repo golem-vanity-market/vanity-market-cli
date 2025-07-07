@@ -14,10 +14,14 @@ export const JobInputSchema = z.object({
 
 export const JobSchema = z.object({
   id: z.string().uuid(),
-  status: z.enum(["pending", "processing", "completed", "failed"]),
-  createdAt: z.date(),
-  updatedAt: z.date(),
-  // TODO: Add generation parameters
+  status: z.enum(["pending", "processing", "completed", "failed", "cancelled"]),
+  publicKey: z.string(),
+  vanityAddressPrefix: z.string(),
+  numWorkers: z.number().int().positive(),
+  budgetGlm: z.number().positive(),
+  processingUnit: z.enum(["cpu", "gpu"]),
+  createdAt: z.string(),
+  updatedAt: z.string(),
 });
 
 export const JobResultSchema = z.array(
@@ -33,13 +37,15 @@ export const JobResultSchema = z.array(
   })
 );
 
+export type JobInput = z.infer<typeof JobInputSchema>;
+export type JobDetails = z.infer<typeof JobSchema>;
+export type JobResult = z.infer<typeof JobResultSchema>;
+
 export const jobsContract = c.router({
   createJob: {
     method: "POST",
     path: "/jobs",
-    body: z.object({
-      input: z.string(),
-    }),
+    body: JobInputSchema,
     responses: {
       202: JobSchema,
     },

@@ -1,9 +1,4 @@
-import "dotenv/config";
 import { drizzle } from "drizzle-orm/libsql";
+import config from "../../config.ts";
 
-const fileName = process.env.DB_FILE_NAME;
-if (!fileName) {
-  throw new Error("DB_FILE_NAME environment variable is not set.");
-}
-
-export const db = drizzle(fileName);
+export const db = drizzle(config.DB_FILE_NAME);
