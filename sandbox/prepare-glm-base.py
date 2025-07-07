@@ -16,7 +16,7 @@ def download_file(url, save_path):
         # os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
         # Write the file to the specified location
-        with open(save_path, 'wb') as file:
+        with open(save_path, "wb") as file:
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
 
@@ -34,7 +34,7 @@ def unzip_file(zip_path, extract_to):
         os.makedirs(extract_to, exist_ok=True)
 
         # Extract the zip file
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(extract_to)
 
         print(f"File extracted successfully to: {extract_to}")
@@ -61,7 +61,7 @@ def prepare_env_file():
     content += "\n"
 
     env_file_path = "./base/.env"
-    with open(env_file_path, 'w') as env_file:
+    with open(env_file_path, "w") as env_file:
         env_file.write(content)
 
 
@@ -73,7 +73,7 @@ def prepare_client_env_file():
     content += "\n"
 
     env_file_path = "../cli/.env"
-    with open(env_file_path, 'w') as env_file:
+    with open(env_file_path, "w") as env_file:
         env_file.write(content)
 
 
@@ -85,7 +85,9 @@ if __name__ == "__main__":
     unpack_location = "base"
 
     if os.path.exists(unpack_location):
-        raise Exception("Unpack location already exists. Please remove it before running this script.")
+        raise Exception(
+            "Unpack location already exists. Please remove it before running this script."
+        )
 
     if system == "Windows":
         file_url = f"https://github.com/golemfactory/yagna/releases/download/{yagna_version}/golem-requestor-windows-{yagna_version}.zip"

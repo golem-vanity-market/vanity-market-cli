@@ -206,9 +206,8 @@ function createSDKConfig() {
 
 // --- Initialization ---
 
-let sdk: NodeSDK | null = null;
+const sdk = new NodeSDK(createSDKConfig());
 
-sdk = new NodeSDK(createSDKConfig());
 try {
   sdk.start();
   console.log("OpenTelemetry initialized successfully");

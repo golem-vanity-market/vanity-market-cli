@@ -3,7 +3,6 @@ import { BudgetMonitor } from "./budget";
 import {
   GolemSessionManager,
   OnErrorHandler,
-  OnResultHandler,
 } from "./node_manager/golem_session";
 import { AppContext } from "./app_context";
 
@@ -29,15 +28,6 @@ export class Scheduler {
     ctx: AppContext,
     params: GenerationParams,
   ): Promise<void> {
-    const onResult: OnResultHandler = async ({ results, provider }) => {
-      ctx
-        .L()
-        .info(
-          `Provider ${provider.name} found ${results.length} results. Returning them to the pool for further processing.`,
-        );
-      // Determine if the results are satisfactory and update reputation here
-      return true; // Keep the rental for further work
-    };
     const onError: OnErrorHandler = async ({ error, provider }) => {
       ctx
         .L()
@@ -63,7 +53,7 @@ export class Scheduler {
 
     // Create and start multiple providers in parallel
     const workerPromises = Array.from({ length: params.numberOfWorkers }, () =>
-      this.workInLoop(ctx, params, onResult, onError, budgetMonitor),
+      this.workInLoop(ctx, params, onError, budgetMonitor),
     );
 
     await Promise.allSettled(workerPromises);
@@ -81,7 +71,6 @@ export class Scheduler {
   private async workInLoop(
     ctx: AppContext,
     params: GenerationParams,
-    onResult: OnResultHandler,
     onError: OnErrorHandler,
     budgetMonitor: BudgetMonitor,
   ): Promise<void> {
@@ -100,6 +89,7 @@ export class Scheduler {
         this.sessionManager.stopWork("Target number of results reached"); // Stop all other providers
         break; // Exit the loop if the target is reached
       }
+
       // Check budget before this worker starts a new task
       if (!(await budgetMonitor.hasSufficientBudget())) {
         ctx.L().warn("Insufficient budget to continue work. Stopping.");
@@ -110,13 +100,13 @@ export class Scheduler {
       try {
         // A single provider runs one iteration. When it's done, the loop
         // will check conditions again and start another if needed.
-        await this.sessionManager.runSingleIteration(
-          ctx,
-          params,
-          onResult,
-          onError,
-        );
+        await this.sessionManager.runSingleIteration(ctx, params, onError);
       } catch (error) {
+        if (this.sessionManager.isWorkStopped()) {
+          // we can safely assume that the error is due to the work being stopped
+          ctx.L().info("Work was stopped, exiting the provider loop.");
+          break;
+        }
         ctx.L().error("Unhandled error during a provider iteration:", error);
         console.error("Error in provider, continuing if possible:", error);
         // don't rethrow the error, just continue the loop, we'll get another provider
