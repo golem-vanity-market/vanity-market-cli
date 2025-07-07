@@ -20,6 +20,7 @@ import { isNativeError } from "util/types";
 import { displayUserMessage } from "../cli";
 import { EstimatorService } from "../estimator_service";
 import { ResultsService } from "../results_service";
+import { VanityPaymentModule } from "./payment_module";
 
 /**
  * Parameters for the GolemSessionManager constructor
@@ -87,8 +88,13 @@ export class GolemSessionManager {
   }
 
   public async connectToGolemNetwork(ctx: AppContext): Promise<void> {
+    VanityPaymentModule.estimatorService = this._estimatorService;
+    VanityPaymentModule.ctx = ctx;
     this.golemNetwork = new GolemNetwork({
       logger: ctx.L(),
+      override: {
+        payment: VanityPaymentModule,
+      },
     });
     try {
       await this.golemNetwork.connect();
@@ -158,6 +164,16 @@ export class GolemSessionManager {
         );
       throw new Error("Golem Network is not initialized");
     }
+
+    this.golemNetwork.payment.events.on(
+      "allocationCreated",
+      ({ allocation }) => {
+        console.log(
+          "Allocation created with budget:",
+          Number(allocation.remainingAmount).toFixed(2),
+        );
+      },
+    );
 
     const glm = this.golemNetwork;
     const rentalDurationWithPaymentsSeconds = this.rentalDurationSeconds + 360;
@@ -258,6 +274,7 @@ export class GolemSessionManager {
     const config = this.getConfigBasedOnProcessingUnitType();
 
     const agreementId = rental.agreement.id;
+
     //displayUserMessage(`Started work on agreement ID: ${agreementId}`);
     await this.estimatorService.initJobIfNotInitialized(
       agreementId,
@@ -388,6 +405,7 @@ export class GolemSessionManager {
 
     const rental = await this.rentalPool.acquire(this.stopWorkAC.signal); // wait as long as needed to find a provider (cancelled by stopWorkAC)
     const providerName = rental.agreement.provider.name;
+
     let shouldKeepRental: boolean;
     try {
       /*console.log(

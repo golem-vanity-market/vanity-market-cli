@@ -89,6 +89,7 @@ export class Scheduler {
         this.sessionManager.stopWork("Target number of results reached"); // Stop all other providers
         break; // Exit the loop if the target is reached
       }
+
       // Check budget before this worker starts a new task
       if (!(await budgetMonitor.hasSufficientBudget())) {
         ctx.L().warn("Insufficient budget to continue work. Stopping.");
