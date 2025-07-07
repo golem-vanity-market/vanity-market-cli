@@ -228,6 +228,14 @@ A complete monitoring stack is available in the `monitoring/` directory. See `mo
 
 ## Sample commands
 
+Windows
+
+```
+bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x33333333 --budget-glm 1 --results-file results.json --processing-unit cpu --min-offers-timeout-sec 1 --num-workers 3
+```
+
+Linux/WSL
+
 ```bash
 # Basic development usage
 npm run dev -- generate \

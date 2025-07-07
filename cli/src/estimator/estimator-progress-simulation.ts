@@ -11,9 +11,9 @@ function randomDifficultyCheck(difficulty: number): boolean {
 }
 
 async function run() {
-  const est = new Estimator(simulatedDifficulty);
+  const est = new Estimator(simulatedDifficulty, "test");
 
-  est.reportAttempts(1);
+  est.addProvedWork(1);
 
   // @ts-expect-error This is library callback
   function formatter(_options, _params, _payload) {
@@ -79,7 +79,7 @@ async function run() {
     }
     await sleep(0.01 + Math.random() * 0.01); // Simulate some processing time
 
-    est.reportAttempts(attempts * scalingFactor);
+    est.addProvedWork(scalingFactor);
     const currentInfo = est.currentInfo();
     bar1.update(currentInfo.attempts);
   }

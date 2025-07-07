@@ -10,7 +10,7 @@ export function estimatorLuckHistogram(silent = false, printHist = true) {
   const lucks = [];
   const total_runs = 1000; // Total number of runs to simulate
   for (let run_no = 0; run_no < total_runs; run_no++) {
-    const est = new Estimator(simulatedDifficulty);
+    const est = new Estimator(simulatedDifficulty, "test");
     for (let attempts = 1; ; attempts += 1) {
       if (randomDifficultyCheck(simulatedDifficulty)) {
         const currentInfo = est.currentInfo();
@@ -20,7 +20,7 @@ export function estimatorLuckHistogram(silent = false, printHist = true) {
         lucks.push(currentInfo.luckFactor * 100);
         break;
       }
-      est.reportAttempts(attempts);
+      est.addProvedWork(1);
       const currentInfo = est.currentInfo();
       if (attempts % 1000 === 0) {
         if (!silent) {
