@@ -7,6 +7,7 @@ import {
   GenerationPrefix,
   GolemSessionManager,
   PublicKey,
+  ResultsService,
   Scheduler,
   type GenerationParams,
   type SessionManagerParams,
@@ -20,6 +21,7 @@ import {
 } from "../../contracts/job.contract";
 import type z from "zod";
 import { fastifyLogger } from "../../lib/logger";
+import { EstimatorService } from "../../../../../cli/dist/estimator_service";
 
 // context of an active job stored in memory
 interface ActiveJobContext {
@@ -84,11 +86,26 @@ async function runJobInBackground(
 
     const rentalDurationSecs = 15 / 60;
 
+    const resultService = new ResultsService(appContext, {
+      vanityPrefix: validated.vanityAddressPrefix,
+      csvOutput: null,
+    });
+    const estimatorService = new EstimatorService(appContext, {
+      vanityPrefix: validated.vanityAddressPrefix,
+      disableMessageLoop: true,
+      processLoopSecs: parseFloat(
+        process.env.PROCESS_LOOP_SEC_INTERVAL || "1.0"
+      ),
+      resultService,
+    });
+
     const sessionParams: SessionManagerParams = {
       numberOfWorkers: input.numWorkers,
       rentalDurationSeconds: rentalDurationSecs,
       budgetGlm: input.budgetGlm,
       processingUnitType: validated.processingUnitType,
+      estimatorService,
+      resultService,
     };
     golemSessionManager = new GolemSessionManager(sessionParams);
 
@@ -112,21 +129,13 @@ async function runJobInBackground(
       numResults: BigInt(input.numResults),
     };
 
+    const seenResults = new Set<string>();
     resultsCollector = setInterval(async () => {
-      const results = await golemSessionManager?.results();
+      const results = await resultService.results();
       if (!results) return;
       if (results.length > 0) {
-        const existingResults = await db
-          .select()
-          .from(jobResultsTable)
-          .where(
-            inArray(
-              jobResultsTable.addr,
-              results.map((r) => r.addr)
-            )
-          );
-        const existingAddrs = new Set(existingResults.map((r) => r.addr));
-        const newResults = results.filter((r) => !existingAddrs.has(r.addr));
+        const newResults = results.filter((r) => !seenResults.has(r.addr));
+        newResults.forEach((r) => seenResults.add(r.addr));
         if (newResults.length > 0) {
           await db.insert(jobResultsTable).values(
             newResults.map((r) => ({

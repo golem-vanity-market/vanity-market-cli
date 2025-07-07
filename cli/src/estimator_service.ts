@@ -11,7 +11,8 @@ import { validateProof } from "./validator";
 import { ResultsService } from "./results_service";
 
 export interface EstimatorServiceOptions {
-  messageLoopSecs: number;
+  disableMessageLoop?: boolean;
+  messageLoopSecs?: number;
   processLoopSecs: number;
   vanityPrefix: GenerationPrefix; // Optional vanity prefix
   resultService: ResultsService;
@@ -131,7 +132,14 @@ export class EstimatorService {
     }
   }
 
+  private get messageLoopSecs(): number {
+    return this.options.messageLoopSecs || 30.0;
+  }
+
   private async runMessageLoop(): Promise<void> {
+    if (this.options.disableMessageLoop) {
+      return;
+    }
     while (true) {
       if (this.isStopping) {
         break;
@@ -141,7 +149,7 @@ export class EstimatorService {
         displayUserMessage("---------------------------");
         displayTotalSummary(this.totalEstimator);
       }
-      await sleep(this.options.messageLoopSecs);
+      await sleep(this.messageLoopSecs);
     }
   }
 
