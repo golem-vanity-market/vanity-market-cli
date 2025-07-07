@@ -1,5 +1,4 @@
 import {
-  type Agreement,
   Allocation,
   DraftOfferProposalPool,
   GolemNetwork,
@@ -7,24 +6,20 @@ import {
   ResourceRental,
   ResourceRentalPool,
 } from "@golem-sdk/golem-js";
-import { AppContext } from "./../app_context";
-import { GenerationParams } from "./../scheduler";
+import { AppContext } from "../app_context";
+import { GenerationParams } from "../scheduler";
 import {
   BaseRentalConfig,
   CPURentalConfig,
   GPURentalConfig,
   ProcessingUnitType,
 } from "./config";
-import { Estimator } from "../estimator";
 import { computePrefixDifficulty } from "../difficulty";
-import { displayDifficulty, displayTime } from "../utils/format";
 import { withTimeout } from "../utils/timeout";
-import {
-  defaultResultsServiceOptions,
-  GenerationEntryResult,
-  ResultsService,
-} from "../results";
 import { isNativeError } from "util/types";
+import { displayUserMessage } from "../cli";
+import { EstimatorService } from "../estimator_service";
+import { ResultsService } from "../results_service";
 
 /**
  * Parameters for the GolemSessionManager constructor
@@ -41,13 +36,13 @@ export interface SessionManagerParams {
 
   /** Type of processing unit to use (CPU or GPU) */
   processingUnitType: ProcessingUnitType;
+
+  estimatorService: EstimatorService;
+
+  resultService: ResultsService;
 }
 
 // Callbacks for `runSingleIteration` method
-export type OnResultHandler = (payload: {
-  results: GenerationEntryResult[];
-  provider: ProviderInfo;
-}) => Promise<boolean>;
 export type OnErrorHandler = (payload: {
   error: Error;
   provider: ProviderInfo;
@@ -67,28 +62,28 @@ export class GolemSessionManager {
   private golemNetwork?: GolemNetwork;
   private allocation?: Allocation;
   private rentalPool?: ResourceRentalPool;
-  private generationResults: ResultsService;
+  private _estimatorService: EstimatorService;
+  private _resultService: ResultsService;
   private stopWorkAC: AbortController = new AbortController();
-  private agreementToEstimator: Record<Agreement["id"], Estimator> = {};
 
   constructor(params: SessionManagerParams) {
     this.numberOfWorkers = params.numberOfWorkers;
     this.rentalDurationSeconds = params.rentalDurationSeconds;
     this.budgetGlm = params.budgetGlm;
     this.processingUnitType = params.processingUnitType;
-    this.generationResults = new ResultsService(defaultResultsServiceOptions());
+    this._estimatorService = params.estimatorService;
+    this._resultService = params.resultService;
   }
 
-  public addGenerationResult(result: GenerationEntryResult): void {
-    this.generationResults.addResult(result);
+  public get estimatorService(): EstimatorService {
+    return this._estimatorService;
+  }
+  public get resultService(): ResultsService {
+    return this._resultService;
   }
 
   public get noResults(): number {
-    return this.generationResults.numberOfResults;
-  }
-
-  public async results(): Promise<GenerationEntryResult[]> {
-    return await this.generationResults.results();
+    return this.resultService.numberOfResults;
   }
 
   public async connectToGolemNetwork(ctx: AppContext): Promise<void> {
@@ -103,12 +98,16 @@ export class GolemSessionManager {
       throw new Error("Connection to Golem Network failed");
     }
     this.golemNetwork.market.events.on("agreementApproved", ({ agreement }) => {
-      console.log(`📃 Signed an agreement with ${agreement.provider.name}`);
+      displayUserMessage(
+        `📃 Signed an agreement with ${agreement.provider.name}`,
+      );
     });
     this.golemNetwork.market.events.on(
       "agreementTerminated",
       ({ agreement }) => {
-        console.log(`🗑️ Terminated agreement with ${agreement.provider.name}`);
+        displayUserMessage(
+          `🗑️ Terminated agreement with ${agreement.provider.name}`,
+        );
       },
     );
   }
@@ -162,7 +161,6 @@ export class GolemSessionManager {
 
     const glm = this.golemNetwork;
     const rentalDurationWithPaymentsSeconds = this.rentalDurationSeconds + 360;
-    const numberOfWorkers = this.numberOfWorkers;
 
     try {
       this.allocation = await glm.payment.createAllocation({
@@ -172,7 +170,10 @@ export class GolemSessionManager {
       });
 
       this.rentalPool = await glm.manyOf({
-        poolSize: numberOfWorkers,
+        poolSize: {
+          min: 0,
+          max: 100,
+        }, //unused in our case, we are managing pool size manually
         order: this.getConfigBasedOnProcessingUnitType().getOrder(
           this.rentalDurationSeconds,
           this.allocation,
@@ -253,18 +254,18 @@ export class GolemSessionManager {
     ctx: AppContext,
     rental: ResourceRental,
     generationParams: GenerationParams,
-  ): Promise<GenerationEntryResult[]> {
+  ): Promise<void> {
     const config = this.getConfigBasedOnProcessingUnitType();
 
-    let estimator = this.agreementToEstimator[rental.agreement.id];
-    if (!estimator) {
-      estimator = new Estimator(
-        computePrefixDifficulty(
-          generationParams.vanityAddressPrefix.fullPrefix(),
-        ),
-      );
-      this.agreementToEstimator[rental.agreement.id] = estimator;
-    }
+    const agreementId = rental.agreement.id;
+    //displayUserMessage(`Started work on agreement ID: ${agreementId}`);
+    await this.estimatorService.initJobIfNotInitialized(
+      agreementId,
+      rental.agreement.provider.name,
+      computePrefixDifficulty(
+        generationParams.vanityAddressPrefix.fullPrefix(),
+      ),
+    );
 
     try {
       // Get or create the exe unit
@@ -281,14 +282,23 @@ export class GolemSessionManager {
       // Validate capabilities (CPU or GPU specific)
       await config.checkAndSetCapabilities(exe);
 
-      let totalCompute = 0;
-      const addressesFound: GenerationEntryResult[] = [];
+      /* Uncomment this to simulate random execution time
+      const simulateRandomExecutionTime = true;
+
+      if (simulateRandomExecutionTime) {
+        generationParams.singlePassSeconds = Math.floor(
+          20 + 100 * Math.random(),
+        );
+      }
+      */
       const command = config.generateCommand(generationParams);
       ctx.L().info(`Executing command: ${command}`);
 
       const res = await exe.run(command, {
         signalOrTimeout: this.stopWorkAC.signal,
       });
+
+      /* Uncomment this code to parse reported compute stats
       let biggestCompute = 0;
       const stderr = res.stderr ? String(res.stderr) : "";
       for (const line of stderr.split("\n")) {
@@ -307,13 +317,9 @@ export class GolemSessionManager {
         }
       }
 
-      if (biggestCompute > 0) {
-        totalCompute += biggestCompute;
-        estimator.reportAttempts(totalCompute);
-      }
-
+       */
       const stdout = res.stdout ? String(res.stdout) : "";
-      // Parse results from stdout
+
       for (let line of stdout.split("\n")) {
         try {
           line = line.trim();
@@ -322,106 +328,25 @@ export class GolemSessionManager {
             const addr = line.split(",")[1].trim();
             const pubKey = line.split(",")[2].trim();
 
-            if (
-              addr.startsWith(
-                generationParams.vanityAddressPrefix.fullPrefix().toLowerCase(),
-              )
-            ) {
-              const generationResult: GenerationEntryResult = {
-                addr,
-                salt,
-                pubKey,
-                provider,
-              };
-              addressesFound.push(generationResult);
-              this.addGenerationResult(generationResult);
-              console.log(`🤩 Provider ${provider.name} found address ${addr}`);
-              ctx
-                .L()
-                .info(
-                  `Found address: ${addr}, with salt: ${salt}, public key: ${pubKey}, prefix: ${generationParams.vanityAddressPrefix.toHex()}, provider: ${provider.name}`,
-                );
-            }
+            ctx.L().debug("Found address:", addr);
+
+            this.estimatorService.pushProofToQueue({
+              addr,
+              salt,
+              pubKey,
+              provider,
+              jobId: agreementId,
+              cpu: this.processingUnitType,
+            });
           }
         } catch (e) {
           ctx.L().error(`Error parsing result line: ${e}`);
         }
       }
-
-      if (addressesFound.length === 0) {
-        ctx
-          .L()
-          .info(
-            `Couldn't find any address, difficulty: ${displayDifficulty(biggestCompute)}`,
-          );
-
-        const commonInfo = estimator.currentInfo();
-        const unfortunateIteration = Math.floor(
-          commonInfo.attempts / estimator.estimateAttemptsGivenProbability(0.5),
-        );
-        const partial =
-          commonInfo.attempts /
-            estimator.estimateAttemptsGivenProbability(0.5) -
-          unfortunateIteration;
-        const speed = commonInfo.estimatedSpeed;
-        const eta = commonInfo.remainingTimeSec;
-        const etaFormatted = eta !== null ? displayTime("", eta) : "N/A";
-        const speedFormatted =
-          speed !== null ? displayDifficulty(speed.speed) + "/s" : "N/A";
-        const bar = "#".repeat(Math.round(partial * 50)).padEnd(50, " ");
-        const attemptsCompleted = commonInfo.attempts;
-        const attemptsCompletedFormatted = displayDifficulty(attemptsCompleted);
-
-        const ecstaticFace = "😃";
-        const smilingFace = "😊";
-        const neutralFace = "😐";
-        const sadFace = "😢";
-        const catastrophicFace = "😱";
-        const weepingFace = "😭";
-        let face;
-        if (commonInfo.luckFactor > 2) {
-          face = ecstaticFace;
-        } else if (unfortunateIteration == 0) {
-          face = smilingFace;
-        } else if (unfortunateIteration == 1) {
-          face = neutralFace;
-        } else if (unfortunateIteration == 2) {
-          face = sadFace;
-        } else if (unfortunateIteration == 3) {
-          face = catastrophicFace;
-        } else {
-          face = weepingFace;
-        }
-        console.log(
-          " --[" +
-            bar +
-            `]-- ${attemptsCompletedFormatted} ETA: ${etaFormatted} SPEED: ${speedFormatted} ITER: ${unfortunateIteration} LUCK: ${(commonInfo.luckFactor * 100).toFixed(1)}% ${face}`,
-        );
-      } else {
-        ctx
-          .L()
-          .info(
-            `Found ${addressesFound.length} addresses, total results: ${this.noResults}`,
-          );
-        //reset the worker's estimator after finding addresses
-        totalCompute = 0;
-        estimator = new Estimator(
-          computePrefixDifficulty(
-            generationParams.vanityAddressPrefix.fullPrefix(),
-          ),
-        );
-        this.agreementToEstimator[rental.agreement.id] = estimator;
-        ctx
-          .L()
-          .info(
-            `Resetting estimator for agreement ${rental.agreement.id} with provider ${provider.name}`,
-          );
-      }
-      return addressesFound;
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
         ctx.L().info("Work was stopped by user");
-        return [];
+        return;
       }
       ctx.L().error(`Error during profanity_cuda execution: ${error}`);
       throw new Error("Profanity execution failed");
@@ -442,7 +367,6 @@ export class GolemSessionManager {
   public async runSingleIteration(
     ctx: AppContext,
     generationParams: GenerationParams,
-    onResult: OnResultHandler,
     onError: OnErrorHandler,
   ): Promise<void> {
     if (this.stopWorkAC.signal.aborted) {
@@ -466,10 +390,10 @@ export class GolemSessionManager {
     const providerName = rental.agreement.provider.name;
     let shouldKeepRental: boolean;
     try {
-      console.log(
+      /*console.log(
         `🔨 Acquired provider ${providerName} from the pool, running the generation command on them ...`,
-      );
-      const results = await this.runCommand(ctx, rental, generationParams);
+      );*/
+      await this.runCommand(ctx, rental, generationParams);
 
       if (this.isWorkStopped()) {
         ctx.L().info("Work was stopped by user, not processing results");
@@ -477,19 +401,8 @@ export class GolemSessionManager {
         return;
       }
 
-      ctx.L().info("Command executed successfully, results:", results);
-      shouldKeepRental = await onResult({
-        results,
-        provider: rental.agreement.provider,
-      }).catch((error) => {
-        ctx
-          .L()
-          .warn(
-            "Error in onResult handler (defaulting to destroying rental):",
-            error,
-          );
-        return false; // Default to destroying rental on error
-      });
+      ctx.L().info("Command finished successfully");
+      shouldKeepRental = true;
     } catch (error) {
       ctx.L().error("Error during command execution:", error);
       wasSuccess = false;
@@ -509,9 +422,9 @@ export class GolemSessionManager {
     try {
       if (shouldKeepRental) {
         ctx.L().info(`Keeping rental with provider: ${providerName}`);
-        console.log(
+        /*console.log(
           `💡 Provider ${providerName} ran the command successfully, returning them to the pool of available workers`,
-        );
+        );*/
         await this.rentalPool.release(rental);
       } else {
         ctx.L().info(`Destroying rental with provider: ${providerName}`);
@@ -573,8 +486,8 @@ export class GolemSessionManager {
 
   public async stopServices(ctx: AppContext): Promise<void> {
     ctx.L().debug("Stopping services...");
-    this.generationResults.stop();
-    await this.generationResults.waitForFinish();
+    this.estimatorService.stop();
+    await this.estimatorService.waitForFinish();
     ctx.L().debug("All services stopped...");
   }
 }

@@ -2,14 +2,18 @@ import { displayDifficulty, displayTime } from "./utils/format";
 
 export interface EstimatorInfo {
   attempts: number;
+  totalSuccesses: number;
   luckFactor: number;
+  probabilityFactor: number;
   remainingTimeSec: number | null;
   estimatedSpeed: SpeedEstimation | null;
+  provName: string;
 }
 
 export function formatEstimatorInfo(info: EstimatorInfo) {
   const attemptsStr = displayDifficulty(info.attempts);
-  const luckFactorStr = (info.luckFactor * 100).toFixed(1) + "%";
+  const _luckFactorStr = (info.luckFactor * 100).toFixed(1) + "%";
+  const probFactorStr = (info.probabilityFactor * 100).toFixed(1) + "%";
   const remainingTime =
     info.remainingTimeSec !== null
       ? displayTime("", info.remainingTimeSec)
@@ -19,12 +23,13 @@ export function formatEstimatorInfo(info: EstimatorInfo) {
       ? displayDifficulty(info.estimatedSpeed.speed) + "s"
       : "N/A";
 
-  return `Attempts: ${attemptsStr} | Luck: ${luckFactorStr} | Remaining Time: ${remainingTime} | Estimated Speed: ${estimatedSpeed}`;
+  return `Attempts: ${attemptsStr} | Prob ${probFactorStr} | Remaining Time: ${remainingTime} | Estimated Speed: ${estimatedSpeed}`;
 }
 
 interface EstimatorHistoryEntry {
   timePoint: Date;
   attempts: number;
+  successes: number;
 }
 
 class SpeedEstimation {
@@ -61,14 +66,18 @@ const MAX_USABLE_HISTORY_SIZE = MAX_HISTORY_SIZE - HISTORY_TRUNCATE_AT_ONCE;
 export class Estimator {
   targetDifficulty: number;
   currentAttempts: number = 0;
+  totalAttempts: number = 0; // Total attempts made
+  totalSuccesses: number = 0;
+  providerName: string;
   _entries: EstimatorHistoryEntry[] = [];
 
-  constructor(targetDifficulty: number) {
+  constructor(targetDifficulty: number, provName: string) {
     this.targetDifficulty = targetDifficulty;
-    this.reportAttempts(0);
+    this.providerName = provName;
+    this.addProvedWork(0);
   }
 
-  _appendEntry(entry: EstimatorHistoryEntry) {
+  private _appendEntry(entry: EstimatorHistoryEntry) {
     this._entries.push(entry);
     if (this._entries.length > MAX_HISTORY_SIZE) {
       this._entries.splice(0, HISTORY_TRUNCATE_AT_ONCE); // Keep the history size manageable
@@ -94,12 +103,21 @@ export class Estimator {
     return this.targetDifficulty / speed.speed;
   }
 
-  reportAttempts(attempts: number) {
+  public async addProvedWork(attempts: number, isSuccess: boolean = false) {
+    if (isSuccess) {
+      this.currentAttempts = 0; // Reset attempts on success
+    } else {
+      this.currentAttempts += attempts;
+    }
+    this.totalAttempts += attempts;
+    if (isSuccess) {
+      this.totalSuccesses += 1;
+    }
     this._appendEntry({
       timePoint: new Date(),
-      attempts: attempts,
+      attempts: this.totalAttempts,
+      successes: this.totalSuccesses,
     });
-    this.currentAttempts = attempts;
   }
 
   estimatedSpeed(): SpeedEstimation | null {
@@ -109,14 +127,14 @@ export class Estimator {
     return new SpeedEstimation(
       new Date(),
       new Date(startTimePoint),
-      this.currentAttempts,
+      this.totalAttempts,
       entry ? entry.attempts : 0,
     );
   }
 
   estimateProbability(attempts: number): number {
     if (attempts <= 0) {
-      throw new Error("Number of attempts must be greater than zero.");
+      return 0;
     }
 
     return 1 - Math.pow(1 - 1 / this.targetDifficulty, attempts);
@@ -149,10 +167,13 @@ export class Estimator {
     const estimatedSpeed = this.estimatedSpeed();
 
     return {
-      attempts: this.currentAttempts,
+      totalSuccesses: this.totalSuccesses,
+      attempts: this.totalAttempts,
       luckFactor: luckFactor,
+      probabilityFactor: this.estimateProbability(this.currentAttempts),
       remainingTimeSec: remainingTimeSec,
       estimatedSpeed: estimatedSpeed,
+      provName: this.providerName,
     };
   }
 }

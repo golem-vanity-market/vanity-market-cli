@@ -211,9 +211,10 @@ export class GPURentalConfig extends BaseRentalConfig {
     };
   }
 
-  public async checkAndSetCapabilities(exe: ExeUnit): Promise<void> {
+  public async checkAndSetCapabilities(_exe: ExeUnit): Promise<void> {
     try {
-      await exe.run("nvidia-smi");
+      //don't waste time on unused command
+      //await exe.run("nvidia-smi");
     } catch (error) {
       throw new Error(`Failed to validate GPU capabilities: ${error}`);
     }

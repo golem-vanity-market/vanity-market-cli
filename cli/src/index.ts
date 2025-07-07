@@ -1,7 +1,7 @@
 // Don't import anything before it!
 import { shutdownOpenTelemetry } from "./instrumentation";
 import { Command } from "commander";
-import { readFileSync, existsSync, writeFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
 import { join, resolve } from "path";
 import { ethers, hexlify } from "ethers";
 import { GenerationParams, Scheduler } from "./scheduler";
@@ -19,6 +19,9 @@ import { sleep } from "@golem-sdk/golem-js";
 import { pinoLogger } from "@golem-sdk/pino-logger";
 import { ProcessingUnitType } from "./node_manager/config";
 import "dotenv/config";
+import { displayUserMessage } from "./cli";
+import { EstimatorService } from "./estimator_service";
+import { ResultsService } from "./results_service";
 
 /**
  * Custom error class for address generation validation errors
@@ -320,63 +323,56 @@ async function handleGenerateCommand(options: any): Promise<void> {
       // first stop the generation process if it's still running
       try {
         golemSessionManager.stopWork("User initiated shutdown");
-        console.log("✅ Generation process stopped successfully");
+        displayUserMessage("✅ Generation process stopped successfully");
       } catch (error) {
-        console.error("❌ Error stopping generation process:", error);
+        appContext.L().error("❌ Error stopping generation process:", error);
       }
 
       if (options.resultsFile) {
         try {
-          const results = await golemSessionManager.results();
-          writeFileSync(
+          await golemSessionManager.resultService.saveResultsToFile(
+            golemSessionManager.estimatorService,
             options.resultsFile,
-            JSON.stringify({ entries: results }, null, 2),
           );
-          console.log(`✅ Results saved to ${options.resultsFile}`);
+          displayUserMessage(
+            `✅ Results saved to file: ${options.resultsFile}`,
+          );
         } catch (error) {
-          console.error("❌ Failed to save results:", error);
-        }
-      } else {
-        try {
-          const results = await golemSessionManager.results();
-          console.log("Results:", results);
-        } catch (error) {
-          console.error("❌ Failed to retrieve results:", error);
+          appContext.L().error(`❌ Error saving results to file: ${error}`);
         }
       }
 
       // then clean up rentals (which gives us the chance to pay for the work done)
       try {
         await golemSessionManager.drainPool(appContext);
-        console.log("✅ All rentals cleaned up successfully");
+        displayUserMessage("✅ All rentals cleaned up successfully");
       } catch (error) {
-        console.error("❌ Error during rental cleanup:", error);
+        appContext.L().error("❌ Error during rental cleanup:", error);
       }
 
       // only then we can safely disconnect from the Golem network and release the allocation
       try {
         await golemSessionManager.disconnectFromGolemNetwork(appContext);
-        console.log("✅ Disconnected from Golem network");
+        displayUserMessage("✅ Disconnected from Golem network");
       } catch (disconnectError) {
-        console.error(
-          "❌ Error disconnecting from Golem network:",
-          disconnectError,
-        );
+        appContext
+          .L()
+          .error("❌ Error disconnecting from Golem network:", disconnectError);
       }
 
       // finally, stop all services in the worker pool
       try {
         await golemSessionManager.stopServices(appContext);
-        console.log("✅ Stopped all services");
+        displayUserMessage("✅ Stopped all services");
       } catch (error) {
-        console.error("❌ Error stopping services:", error);
+        appContext.L().error("❌ Error stopping services:", error);
       }
     }
 
     // and shut down OpenTelemetry
     try {
       await shutdownOpenTelemetry();
-      console.log("✅ OpenTelemetry shut down successfully");
+      displayUserMessage("✅ OpenTelemetry shut down successfully");
     } catch (err) {
       console.error("❌ Error shutting down OpenTelemetry", err);
     }
@@ -451,7 +447,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       budgetGlm: validatedOptions.budgetGlm!,
       numberOfWorkers: parseInt(options.numWorkers),
       singlePassSeconds: options.singlePassSec
-        ? parseInt(options.singlePassSec, 10)
+        ? parseInt(options.singlePassSec)
         : 20, // Default single pass duration
       numResults: options.numResults,
     };
@@ -462,14 +458,39 @@ async function handleGenerateCommand(options: any): Promise<void> {
         generationParams.numberOfWorkers,
     );
 
-    const workerPoolParams: SessionManagerParams = {
+    const formatDateForFilename = (date = new Date()) => {
+      return date
+        .toISOString()
+        .slice(0, 19)
+        .replace(/:/g, "-")
+        .replace("T", "_");
+    };
+    const resultService = new ResultsService(appContext, {
+      vanityPrefix: validatedOptions.vanityAddressPrefix,
+      //location of the file that saves all results
+      csvOutput:
+        process.env.RESULT_CSV_FILE || `results-${formatDateForFilename()}.csv`,
+    });
+    const estimatorService = new EstimatorService(appContext, {
+      vanityPrefix: validatedOptions.vanityAddressPrefix,
+      messageLoopSecs: parseFloat(
+        process.env.MESSAGE_LOOP_SEC_INTERVAL || "30.0",
+      ),
+      processLoopSecs: parseFloat(
+        process.env.PROCESS_LOOP_SEC_INTERVAL || "1.0",
+      ),
+      resultService,
+    });
+    const sessionManagerParams: SessionManagerParams = {
       numberOfWorkers: generationParams.numberOfWorkers,
       rentalDurationSeconds: estimatedRentalDurationSeconds,
       budgetGlm: generationParams.budgetGlm,
       processingUnitType: validatedOptions.processingUnitType,
+      estimatorService,
+      resultService,
     };
 
-    golemSessionManager = new GolemSessionManager(workerPoolParams);
+    golemSessionManager = new GolemSessionManager(sessionManagerParams);
 
     await golemSessionManager.connectToGolemNetwork(appContext);
     console.log("✅ Connected to Golem network successfully");

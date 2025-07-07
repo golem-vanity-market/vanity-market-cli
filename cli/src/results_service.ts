@@ -1,0 +1,58 @@
+import { appendFile } from "fs/promises";
+import { displayDifficulty } from "./utils/format";
+import { displayUserMessage } from "./cli";
+import { GenerationPrefix } from "./prefix";
+import { computePrefixDifficulty } from "./difficulty";
+import { AppContext } from "./app_context";
+import { ProofEntryResult } from "./model/proof";
+import { writeFileSync } from "fs";
+import { EstimatorService } from "./estimator_service";
+
+export interface ResultsServiceOptions {
+  csvOutput: string | null; // File name for CSV output
+  vanityPrefix: GenerationPrefix; // Optional vanity prefix
+}
+
+export class ResultsService {
+  private ctx;
+  private options: ResultsServiceOptions;
+  private savedAddr: ProofEntryResult[] = [];
+
+  constructor(ctx: AppContext, opt: ResultsServiceOptions) {
+    this.ctx = ctx;
+    this.options = opt;
+  }
+
+  public get numberOfResults(): number {
+    return this.savedAddr.length;
+  }
+
+  public async results(): Promise<ProofEntryResult[]> {
+    return this.savedAddr;
+  }
+
+  public async saveResultsToFile(
+    estimatorService: EstimatorService,
+    resultJsonPath: string,
+  ): Promise<void> {
+    await estimatorService.forceProcess();
+    const entries = await this.results();
+    writeFileSync(resultJsonPath, JSON.stringify({ entries }, null, 2));
+  }
+
+  public async processValidatedEntry(entry: ProofEntryResult): Promise<void> {
+    if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
+      this.savedAddr.push(entry);
+      const addrDifficulty = computePrefixDifficulty(
+        this.options.vanityPrefix.fullPrefix(),
+      );
+      displayUserMessage(
+        `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
+      );
+    }
+    if (this.options.csvOutput) {
+      const csvLine = `0,${entry.addr},${entry.salt},${entry.pubKey},${entry.provider.id},${entry.provider.name},${entry.provider.walletAddress}\n`;
+      await appendFile(this.options.csvOutput, csvLine);
+    }
+  }
+}
