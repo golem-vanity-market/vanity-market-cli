@@ -63,7 +63,7 @@ async function runJobInBackground(
 ) {
   let golemSessionManager: GolemSessionManager | null = null;
   let appContext: AppContext | null = null;
-  let resultsCollector: NodeJS.Timer | null = null;
+  let resultsCollector: NodeJS.Timeout | null = null;
 
   try {
     const validated = validateAndTransformInputs(input);
@@ -164,6 +164,10 @@ async function runJobInBackground(
         rootLogger.error(`Failed to update job status for ${jobId} ${dbError}`);
       });
   } finally {
+    if (resultsCollector) {
+      clearInterval(resultsCollector);
+      rootLogger.info(`Stopped results collector for job ${jobId}`);
+    }
     // 6. Cleanup: This block runs on success, failure, or cancellation.
     if (golemSessionManager && appContext) {
       rootLogger.info(`Cleaning up resources for job ${jobId}`);
