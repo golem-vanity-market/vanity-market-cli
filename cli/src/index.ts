@@ -19,7 +19,6 @@ import { sleep } from "@golem-sdk/golem-js";
 import { pinoLogger } from "@golem-sdk/pino-logger";
 import { ProcessingUnitType } from "./node_manager/config";
 import "dotenv/config";
-import { displayUserMessage } from "./cli";
 import { EstimatorService } from "./estimator_service";
 import { ResultsService } from "./results_service";
 
@@ -308,7 +307,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
     },
   });
 
-  const appContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
+  const appCtx = new AppContext(ROOT_CONTEXT).WithLogger(logger);
 
   let golemSessionManager: GolemSessionManager | null = null;
   let isShuttingDown = false;
@@ -323,9 +322,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
       // first stop the generation process if it's still running
       try {
         golemSessionManager.stopWork("User initiated shutdown");
-        displayUserMessage("✅ Generation process stopped successfully");
+        appCtx.consoleInfo("✅ Generation process stopped successfully");
       } catch (error) {
-        appContext.L().error("❌ Error stopping generation process:", error);
+        appCtx.L().error("❌ Error stopping generation process:", error);
       }
 
       if (options.resultsFile) {
@@ -334,45 +333,45 @@ async function handleGenerateCommand(options: any): Promise<void> {
             golemSessionManager.estimatorService,
             options.resultsFile,
           );
-          displayUserMessage(
+          appCtx.consoleInfo(
             `✅ Results saved to file: ${options.resultsFile}`,
           );
         } catch (error) {
-          appContext.L().error(`❌ Error saving results to file: ${error}`);
+          appCtx.L().error(`❌ Error saving results to file: ${error}`);
         }
       }
 
       // then clean up rentals (which gives us the chance to pay for the work done)
       try {
-        await golemSessionManager.drainPool(appContext);
-        displayUserMessage("✅ All rentals cleaned up successfully");
+        await golemSessionManager.drainPool(appCtx);
+        appCtx.consoleInfo("✅ All rentals cleaned up successfully");
       } catch (error) {
-        appContext.L().error("❌ Error during rental cleanup:", error);
+        appCtx.L().error("❌ Error during rental cleanup:", error);
       }
 
       // only then we can safely disconnect from the Golem network and release the allocation
       try {
-        await golemSessionManager.disconnectFromGolemNetwork(appContext);
-        displayUserMessage("✅ Disconnected from Golem network");
+        await golemSessionManager.disconnectFromGolemNetwork(appCtx);
+        appCtx.consoleInfo("✅ Disconnected from Golem network");
       } catch (disconnectError) {
-        appContext
+        appCtx
           .L()
           .error("❌ Error disconnecting from Golem network:", disconnectError);
       }
 
       // finally, stop all services in the worker pool
       try {
-        await golemSessionManager.stopServices(appContext);
-        displayUserMessage("✅ Stopped all services");
+        await golemSessionManager.stopServices(appCtx);
+        appCtx.consoleInfo("✅ Stopped all services");
       } catch (error) {
-        appContext.L().error("❌ Error stopping services:", error);
+        appCtx.L().error("❌ Error stopping services:", error);
       }
     }
 
     // and shut down OpenTelemetry
     try {
       await shutdownOpenTelemetry();
-      displayUserMessage("✅ OpenTelemetry shut down successfully");
+      appCtx.consoleInfo("✅ OpenTelemetry shut down successfully");
     } catch (err) {
       console.error("❌ Error shutting down OpenTelemetry", err);
     }
@@ -403,20 +402,16 @@ async function handleGenerateCommand(options: any): Promise<void> {
 
     const validatedOptions = validateGenerateOptions(generateOptions);
 
-    console.log(
-      "🚀 Starting vanity address generation with the following parameters:",
+    appCtx.consoleInfo(
+      "🚀 Starting vanity address generation with the following parameters:\n" +
+        `   Public Key File: ${generateOptions.publicKeyPath}\n` +
+        `   Public Key: ${validatedOptions.publicKey.toHex()}\n` +
+        `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}\n` +
+        `   Budget (GLM): ${validatedOptions.budgetGlm}\n` +
+        `   Worker Type: ${validatedOptions.processingUnitType}\n\n` +
+        `✓ All parameters validated successfully\n` +
+        `✓ OpenTelemetry tracing enabled for generation process\n`,
     );
-    console.log(`   Public Key File: ${generateOptions.publicKeyPath}`);
-    console.log(`   Public Key: ${validatedOptions.publicKey.toHex()}`);
-    console.log(
-      `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}`,
-    );
-    console.log(`   Budget (GLM): ${validatedOptions.budgetGlm}`);
-    console.log(`   Worker Type: ${validatedOptions.processingUnitType}`);
-    console.log("");
-    console.log("✓ All parameters validated successfully");
-    console.log("✓ OpenTelemetry tracing enabled for generation process");
-    console.log("");
 
     const difficulty = computePrefixDifficulty(
       validatedOptions.vanityAddressPrefix.fullPrefix(),
@@ -426,18 +421,20 @@ async function handleGenerateCommand(options: any): Promise<void> {
         ? difficulty / 10000000
         : difficulty / 250000000;
 
-    console.log(`Difficulty of the prefix: ${displayDifficulty(difficulty)}`);
+    appCtx.consoleInfo(
+      `Difficulty of the prefix: ${displayDifficulty(difficulty)}`,
+    );
     if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
-      console.log(
+      appCtx.consoleInfo(
         `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime("GPU ", estimatedSecondsToFindOneAddress)}`,
       );
     } else {
-      console.log(
+      appCtx.consoleInfo(
         `Using CPU worker type. Estimated time: ${displayTime("CPU ", estimatedSecondsToFindOneAddress)}`,
       );
     }
     if (!generateOptions.nonInteractive) {
-      console.log("Continue in 10 seconds... Press Ctrl+C to cancel");
+      appCtx.consoleInfo("Continue in 10 seconds... Press Ctrl+C to cancel");
       await sleep(10);
     }
 
@@ -465,13 +462,13 @@ async function handleGenerateCommand(options: any): Promise<void> {
         .replace(/:/g, "-")
         .replace("T", "_");
     };
-    const resultService = new ResultsService(appContext, {
+    const resultService = new ResultsService(appCtx, {
       vanityPrefix: validatedOptions.vanityAddressPrefix,
       //location of the file that saves all results
       csvOutput:
         process.env.RESULT_CSV_FILE || `results-${formatDateForFilename()}.csv`,
     });
-    const estimatorService = new EstimatorService(appContext, {
+    const estimatorService = new EstimatorService(appCtx, {
       vanityPrefix: validatedOptions.vanityAddressPrefix,
       messageLoopSecs: parseFloat(
         process.env.MESSAGE_LOOP_SEC_INTERVAL || "30.0",
@@ -492,32 +489,32 @@ async function handleGenerateCommand(options: any): Promise<void> {
 
     golemSessionManager = new GolemSessionManager(sessionManagerParams);
 
-    await golemSessionManager.connectToGolemNetwork(appContext);
-    console.log("✅ Connected to Golem network successfully");
+    await golemSessionManager.connectToGolemNetwork(appCtx);
+    appCtx.consoleInfo("✅ Connected to Golem network successfully");
 
-    await golemSessionManager.initializeRentalPool(appContext);
-    console.log(
+    await golemSessionManager.initializeRentalPool(appCtx);
+    appCtx.consoleInfo(
       `✅ Initialized pool of ${generationParams.numberOfWorkers} rentals`,
     );
 
-    console.log(
+    appCtx.consoleInfo(
       `🔍 Looking for the best offer (waiting for at least ${generateOptions.minOffers} proposals with a ${generateOptions.minOffersTimeoutSec} second timeout)`,
     );
     await golemSessionManager.waitForEnoughOffers(
-      appContext,
+      appCtx,
       generateOptions.minOffers,
       generateOptions.minOffersTimeoutSec,
     );
 
     const scheduler = new Scheduler(golemSessionManager);
-    await scheduler.runGenerationProcess(appContext, generationParams);
+    await scheduler.runGenerationProcess(appCtx, generationParams);
 
     // Normal completion, initiate shutdown.
     await gracefulShutdown(0);
   } catch (error) {
     // Avoid logging error if shutdown was user-initiated via Ctrl+C
     if (!isShuttingDown) {
-      console.error("❌ Failed during execution:", error);
+      appCtx.consoleError("❌ Failed during execution:", error);
     }
     await gracefulShutdown(1);
   }

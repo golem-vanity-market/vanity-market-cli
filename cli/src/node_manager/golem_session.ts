@@ -17,7 +17,6 @@ import {
 import { computePrefixDifficulty } from "../difficulty";
 import { withTimeout } from "../utils/timeout";
 import { isNativeError } from "util/types";
-import { displayUserMessage } from "../cli";
 import { EstimatorService } from "../estimator_service";
 import { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
@@ -104,14 +103,12 @@ export class GolemSessionManager {
       throw new Error("Connection to Golem Network failed");
     }
     this.golemNetwork.market.events.on("agreementApproved", ({ agreement }) => {
-      displayUserMessage(
-        `📃 Signed an agreement with ${agreement.provider.name}`,
-      );
+      ctx.consoleInfo(`📃 Signed an agreement with ${agreement.provider.name}`);
     });
     this.golemNetwork.market.events.on(
       "agreementTerminated",
       ({ agreement }) => {
-        displayUserMessage(
+        ctx.consoleInfo(
           `🗑️ Terminated agreement with ${agreement.provider.name}`,
         );
       },
@@ -168,7 +165,7 @@ export class GolemSessionManager {
     this.golemNetwork.payment.events.on(
       "allocationCreated",
       ({ allocation }) => {
-        console.log(
+        ctx.consoleInfo(
           "Allocation created with budget:",
           Number(allocation.remainingAmount).toFixed(2),
         );
@@ -275,7 +272,6 @@ export class GolemSessionManager {
 
     const agreementId = rental.agreement.id;
 
-    //displayUserMessage(`Started work on agreement ID: ${agreementId}`);
     await this.estimatorService.initJobIfNotInitialized(
       agreementId,
       rental.agreement.provider.name,
@@ -445,14 +441,23 @@ export class GolemSessionManager {
         );*/
         await this.rentalPool.release(rental);
       } else {
-        ctx.L().info(`Destroying rental with provider: ${providerName}`);
-        console.log(
+        ctx
+          .L()
+          .info(
+            `Destroying rental with provider: ${providerName}, the provider failed to run the commmand`,
+          );
+        ctx.consoleInfo(
           `💔 Provider ${providerName} did not run the command successfully, destroying the rental`,
         );
         await this.rentalPool.destroy(rental);
       }
     } catch (error) {
-      ctx.L().error("Error during rental release/destroy:", error);
+      ctx
+        .L()
+        .error(
+          `Error during rental for ${providerName} release/destroy:`,
+          error,
+        );
       throw new Error("Rental release/destroy failed");
     }
     if (!wasSuccess) {

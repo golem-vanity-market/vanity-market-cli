@@ -1,8 +1,8 @@
 import { sleep } from "@golem-sdk/golem-js";
 import { Estimator } from "./estimator";
-import { displayUserMessage } from "./cli";
 import { GenerationPrefix } from "./prefix";
 import { ProcessingUnitType } from "./node_manager/config";
+import { displayDifficulty } from "./utils/format";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
 import { displaySummary, displayTotalSummary } from "./ui/displaySummary";
@@ -92,7 +92,14 @@ export class EstimatorService {
         }
         const proverDifficulty = computePrefixDifficulty(prover);
 
-        await this.options.resultService.processValidatedEntry(entry);
+        await this.options.resultService.processValidatedEntry(
+          entry,
+          (jobId: string, address: string, addrDifficulty: number) => {
+            this.ctx.consoleInfo(
+              `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
+            );
+          },
+        );
 
         if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
           this.totalEstimator?.addProvedWork(proverDifficulty, true);
@@ -138,7 +145,7 @@ export class EstimatorService {
       }
       if (this.totalEstimator) {
         displaySummary(this.estimators);
-        displayUserMessage("---------------------------");
+        this.ctx.consoleInfo("---------------------------");
         displayTotalSummary(this.totalEstimator);
       }
       await sleep(this.options.messageLoopSecs);

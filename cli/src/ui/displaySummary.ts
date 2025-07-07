@@ -1,6 +1,5 @@
 import { Estimator } from "../estimator";
 import { displayDifficulty, displayTime } from "../utils/format";
-import { displayUserMessage } from "../cli";
 
 function getFaceEmoji(
   luckFactor: number,
@@ -55,7 +54,7 @@ function displayEstimatorSummary(est: Estimator, label: string): void {
 
   const efficiency =
     info.cost > 0 ? (attemptsCompleted / info.cost / 1e12).toFixed(6) : "N/A";
-  displayUserMessage(
+  console.log(
     ` ${icon} ${label} - ${attemptsCompletedFormatted}${donePart} ETA: ${etaFormatted} SPEED: ${speedFormatted} PROB: ${(info.probabilityFactor * 100).toFixed(1)}% \n   -- GLM: ${costFormatted}(${glmPerHour}/h) TOT EFFICIENCY: ${efficiency} TH/GLM ${face}`,
   );
 }

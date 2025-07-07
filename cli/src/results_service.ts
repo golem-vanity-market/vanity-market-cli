@@ -1,6 +1,4 @@
 import { appendFile } from "fs/promises";
-import { displayDifficulty } from "./utils/format";
-import { displayUserMessage } from "./cli";
 import { GenerationPrefix } from "./prefix";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
@@ -40,15 +38,20 @@ export class ResultsService {
     writeFileSync(resultJsonPath, JSON.stringify({ entries }, null, 2));
   }
 
-  public async processValidatedEntry(entry: ProofEntryResult): Promise<void> {
+  public async processValidatedEntry(
+    entry: ProofEntryResult,
+    onAddressFound: (
+      jobId: string,
+      address: string,
+      addrDifficulty: number,
+    ) => void,
+  ): Promise<void> {
     if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
       this.savedAddr.push(entry);
       const addrDifficulty = computePrefixDifficulty(
         this.options.vanityPrefix.fullPrefix(),
       );
-      displayUserMessage(
-        `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
-      );
+      onAddressFound(entry.jobId, entry.addr, addrDifficulty);
     }
     if (this.options.csvOutput) {
       const csvLine = `0,${entry.addr},${entry.salt},${entry.pubKey},${entry.provider.id},${entry.provider.name},${entry.provider.walletAddress}\n`;
