@@ -403,7 +403,7 @@ export class GolemSessionManager {
 
     let wasSuccess = true;
 
-    const rental = await this.rentalPool.acquire(5_000); // timeout if fail to acquire rental in 5 seconds
+    const rental = await this.rentalPool.acquire(this.stopWorkAC.signal); // wait as long as needed to find a provider (cancelled by stopWorkAC)
     const providerName = rental.agreement.provider.name;
 
     let shouldKeepRental: boolean;
@@ -439,21 +439,13 @@ export class GolemSessionManager {
     }
     try {
       if (shouldKeepRental) {
-        ctx
-          .L()
-          .info(
-            `Keeping rental with provider: ${rental.agreement.provider.name}`,
-          );
+        ctx.L().info(`Keeping rental with provider: ${providerName}`);
         /*console.log(
           `💡 Provider ${providerName} ran the command successfully, returning them to the pool of available workers`,
         );*/
         await this.rentalPool.release(rental);
       } else {
-        ctx
-          .L()
-          .info(
-            `Destroying rental with provider: ${rental.agreement.provider.name}`,
-          );
+        ctx.L().info(`Destroying rental with provider: ${providerName}`);
         console.log(
           `💔 Provider ${providerName} did not run the command successfully, destroying the rental`,
         );
