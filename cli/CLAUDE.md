@@ -9,6 +9,7 @@ This is a TypeScript CLI application for generating vanity cryptocurrency addres
 - `dist/` - Built JavaScript output
 - `package.json` - NPM dependencies and scripts
 - `monitoring/` - scripts for setting up the local monitoring stack
+- `.claude/scripts/` - Claude Code hook scripts (bash) for automation
 
 ## Development Commands
 
@@ -105,6 +106,10 @@ npm run dev -- generate \
 - Memory efficiency considerations
 - CPU utilization optimization
 - Monitor generation time and success rates
+
+## Claude Code Hooks
+
+The `.claude/scripts/` directory contains bash scripts that execute in response to Claude Code events.
 
 ## Current Status
 
