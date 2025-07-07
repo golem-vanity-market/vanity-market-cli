@@ -35,4 +35,12 @@ export class AppContext {
     const otl_key = otl.createContextKey(key);
     return this._activeContext.getValue(otl_key) as T | undefined;
   }
+
+  public consoleInfo(message?: unknown, ...optionalParams: unknown[]): void {
+    console.log(message, ...optionalParams);
+  }
+
+  public consoleError(message?: unknown, ...optionalParams: unknown[]): void {
+    console.error(message, ...optionalParams);
+  }
 }
