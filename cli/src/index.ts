@@ -128,7 +128,7 @@ function readPublicKeyFromFile(publicKeyPath: string): string {
   }
 }
 
-class PublicKey {
+export class PublicKey {
   bytes: Uint8Array;
 
   constructor(publicKey: string) {
