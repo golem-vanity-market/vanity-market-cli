@@ -17,6 +17,11 @@ export interface EstimatorServiceOptions {
   resultService: ResultsService;
 }
 
+export interface ReportCostResponse {
+  accepted: boolean;
+  reason: string;
+}
+
 export class EstimatorService {
   private proofQueue: ProofEntryResult[] = [];
 
@@ -25,6 +30,7 @@ export class EstimatorService {
   private isFinished = false;
 
   private estimators: Map<string, Estimator> = new Map();
+  private costs: Map<string, number> = new Map();
   private totalEstimator: Estimator | null = null;
   private options;
   private ctx;
@@ -137,6 +143,33 @@ export class EstimatorService {
       }
       await sleep(this.options.messageLoopSecs);
     }
+  }
+
+  public reportCosts(jobId: string, cost: number): ReportCostResponse {
+    const job = this.estimators.get(jobId);
+    if (!job) {
+      return {
+        accepted: false,
+        reason: `Estimator for job ${jobId} not found.`,
+      };
+    }
+    if (job.currentInfo().attempts == 0) {
+      return {
+        accepted: false,
+        reason: `No work made for job ${jobId}.`,
+      };
+    }
+    job.setCurrentCost(cost);
+
+    let totalCost = 0;
+    for (const estimator of this.estimators.values()) {
+      totalCost += estimator.currentCost;
+    }
+    this.totalEstimator?.setCurrentCost(totalCost);
+    return {
+      accepted: true,
+      reason: `Cost for job ${jobId} accepted: ${cost} GLM.`,
+    };
   }
 
   public pushProofToQueue(result: ProofEntryResult): boolean {

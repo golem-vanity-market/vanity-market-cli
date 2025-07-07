@@ -41,6 +41,8 @@ function displayEstimatorSummary(est: Estimator, label: string): void {
   const etaFormatted = eta !== null ? displayTime("", eta) : "N/A";
   const speedFormatted =
     speed !== null ? displayDifficulty(speed.speed) + "/s" : "N/A";
+  const glmPerHour =
+    speed !== null ? (speed?.costPerHour.toFixed(5) ?? 0) : "N/A";
   const attemptsCompleted = info.attempts;
   const attemptsCompletedFormatted = displayDifficulty(attemptsCompleted);
 
@@ -48,8 +50,13 @@ function displayEstimatorSummary(est: Estimator, label: string): void {
   const donePart = successes > 0 ? ` DONE: ${successes}` : "";
 
   const icon = label == "total" ? "🌍" : "💻";
+
+  const costFormatted = info.cost.toFixed(6);
+
+  const efficiency =
+    info.cost > 0 ? (attemptsCompleted / info.cost / 1e12).toFixed(6) : "N/A";
   displayUserMessage(
-    ` ${icon} ${label} - ${attemptsCompletedFormatted}${donePart} ETA: ${etaFormatted} SPEED: ${speedFormatted} PROB: ${(info.probabilityFactor * 100).toFixed(1)}% ${face}`,
+    ` ${icon} ${label} - ${attemptsCompletedFormatted}${donePart} ETA: ${etaFormatted} SPEED: ${speedFormatted} PROB: ${(info.probabilityFactor * 100).toFixed(1)}% \n   -- GLM: ${costFormatted}(${glmPerHour}/h) TOT EFFICIENCY: ${efficiency} TH/GLM ${face}`,
   );
 }
 

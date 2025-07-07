@@ -8,6 +8,7 @@ export interface EstimatorInfo {
   remainingTimeSec: number | null;
   estimatedSpeed: SpeedEstimation | null;
   provName: string;
+  cost: number;
 }
 
 export function formatEstimatorInfo(info: EstimatorInfo) {
@@ -30,6 +31,7 @@ interface EstimatorHistoryEntry {
   timePoint: Date;
   attempts: number;
   successes: number;
+  cost: number;
 }
 
 class SpeedEstimation {
@@ -37,17 +39,23 @@ class SpeedEstimation {
   startTimePoint: Date;
   currentAttempts: number;
   startAttempts: number;
+  currentCost: number; // Default value, can be set later
+  startCost: number;
 
   constructor(
     currentTimePoint: Date,
     startTimePoint: Date,
     currentAttempts: number,
     startAttempts: number,
+    currentCost: number = 0, // Default value, can be set later
+    startCost: number = 0, // Default value, can be set later
   ) {
     this.currentTimePoint = currentTimePoint;
     this.startTimePoint = startTimePoint;
     this.currentAttempts = currentAttempts;
     this.startAttempts = startAttempts; // Default value, can be set later
+    this.currentCost = currentCost;
+    this.startCost = startCost; // Default value, can be set later
   }
 
   get speed(): number {
@@ -57,6 +65,15 @@ class SpeedEstimation {
       return 0;
     }
     return (this.currentAttempts - this.startAttempts) / (timeDiff / 1000); // Speed in attempts per second
+  }
+
+  get costPerHour(): number {
+    const timeDiff =
+      this.currentTimePoint.getTime() - this.startTimePoint.getTime();
+    if (timeDiff <= 0) {
+      return 0;
+    }
+    return (this.currentCost - this.startCost) / (timeDiff / 3600000); // Cost per hour
   }
 }
 
@@ -69,6 +86,7 @@ export class Estimator {
   totalAttempts: number = 0; // Total attempts made
   totalSuccesses: number = 0;
   providerName: string;
+  currentCost: number = 0;
   _entries: EstimatorHistoryEntry[] = [];
 
   constructor(targetDifficulty: number, provName: string) {
@@ -103,6 +121,10 @@ export class Estimator {
     return this.targetDifficulty / speed.speed;
   }
 
+  public setCurrentCost(cost: number) {
+    this.currentCost = cost;
+  }
+
   public async addProvedWork(attempts: number, isSuccess: boolean = false) {
     if (isSuccess) {
       this.currentAttempts = 0; // Reset attempts on success
@@ -117,6 +139,7 @@ export class Estimator {
       timePoint: new Date(),
       attempts: this.totalAttempts,
       successes: this.totalSuccesses,
+      cost: this.currentCost,
     });
   }
 
@@ -129,6 +152,8 @@ export class Estimator {
       new Date(startTimePoint),
       this.totalAttempts,
       entry ? entry.attempts : 0,
+      this.currentCost,
+      entry ? entry.cost : 0,
     );
   }
 
@@ -174,6 +199,7 @@ export class Estimator {
       remainingTimeSec: remainingTimeSec,
       estimatedSpeed: estimatedSpeed,
       provName: this.providerName,
+      cost: this.currentCost,
     };
   }
 }
