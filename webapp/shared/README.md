@@ -1,0 +1,1 @@
+This directory contains shared code for the frontend and backend of the web application.
