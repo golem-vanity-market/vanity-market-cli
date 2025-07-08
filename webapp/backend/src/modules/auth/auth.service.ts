@@ -1,10 +1,11 @@
-import { noncesTable } from "./../../lib/db/schema.ts";
+import { noncesTable, refreshTokensTable } from "./../../lib/db/schema.ts";
 import { db } from "../../lib/db/index.ts";
-import type { FastifyInstance, FastifyRequest } from "fastify";
+import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import { usersTable } from "../../lib/db/schema.ts";
 import { eq, and, gte } from "drizzle-orm";
 import { verifyMessage } from "viem";
 import { generateSiweNonce, parseSiweMessage } from "viem/siwe";
+import { randomUUID } from "node:crypto";
 
 export async function generateNonce() {
   const nonce = generateSiweNonce();
@@ -19,7 +20,8 @@ export async function generateNonce() {
 export async function verifySignatureAndLogin(
   fastify: FastifyInstance,
   message: string,
-  signature: `0x${string}`
+  signature: `0x${string}`,
+  reply: FastifyReply
 ) {
   try {
     const fields = parseSiweMessage(message);
@@ -63,10 +65,29 @@ export async function verifySignatureAndLogin(
         .returning()
         .then((rows) => rows[0]);
     }
-    const token = fastify.jwt.sign({
-      walletAddress: address,
+    const token = randomUUID();
+    const refreshToken = await reply.jwtSign(
+      { walletAddress: address, token },
+      {
+        expiresIn: "30d",
+      }
+    );
+    await db.insert(refreshTokensTable).values({
+      token,
+      userAddress: address,
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days expiration
     });
-    return { token };
+
+    const accessToken = await reply.jwtSign(
+      { walletAddress: address, token },
+      {
+        expiresIn: "15m",
+      }
+    );
+    return {
+      accessToken,
+      refreshToken,
+    };
   } catch (error) {
     fastify.log.error(error);
     throw new Error("Authentication failed");
@@ -88,4 +109,55 @@ export async function getCurrentUser(request: FastifyRequest) {
     throw new Error("User not found");
   }
   return user;
+}
+
+export async function refreshAccessToken(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  const { token, walletAddress } = await request.jwtVerify<{
+    token: string;
+    walletAddress: `0x${string}`;
+  }>({ onlyCookie: true });
+  if (!token || !walletAddress) {
+    throw new Error("Refresh token is required");
+  }
+  await db
+    .delete(refreshTokensTable)
+    .where(eq(refreshTokensTable.token, token));
+
+  const newToken = randomUUID();
+  const newRefreshToken = await reply.jwtSign(
+    { walletAddress, token: newToken },
+    {
+      expiresIn: "30d",
+    }
+  );
+  await db.insert(refreshTokensTable).values({
+    token: newToken,
+    userAddress: walletAddress.toLowerCase(),
+    expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days expiration
+  });
+  const newAccessToken = await reply.jwtSign(
+    { token: newToken, walletAddress },
+    {
+      expiresIn: "15m",
+    }
+  );
+  return {
+    accessToken: newAccessToken,
+    refreshToken: newRefreshToken,
+  };
+}
+
+export async function logout(request: FastifyRequest) {
+  const { token } = await request.jwtVerify<{ token: string }>({
+    onlyCookie: true,
+  });
+  if (!token) {
+    throw new Error("Refresh token is required");
+  }
+  await db
+    .delete(refreshTokensTable)
+    .where(eq(refreshTokensTable.token, token));
 }

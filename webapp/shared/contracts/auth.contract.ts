@@ -14,7 +14,6 @@ export const SignInSchema = z.object({
 });
 
 export const UserSchema = z.object({
-  id: z.number().int(),
   address: EthereumAddress,
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -60,5 +59,34 @@ export const authContract = c.router({
       }),
     },
     summary: "Get the current user's information",
+  },
+  refresh: {
+    method: "POST",
+    path: "/auth/refresh",
+    body: z.object({}),
+    responses: {
+      200: z.object({
+        accessToken: z.string(),
+        refreshToken: z.string(),
+      }),
+      401: z.object({
+        message: z.string(),
+      }),
+    },
+    summary: "Refresh the access token using the refresh token",
+  },
+  logout: {
+    method: "POST",
+    path: "/auth/logout",
+    body: z.object({}),
+    responses: {
+      200: z.object({
+        message: z.string(),
+      }),
+      401: z.object({
+        message: z.string(),
+      }),
+    },
+    summary: "Log out the current user",
   },
 });

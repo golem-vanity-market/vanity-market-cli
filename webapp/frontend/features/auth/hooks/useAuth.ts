@@ -11,6 +11,5 @@ export function useAuth() {
       }
       return response.body;
     },
-    refetchOnWindowFocus: false,
   });
 }

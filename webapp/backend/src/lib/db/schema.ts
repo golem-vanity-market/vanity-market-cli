@@ -2,8 +2,7 @@ import { sql } from "drizzle-orm";
 import { int, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const usersTable = sqliteTable("user", {
-  id: int("id").primaryKey({ autoIncrement: true }),
-  address: text("address").notNull().unique(),
+  address: text("address", { length: 42 }).primaryKey(),
   createdAt: text("created_at")
     .notNull()
     .default(sql`(current_timestamp)`),
@@ -17,11 +16,19 @@ export const noncesTable = sqliteTable("nonce", {
   expiresAt: int("expires_at", { mode: "timestamp" }).notNull(),
 });
 
+export const refreshTokensTable = sqliteTable("refresh_tokens", {
+  token: text("token").primaryKey(),
+  userAddress: text("user_address", { length: 42 })
+    .notNull()
+    .references(() => usersTable.address, { onDelete: "cascade" }),
+  expiresAt: int("expires_at", { mode: "timestamp" }).notNull(),
+});
+
 export const jobsTable = sqliteTable("job", {
   id: text("id").primaryKey(), // Using text for UUIDs
-  userId: int("user_id")
+  userAddress: text("user_address")
     .notNull()
-    .references(() => usersTable.id, { onDelete: "cascade" }),
+    .references(() => usersTable.address, { onDelete: "cascade" }),
   status: text("status", {
     enum: ["pending", "processing", "completed", "failed", "cancelled"],
   }).notNull(),

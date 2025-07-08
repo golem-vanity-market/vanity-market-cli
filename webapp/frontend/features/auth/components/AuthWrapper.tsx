@@ -4,7 +4,7 @@ import {
   createAuthenticationAdapter,
   RainbowKitAuthenticationProvider,
 } from "@rainbow-me/rainbowkit";
-import { apiClient } from "@/lib/api";
+import { apiClient, setAccessToken } from "@/lib/api";
 import { createSiweMessage } from "viem/siwe";
 
 export default function AuthWrapper({
@@ -15,7 +15,7 @@ export default function AuthWrapper({
   const { data: user, isLoading, refetch } = useAuth();
 
   const authAdapter = useMemo(() => {
-    return createAuthenticationAdapter<unknown>({
+    return createAuthenticationAdapter({
       getNonce: async () => {
         const response = await apiClient.auth.getNonce({ body: {} });
         if (response.status !== 200) {
@@ -23,6 +23,7 @@ export default function AuthWrapper({
         }
         return response.body.nonce;
       },
+
       createMessage: ({ nonce, address, chainId }) => {
         return createSiweMessage({
           domain: window.location.host,
@@ -34,31 +35,48 @@ export default function AuthWrapper({
           nonce,
         });
       },
+
       verify: async ({ message, signature }) => {
-        const response = await apiClient.auth.signIn({
-          body: {
-            message: message as `0x${string}`,
-            signature: signature as `0x${string}`,
-          },
-        });
-        if (response.status !== 200) {
+        try {
+          const response = await apiClient.auth.signIn({
+            body: {
+              message,
+              signature: signature as `0x${string}`,
+            },
+          });
+
+          if (response.status !== 200) {
+            return false;
+          }
+
+          setAccessToken(response.body.accessToken);
+          await refetch();
+          return true;
+        } catch (error) {
+          console.error("Verification failed", error);
           return false;
         }
-        localStorage.setItem("token", response.body.accessToken);
-        refetch();
-        return true;
       },
+
       signOut: async () => {
-        localStorage.removeItem("token");
-        refetch();
+        try {
+          await apiClient.auth.logout({ body: {} });
+        } catch (error) {
+          console.error("Logout failed", error);
+        } finally {
+          setAccessToken("");
+          await refetch();
+        }
       },
     });
   }, [refetch]);
+
   const authState = !!user
     ? "authenticated"
     : isLoading
     ? "loading"
     : "unauthenticated";
+
   return (
     <RainbowKitAuthenticationProvider adapter={authAdapter} status={authState}>
       {children}
