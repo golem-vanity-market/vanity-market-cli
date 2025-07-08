@@ -9,7 +9,7 @@ import cookiePlugin from "@fastify/cookie";
 import config from "./config.ts";
 export async function buildApp() {
   const app = Fastify({
-    logger: false, // TODO: use golem-compatible logger
+    logger: true, // TODO: use golem-compatible logger
   });
 
   app.register(corsPlugin, {
