@@ -24,7 +24,7 @@ const queryClient = new QueryClient();
 
 const config = getDefaultConfig({
   appName: "Golem Vanity Market",
-  projectId: "3ceb790c9f98b79ce035389f303abd69", //TODO: env
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "",
   chains: [polygon],
   ssr: false,
 });

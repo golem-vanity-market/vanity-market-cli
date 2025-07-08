@@ -10,7 +10,7 @@ export const setAccessToken = (token: string) => {
 };
 
 export const apiClient = initClient(contract, {
-  baseUrl: "http://localhost:3001",
+  baseUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
   baseHeaders: {
     Authorization: () => (accessToken ? `Bearer ${accessToken}` : ""),
   },
