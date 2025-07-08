@@ -1,5 +1,7 @@
 // Don't import anything before it!
 import { shutdownOpenTelemetry } from "./instrumentation";
+import { trace, metrics } from "@opentelemetry/api";
+import { MetricsCollector } from "./metrics_collector";
 import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
@@ -292,7 +294,14 @@ async function handleGenerateCommand(options: any): Promise<void> {
     },
   });
 
-  const appCtx = new AppContext(ROOT_CONTEXT).WithLogger(logger);
+  const tracer = trace.getTracer(APP_NAME, APP_VERSION);
+  const meter = metrics.getMeter(APP_NAME, APP_VERSION);
+  const mCollector = MetricsCollector.newCollector(meter);
+
+  const appCtx = new AppContext(ROOT_CONTEXT)
+    .WithLogger(logger)
+    .WithTracer(tracer)
+    .WithCollector(mCollector);
 
   let golemSessionManager: GolemSessionManager | null = null;
   let isShuttingDown = false;

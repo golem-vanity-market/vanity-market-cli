@@ -1,0 +1,34 @@
+{
+  "entries": [
+    {
+      "addr": "0x666600b6c15a963133e544df9320d941a5b9d972",
+      "salt": "0x00000000000000bda609f54e4762edd65ea918a069bdf781073e3f6e894fc09b",
+      "pubKey": "0xd4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
+      "provider": {
+        "id": "0x5e173625ae406256a1039ea52e819d5c9154c441",
+        "name": "testnet-golembase-0-DE",
+        "walletAddress": "0x5e173625ae406256a1039ea52e819d5c9154c441"
+      }
+    },
+    {
+      "addr": "0x6666001d7a0a7e4c895156dac351222d71f4f884",
+      "salt": "0x000000000000007dca66d44174c464ac88af443956a1f24f7f12a6497149ddd9",
+      "pubKey": "0xd4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
+      "provider": {
+        "id": "0x5e173625ae406256a1039ea52e819d5c9154c441",
+        "name": "testnet-golembase-0-DE",
+        "walletAddress": "0x5e173625ae406256a1039ea52e819d5c9154c441"
+      }
+    },
+    {
+      "addr": "0x6666007c184d4fbbee985ca0d7a991af0ad42fac",
+      "salt": "0x00000000000000838bcfacbda7c636f1ec18ff767ad8bb2aa9b6e5887f383f27",
+      "pubKey": "0xd4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab74decd66d80396308db9cb4db13b0c273811d51a1773d6d9e2dbcac1d28",
+      "provider": {
+        "id": "0x5f93f271a921a7d6b2237fb8a8ceda94bebcd910",
+        "name": "testnet-golembase-1-DE",
+        "walletAddress": "0x5f93f271a921a7d6b2237fb8a8ceda94bebcd910"
+      }
+    }
+  ]
+}

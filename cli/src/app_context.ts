@@ -1,12 +1,12 @@
 import * as otl from "@opentelemetry/api";
 import { Logger } from "@golem-sdk/golem-js";
-import { MetricCollector } from "./metric_collector";
+import { MetricsCollector } from "./metrics_collector";
 
 export class AppContext {
   private _activeContext: otl.Context;
   private logger?: Logger;
   private tracer?: otl.Tracer;
-  private collector?: MetricCollector;
+  private collector?: MetricsCollector;
 
   constructor(ctx: otl.Context) {
     this._activeContext = ctx;
@@ -19,14 +19,14 @@ export class AppContext {
     return newCtx;
   }
 
-  public WithTracker(tracer: otl.Tracer): AppContext {
+  public WithTracer(tracer: otl.Tracer): AppContext {
     const newCtx = new AppContext(this._activeContext);
     newCtx.tracer = tracer;
     newCtx.logger = this.logger;
     return newCtx;
   }
 
-  public WithMeterCollector(collector: MetricCollector): AppContext {
+  public WithCollector(collector: MetricsCollector): AppContext {
     const newCtx = new AppContext(this._activeContext);
     newCtx.collector = collector;
     newCtx.logger = this.logger; // Preserve the logger
