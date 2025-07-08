@@ -40,7 +40,6 @@ pids
 # Temporary folders
 tmp/
 temp/
-cli/results/
 
 # Keys and secrets
 *.key
@@ -55,8 +54,11 @@ cli/results/
 /cli/generated.pub
 
 .env
-results.csv
-results.json
+
+# result files that CLI generates 
+results*.csv
+results*.json
+results/
 
 *.sqlite
 
