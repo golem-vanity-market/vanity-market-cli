@@ -276,7 +276,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       targets: [
         {
           target: "pino-opentelemetry-transport",
-          level: "info",
+          level: process.env.OTEL_LOG_LEVEL || "info",
           options: {
             severityNumberMap: {
               trace: 1,
