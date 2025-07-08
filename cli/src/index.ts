@@ -271,7 +271,7 @@ function validateGenerateOptions(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerateCommand(options: any): Promise<void> {
   const logger = pinoLogger({
-    name: "golem-vaddr-cli",
+    name: APP_NAME,
     transport: {
       targets: [
         {
