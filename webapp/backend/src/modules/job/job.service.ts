@@ -20,7 +20,7 @@ import {
   type JobInput,
   type JobDetails,
   type JobResult,
-} from "../../contracts/job.contract.ts";
+} from "../../../../shared/contracts/job.contract.ts";
 import { fastifyLogger } from "../../lib/logger.ts";
 import { db } from "../../lib/db/index.ts";
 

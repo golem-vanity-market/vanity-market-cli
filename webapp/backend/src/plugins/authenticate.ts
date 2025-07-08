@@ -1,30 +1,37 @@
-import type { FastifyRequest, FastifyReply } from "fastify";
+import type {
+  FastifyRequest,
+  FastifyReply,
+  HookHandlerDoneFunction,
+} from "fastify";
 import fp from "fastify-plugin";
-import type { User } from "../contracts/auth.contract.ts";
+
+declare module "@fastify/jwt" {
+  interface FastifyJWT {
+    payload: { walletAddress: `0x${string}` };
+    user: {
+      walletAddress: `0x${string}`;
+    };
+  }
+}
 
 declare module "fastify" {
-  interface FastifyRequest {
-    user: User;
+  interface FastifyInstance {
+    authenticate: (
+      request: FastifyRequest,
+      reply: FastifyReply,
+      done: HookHandlerDoneFunction
+    ) => Promise<void>;
   }
 }
 
 async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   try {
-    // TODO: verify JWT auth here
-    request.user = {
-      id: 1,
-      address: "0x1234567890abcdef1234567890abcdef12345678",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    await request.jwtVerify();
   } catch (err) {
     reply.status(401).send({ message: "Unauthorized" });
   }
 }
 
 export default fp(async (fastify) => {
-  // Decorate the request object so we can assign `request.user`
-  fastify.decorate("user", null);
-  // Register the main authentication function as a hook or decorator
-  fastify.addHook("preHandler", authenticate);
+  fastify.decorate("authenticate", authenticate);
 });

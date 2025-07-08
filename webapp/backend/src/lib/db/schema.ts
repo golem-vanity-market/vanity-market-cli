@@ -12,6 +12,11 @@ export const usersTable = sqliteTable("user", {
     .default(sql`(current_timestamp)`),
 });
 
+export const noncesTable = sqliteTable("nonce", {
+  nonce: text("nonce").notNull().primaryKey(),
+  expiresAt: int("expires_at", { mode: "timestamp" }).notNull(),
+});
+
 export const jobsTable = sqliteTable("job", {
   id: text("id").primaryKey(), // Using text for UUIDs
   userId: int("user_id")

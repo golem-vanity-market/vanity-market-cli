@@ -10,17 +10,20 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@fastify/cors": "^8.5.0",
+    "@fastify/jwt": "^8.0.1",
     "@golem-sdk/golem-js": "^3.5.0",
     "@golem-sdk/pino-logger": "^1.1.0",
     "@libsql/client": "^0.15.9",
     "@opentelemetry/api": "^1.9.0",
-    "@ts-rest/core": "^3.52.1",
-    "@ts-rest/fastify": "^3.52.1",
+    "@ts-rest/core": "^3.53.0-rc.1",
+    "@ts-rest/fastify": "^3.53.0-rc.1",
     "@unoperate/golem-vaddr-cli": "file:../../cli",
     "dotenv": "^17.0.1",
     "drizzle-orm": "^0.44.2",
     "fastify": "^4.29.1",
     "fastify-plugin": "^5.0.1",
+    "viem": "^2.31.7",
     "zod": "^3.25.73"
   },
   "devDependencies": {

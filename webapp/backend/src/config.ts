@@ -1,5 +1,5 @@
 import "dotenv/config";
-import z from "zod";
+import * as z from "zod/v4";
 
 const envSchema = z.object({
   DB_FILE_NAME: z.string().default("db.sqlite"),

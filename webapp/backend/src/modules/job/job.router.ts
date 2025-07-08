@@ -1,5 +1,5 @@
 import { initServer } from "@ts-rest/fastify";
-import { contract } from "../../contracts/index.ts";
+import { contract } from "../../../../shared/contracts/index.ts";
 import * as JobService from "./job.service.ts";
 
 const s = initServer();
