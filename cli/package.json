@@ -14,7 +14,7 @@
     }
   },
   "scripts": {
-    "prebuild": "bash tools/update-version.sh",
+    "prebuild": "ts-node tools/update-version.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "generate": "ts-node ../tools/generate.ts",
