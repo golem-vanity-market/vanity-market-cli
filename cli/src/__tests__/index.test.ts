@@ -6,6 +6,7 @@ import {
   readPublicKeyFromFile,
   GenerateCmdOptions,
 } from "../index";
+import { APP_NAME } from "../version";
 
 describe("Vanity Address Generator CLI - Step 2", () => {
   const cliPath = join(__dirname, "../../dist/index.js");
@@ -24,7 +25,7 @@ describe("Vanity Address Generator CLI - Step 2", () => {
     it("should display help when no arguments are provided", () => {
       const result = execSync(`node ${cliPath} --help`, { encoding: "utf8" });
       expect(result).toContain("Usage:");
-      expect(result).toContain("golem-addr");
+      expect(result).toContain(APP_NAME);
       expect(result).toContain("Vanity address generator CLI");
     });
   });

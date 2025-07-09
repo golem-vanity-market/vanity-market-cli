@@ -2,7 +2,7 @@
 import { shutdownOpenTelemetry } from "./instrumentation";
 import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
-import { join, resolve } from "path";
+import { resolve } from "path";
 import { ethers, hexlify } from "ethers";
 import { GenerationParams, Scheduler } from "./scheduler";
 import { GenerationPrefix } from "./prefix";
@@ -21,6 +21,7 @@ import { ProcessingUnitType } from "./node_manager/config";
 import "dotenv/config";
 import { EstimatorService } from "./estimator_service";
 import { ResultsService } from "./results_service";
+import { APP_NAME, APP_VERSION } from "./version";
 
 /**
  * Custom error class for address generation validation errors
@@ -73,22 +74,6 @@ const MAX_VANITY_PREFIX_LENGTH = 16;
  * Maximum budget to prevent excessive resource usage
  */
 const MAX_BUDGET_GLM = 1000;
-
-/**
- * Retrieves package version from package.json with proper error handling
- * @returns The semantic version string from package.json or fallback version
- */
-function getPackageVersion(): string {
-  try {
-    const packageJsonPath = join(__dirname, "../package.json");
-    const packageJsonContent = readFileSync(packageJsonPath, "utf8");
-    const packageJson = JSON.parse(packageJsonContent);
-    return packageJson.version;
-  } catch (error) {
-    console.error("Failed to read package version:", error);
-    return "1.0.0"; // Fallback version
-  }
-}
 
 /**
  * Reads and validates a public key from a file path
@@ -530,9 +515,9 @@ function main(): void {
   const program = new Command();
 
   program
-    .name("golem-addr")
+    .name(APP_NAME)
     .description("Vanity address generator CLI with OpenTelemetry support")
-    .version(getPackageVersion());
+    .version(APP_VERSION);
 
   // Generate command - Step 2 implementation
   program
@@ -601,7 +586,6 @@ if (require.main === module) {
 // Export functions for comprehensive testing coverage
 export {
   main,
-  getPackageVersion,
   validateGenerateOptions,
   validateProcessingUnit,
   readPublicKeyFromFile,

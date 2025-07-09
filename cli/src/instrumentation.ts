@@ -16,9 +16,16 @@ import {
   BatchLogRecordProcessor,
   LogRecordExporter,
   ReadableLogRecord,
+  SimpleLogRecordProcessor,
   InMemoryLogRecordExporter, // For testing
 } from "@opentelemetry/sdk-logs";
 import { ExportResult, ExportResultCode } from "@opentelemetry/core";
+import { APP_NAME, APP_VERSION } from "./version";
+import {
+  ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
+} from "@opentelemetry/semantic-conventions";
+import { resourceFromAttributes } from "@opentelemetry/resources";
 
 // --- Custom Exporters with Asynchronous I/O ---
 class FileMetricExporter implements PushMetricExporter {
@@ -170,8 +177,6 @@ function createSDKConfig() {
   console.log(
     "OpenTelemetry: No config file found, using programmatic file-based configuration.",
   );
-  process.env.OTEL_RESOURCE_ATTRIBUTES =
-    "service.name=golem-vanity-cli,service.version=1.0.0";
 
   const logsDir = path.resolve("./logs");
   // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -194,13 +199,12 @@ function createSDKConfig() {
       exportIntervalMillis: 2500,
       exportTimeoutMillis: 2000,
     }),
-    logRecordProcessors: [
-      new BatchLogRecordProcessor(fileLogExporter, {
-        exportTimeoutMillis: 2000,
-        scheduledDelayMillis: 500,
-      }),
-    ],
+    logRecordProcessors: [new SimpleLogRecordProcessor(fileLogExporter)],
     shutdownTimeout: 5000,
+    resource: resourceFromAttributes({
+      [ATTR_SERVICE_NAME]: APP_NAME,
+      [ATTR_SERVICE_VERSION]: APP_VERSION,
+    }),
   };
 }
 

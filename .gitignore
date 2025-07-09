@@ -58,3 +58,6 @@ results.csv
 results.json
 
 *.sqlite
+
+# code generation
+cli/src/version.ts

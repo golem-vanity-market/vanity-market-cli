@@ -27,8 +27,10 @@ jobs:
       - working-directory: cli
         run: npm install
       - working-directory: cli
-        run: npm run test
+        run: npm run prebuild
       - working-directory: cli
         run: npm run lint
       - working-directory: cli
         run: npm run format
+      - working-directory: cli
+        run: npm run test

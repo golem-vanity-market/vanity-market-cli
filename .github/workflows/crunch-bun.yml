@@ -83,6 +83,7 @@ jobs:
         working-directory: cli
         run: |
           bun install
+          bun run prebuild
 
       - name: Check payments
         working-directory: sandbox/yagna
