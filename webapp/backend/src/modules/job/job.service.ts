@@ -193,7 +193,7 @@ async function runJobInBackground(
 
 export async function createJob(
   input: JobInput,
-  userId: number
+  userAddress: `0x${string}`
 ): Promise<JobDetails> {
   // Validate inputs before even creating the DB record
   validateAndTransformInputs(input);
@@ -203,7 +203,7 @@ export async function createJob(
     .insert(jobsTable)
     .values({
       id: jobId,
-      userId,
+      userAddress,
       status: "pending",
       publicKey: input.publicKey,
       vanityAddressPrefix: input.vanityAddressPrefix,
@@ -328,12 +328,15 @@ export async function findJobById(jobId: string): Promise<JobDetails | null> {
 /**
  * Finds all jobs for a specific user.
  */
-export async function findJobsByUserId(userId: number): Promise<JobDetails[]> {
+export async function findJobsByUserId(
+  userAddress: `0x${string}`
+): Promise<JobDetails[]> {
   const jobs = await db
     .select()
     .from(jobsTable)
-    .where(eq(jobsTable.userId, userId))
+    .where(eq(jobsTable.userAddress, userAddress))
     .orderBy(desc(jobsTable.createdAt))
+    .limit(100) // Limit to 100 latest jobs
     .then((rows) => rows);
 
   return jobs.map((job) => {
