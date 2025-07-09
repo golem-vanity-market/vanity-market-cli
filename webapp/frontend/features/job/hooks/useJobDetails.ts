@@ -13,5 +13,6 @@ export default function useJobDetails(jobId: string) {
       }
       return response.body;
     },
+    refetchInterval: 5000,
   });
 }

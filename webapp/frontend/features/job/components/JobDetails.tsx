@@ -51,8 +51,6 @@ export function JobDetails({ jobId }: JobDetailsProps) {
     error: errorDetails,
   } = useJobDetails(jobId);
 
-  const isJobCompleted = job?.status === "completed";
-
   const {
     data: results,
     isLoading: isLoadingResults,
@@ -116,59 +114,57 @@ export function JobDetails({ jobId }: JobDetailsProps) {
         </CardContent>
       </Card>
 
-      {isJobCompleted && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-6 w-6 text-green-500" />
-              Results
-            </CardTitle>
-            <CardDescription>
-              Found vanity addresses matching your criteria.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingResults && <Skeleton className="h-24 w-full" />}
-            {isErrorResults && (
-              <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Error Loading Results</AlertTitle>
-                <AlertDescription>{errorResults?.message}</AlertDescription>
-              </Alert>
-            )}
-            {results && (
-              <div className="rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Address</TableHead>
-                      <TableHead>Salt</TableHead>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-6 w-6 text-green-500" />
+            Results
+          </CardTitle>
+          <CardDescription>
+            Found vanity addresses matching your criteria.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingResults && <Skeleton className="h-24 w-full" />}
+          {isErrorResults && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Error Loading Results</AlertTitle>
+              <AlertDescription>{errorResults?.message}</AlertDescription>
+            </Alert>
+          )}
+          {results && (
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Address</TableHead>
+                    <TableHead>Salt</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {results.map((result) => (
+                    <TableRow key={result.addr}>
+                      <TableCell
+                        className="font-mono hover:cursor-pointer"
+                        onClick={() => copyToClipboard(result.addr)}
+                      >
+                        {result.addr}
+                      </TableCell>
+                      <TableCell
+                        className="font-mono hover:cursor-pointer"
+                        onClick={() => copyToClipboard(result.salt)}
+                      >
+                        {result.salt.slice(0, 20)}...
+                      </TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {results.map((result) => (
-                      <TableRow key={result.addr}>
-                        <TableCell
-                          className="font-mono hover:cursor-pointer"
-                          onClick={() => copyToClipboard(result.addr)}
-                        >
-                          {result.addr}
-                        </TableCell>
-                        <TableCell
-                          className="font-mono hover:cursor-pointer"
-                          onClick={() => copyToClipboard(result.salt)}
-                        >
-                          {result.salt.slice(0, 20)}...
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
