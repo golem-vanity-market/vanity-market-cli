@@ -8,7 +8,7 @@ import { resolve } from "path";
 import { ethers, hexlify } from "ethers";
 import { Scheduler } from "./scheduler";
 import { GenerationParams } from "./params";
-import { GenerationPrefix } from "./prefix";
+import { GenerationPrefix } from "./params";
 import {
   GolemSessionManager,
   SessionManagerParams,

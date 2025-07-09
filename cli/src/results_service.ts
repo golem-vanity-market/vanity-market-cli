@@ -1,5 +1,5 @@
 import { appendFile } from "fs/promises";
-import { GenerationPrefix } from "./prefix";
+import { GenerationPrefix } from "./params";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";

@@ -1,6 +1,6 @@
 import { sleep } from "@golem-sdk/golem-js";
 import { Estimator } from "./estimator";
-import { GenerationPrefix } from "./prefix";
+import { GenerationPrefix } from "./params";
 import { ProcessingUnitType } from "./node_manager/config";
 import { displayDifficulty } from "./utils/format";
 import { computePrefixDifficulty } from "./difficulty";
