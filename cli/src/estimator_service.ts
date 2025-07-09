@@ -6,7 +6,7 @@ import { displayDifficulty } from "./utils/format";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
 import { displaySummary, displayTotalSummary } from "./ui/displaySummary";
-import { ProofEntryResult } from "./model/proof";
+import { ProofEntryResult } from "./estimator/proof";
 import { validateProof } from "./validator";
 import { ResultsService } from "./results_service";
 

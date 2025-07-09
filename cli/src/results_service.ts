@@ -2,7 +2,7 @@ import { appendFile } from "fs/promises";
 import { GenerationPrefix } from "./prefix";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
-import { ProofEntryResult } from "./model/proof";
+import { ProofEntryResult } from "./estimator/proof";
 import { writeFileSync } from "fs";
 import { EstimatorService } from "./estimator_service";
 
