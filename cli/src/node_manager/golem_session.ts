@@ -20,6 +20,7 @@ import { isNativeError } from "util/types";
 import { EstimatorService } from "../estimator_service";
 import { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
+import { ParseVanityResults } from "./result";
 
 /**
  * Parameters for the GolemSessionManager constructor
@@ -333,28 +334,36 @@ export class GolemSessionManager {
        */
       const stdout = res.stdout ? String(res.stdout) : "";
 
-      for (let line of stdout.split("\n")) {
-        try {
-          line = line.trim();
-          if (line.startsWith("0x")) {
-            const salt = line.split(",")[0].trim();
-            const addr = line.split(",")[1].trim();
-            const pubKey = line.split(",")[2].trim();
-
-            ctx.L().debug("Found address:", addr);
-
-            this.estimatorService.pushProofToQueue({
-              addr,
-              salt,
-              pubKey,
-              provider,
-              jobId: agreementId,
-              cpu: this.processingUnitType,
-            });
-          }
-        } catch (e) {
-          ctx.L().error(`Error parsing result line: ${e}`);
-        }
+      const cmdResults = ParseVanityResults(
+        ctx,
+        stdout.split("\n"),
+        agreementId,
+        this.processingUnitType,
+        generationParams.singlePassSeconds,
+        generationParams.vanityAddressPrefix.fullPrefix(),
+        computePrefixDifficulty,
+        provider,
+      );
+      if (!cmdResults) {
+        ctx.L().error("No results found in the output");
+        return;
+      }
+      ctx
+        .L()
+        .info(
+          `Found ${cmdResults.results.length} results for job ${agreementId}`,
+        );
+      for (const r in cmdResults.results) {
+        const addr = cmdResults.results[r].address;
+        this.estimatorService.pushProofToQueue({
+          addr: addr,
+          salt: cmdResults.results[r].salt,
+          pubKey: cmdResults.results[r].pubKey,
+          provider: cmdResults.provider,
+          jobId: cmdResults.iter.jobId,
+          cpu: cmdResults.providerType,
+        });
+        ctx.L().debug("Found address:", addr);
       }
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {

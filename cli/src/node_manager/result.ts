@@ -1,0 +1,102 @@
+import { ProviderInfo } from "@golem-sdk/golem-js";
+import { ProcessingUnitType } from "../node_manager/config";
+import { AppContext } from "../app_context";
+
+export interface VanityResult {
+  address: string;
+  salt: string;
+  pubKey: string;
+  pattern: string;
+  estimatedComplexity: number;
+}
+
+export interface VanityResults {
+  results: VanityResult[];
+  provider: ProviderInfo;
+  providerType: ProcessingUnitType;
+  iter: {
+    jobId: string;
+    duration?: number;
+  };
+  status: "success" | "error" | "not_found";
+}
+
+interface ComplexityFunction {
+  (pattern: string): number;
+}
+
+export function ParseVanityResults(
+  ctx: AppContext,
+  lines: string[],
+  jobId: string,
+  pType: ProcessingUnitType,
+  durationSeconds: number,
+  pattern: string,
+  complexFunc: ComplexityFunction,
+  pInfo: ProviderInfo,
+): VanityResults | null {
+  const results: VanityResult[] = [];
+
+  for (let line of lines) {
+    try {
+      line = line.trim();
+      if (line.startsWith("0x")) {
+        const r = ParseVanityResult(ctx, line, pattern, complexFunc);
+        if (r == null) {
+          ctx
+            .L()
+            .warn(
+              `Invalid vanity result line from provider ${pInfo.name}:`,
+              line,
+            );
+          continue;
+        }
+        results.push(r);
+      }
+    } catch (error) {
+      console.error("Error parsing vanity result line:", line, error);
+      continue;
+    }
+  }
+
+  return {
+    results: results,
+    provider: pInfo,
+    providerType: pType,
+    iter: {
+      jobId: jobId,
+      duration: durationSeconds,
+    },
+    status: "not_found",
+  };
+}
+
+export function ParseVanityResult(
+  ctx: AppContext,
+  line: string,
+  keyPattern: string,
+  complexFunc: ComplexityFunction,
+): VanityResult | null {
+  const trimmedLine = line.trim();
+  if (!trimmedLine.startsWith("0x")) {
+    return null;
+  }
+
+  const parts = trimmedLine.split(",");
+  if (parts.length < 3) {
+    return null;
+  }
+
+  const salt = parts[0].trim();
+  const address = parts[1].trim();
+  const pubKey = parts[2].trim();
+  const pattern = keyPattern;
+
+  return {
+    address,
+    salt,
+    pubKey,
+    pattern,
+    estimatedComplexity: complexFunc(pattern),
+  };
+}
