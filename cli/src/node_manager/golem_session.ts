@@ -21,6 +21,8 @@ import { EstimatorService } from "../estimator_service";
 import { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
 import { ParseVanityResults } from "./result";
+import { ProofEntryResult } from "../estimator/proof";
+import { displayDifficulty } from "../utils/format";
 
 /**
  * Parameters for the GolemSessionManager constructor
@@ -361,19 +363,38 @@ export class GolemSessionManager {
         );
       for (const r in cmdResults.results) {
         const addr = cmdResults.results[r].address;
-        this.estimatorService.pushProofToQueue({
+
+        const entry: ProofEntryResult = {
           addr: addr,
           salt: cmdResults.results[r].salt,
           pubKey: cmdResults.results[r].pubKey,
           provider: cmdResults.provider,
           jobId: cmdResults.iter.jobId,
           cpu: cmdResults.providerType,
-        });
+        };
 
-        
+        this.estimatorService.pushProofToQueue(entry);
 
+        this.resultService.processValidatedEntry(
+          entry,
+          (jobId: string, address: string, addrDifficulty: number) => {
+            ctx.consoleInfo(
+              `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
+            );
+          },
+        );
         ctx.L().debug("Found address:", addr);
       }
+
+      const esp = await this.estimatorService.getEstimatedProvider(agreementId);
+
+      ctx
+        .L()
+        .info(
+          `Provider: ${esp.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
+        );
+
+      // Process the results
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
         ctx.L().info("Work was stopped by user");

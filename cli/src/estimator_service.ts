@@ -1,15 +1,11 @@
-import { sleep } from "@golem-sdk/golem-js";
 import { Estimator } from "./estimator";
 import { GenerationPrefix } from "./params";
 import { ProcessingUnitType } from "./node_manager/config";
-import { displayDifficulty } from "./utils/format";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
-import { displaySummary, displayTotalSummary } from "./ui/displaySummary";
 import { ProofEntryResult } from "./estimator/proof";
 import { validateProof } from "./validator";
 import { ResultsService } from "./results_service";
-import { VanityResult } from "./node_manager/result";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
@@ -24,9 +20,12 @@ export interface ReportCostResponse {
   reason: string;
 }
 
-interface EstimatedVanityResults {
-  r: VanityResult;
-  provedDifficulty: number;
+export interface EstimatedProvider {
+  jobId: string;
+  name: string;
+  estimatedSpeed: number;
+  totalSuccesses: number;
+  remainingTimeSec: number;
 }
 
 export class EstimatorService {
@@ -77,6 +76,22 @@ export class EstimatorService {
   //   await this.process();
   // }
 
+  public async getEstimatedProvider(jobId: string): Promise<EstimatedProvider> {
+    await this.process(); // Ensure processing is done before getting the estimator
+    const est = this.estimators.get(jobId);
+    if (!est) {
+      throw new Error(`Estimator for job ${jobId} not found.`);
+    }
+    const info = est.currentInfo();
+    return {
+      jobId,
+      name: info.provName || "Unknown",
+      estimatedSpeed: info.estimatedSpeed?.speed || 0,
+      totalSuccesses: info.totalSuccesses || 0,
+      remainingTimeSec: info.remainingTimeSec || 0,
+    };
+  }
+
   public async process(): Promise<void> {
     const proofQueue = this.proofQueue;
     this.proofQueue = []; // Clear the proof queue after processing
@@ -98,15 +113,6 @@ export class EstimatorService {
           throw "Estimator not found for job: " + entry.jobId;
         }
         const proverDifficulty = computePrefixDifficulty(prover);
-
-        await this.options.resultService.processValidatedEntry(
-          entry,
-          (jobId: string, address: string, addrDifficulty: number) => {
-            this.ctx.consoleInfo(
-              `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
-            );
-          },
-        );
 
         if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
           this.totalEstimator?.addProvedWork(proverDifficulty, true);
