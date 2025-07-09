@@ -27,8 +27,11 @@ export const jobRouter = s.router(contract.jobs, {
     },
   },
   getJobDetails: {
-    handler: async ({ params }) => {
-      const job = await JobService.findJobById(params.id);
+    handler: async ({ params, request }) => {
+      const job = await JobService.findJobById(
+        params.id,
+        request.user.walletAddress
+      );
       if (!job) {
         return { status: 404, body: { message: "Job not found" } };
       }
@@ -39,8 +42,11 @@ export const jobRouter = s.router(contract.jobs, {
     },
   },
   getJobResult: {
-    handler: async ({ params }) => {
-      const result = await JobService.getJobResult(params.id);
+    handler: async ({ params, request }) => {
+      const result = await JobService.getJobResult(
+        params.id,
+        request.user.walletAddress
+      );
       if (!result) {
         return { status: 404, body: { message: "Result not found" } };
       }

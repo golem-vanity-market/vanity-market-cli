@@ -13,7 +13,7 @@ import {
   type SessionManagerParams,
 } from "@unoperate/golem-vaddr-cli/lib";
 import { jobResultsTable, jobsTable } from "../../lib/db/schema.ts";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   JobSchema,
   JobResultSchema,
@@ -236,12 +236,15 @@ export async function createJob(
 /**
  * Cancels a running job.
  */
-export async function cancelJob(jobId: string): Promise<JobDetails | null> {
+export async function cancelJob(
+  jobId: string,
+  userAddress: string
+): Promise<JobDetails | null> {
   const jobContext = activeJobs[jobId];
   const dbJob = await db
     .select()
     .from(jobsTable)
-    .where(eq(jobsTable.id, jobId))
+    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
     .limit(1)
     .then((rows) => rows[0]);
 
@@ -298,11 +301,14 @@ export async function cancelJob(jobId: string): Promise<JobDetails | null> {
 /**
  * Finds a job by its ID.
  */
-export async function findJobById(jobId: string): Promise<JobDetails | null> {
+export async function findJobById(
+  jobId: string,
+  userAddress: string
+): Promise<JobDetails | null> {
   const job = await db
     .select()
     .from(jobsTable)
-    .where(eq(jobsTable.id, jobId))
+    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
     .limit(1)
     .then((rows) => rows[0]);
 
@@ -358,7 +364,24 @@ export async function findJobsByUserId(
 /**
  * Fetches the results for a completed job.
  */
-export async function getJobResult(jobId: string): Promise<JobResult> {
+export async function getJobResult(
+  jobId: string,
+  userAddress: string
+): Promise<JobResult> {
+  // First check if the job belongs to the owner
+  const job = await db
+    .select()
+    .from(jobsTable)
+    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (!job) {
+    throw new Error(
+      `Job with ID ${jobId} not found or you do not have permission to access it.`
+    );
+  }
+
   const results = await db
     .select()
     .from(jobResultsTable)
