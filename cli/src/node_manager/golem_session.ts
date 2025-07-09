@@ -23,7 +23,7 @@ import { VanityPaymentModule } from "./payment_module";
 import { ParseVanityResults } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
-
+import { GolemCompletedJob } from "./result";
 /**
  * Parameters for the GolemSessionManager constructor
  */
@@ -270,7 +270,7 @@ export class GolemSessionManager {
     ctx: AppContext,
     rental: ResourceRental,
     generationParams: GenerationParams,
-  ): Promise<void> {
+  ): Promise<GolemCompletedJob> {
     const config = this.getConfigBasedOnProcessingUnitType();
 
     const agreementId = rental.agreement.id;
@@ -349,12 +349,22 @@ export class GolemSessionManager {
       if (!cmdResults) {
         // TODO: inform estiator and reputation model
         ctx.L().error("No results found in the output");
-        return;
+        return {
+          jobId: agreementId,
+          provider,
+          durationSeconds: generationParams.singlePassSeconds,
+          status: "not_found",
+        };
       }
       if (cmdResults.results.length === 0) {
         // TODO: inform estiator and reputation model
         ctx.L().info("No results found in the output");
-        return;
+        return {
+          jobId: agreementId,
+          provider,
+          durationSeconds: generationParams.singlePassSeconds,
+          status: "not_found",
+        };
       }
       ctx
         .L()
@@ -369,7 +379,7 @@ export class GolemSessionManager {
           salt: cmdResults.results[r].salt,
           pubKey: cmdResults.results[r].pubKey,
           provider: cmdResults.provider,
-          jobId: cmdResults.iter.jobId,
+          jobId: cmdResults.jobId,
           cpu: cmdResults.providerType,
         };
 
@@ -385,20 +395,17 @@ export class GolemSessionManager {
         );
         ctx.L().debug("Found address:", addr);
       }
-
-      const esp = await this.estimatorService.getEstimatedProvider(agreementId);
-
-      ctx
-        .L()
-        .info(
-          `Provider: ${esp.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
-        );
-
       // Process the results
+      return cmdResults;
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
         ctx.L().info("Work was stopped by user");
-        return;
+        return {
+          jobId: agreementId,
+          provider: rental.agreement.provider,
+          durationSeconds: generationParams.singlePassSeconds,
+          status: "error",
+        };
       }
       // TODO: inform estiator and reputation model
       ctx.L().error(`Error during profanity_cuda execution: ${error}`);
@@ -421,7 +428,7 @@ export class GolemSessionManager {
     ctx: AppContext,
     generationParams: GenerationParams,
     onError: OnErrorHandler,
-  ): Promise<void> {
+  ): Promise<ProviderInfo | void> {
     if (this.stopWorkAC.signal.aborted) {
       ctx.L().info("Work was stopped by user");
       return;

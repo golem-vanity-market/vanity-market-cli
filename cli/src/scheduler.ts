@@ -89,6 +89,14 @@ export class Scheduler {
         // A single provider runs one iteration. When it's done, the loop
         // will check conditions again and start another if needed.
         await this.sessionManager.runSingleIteration(ctx, params, onError);
+
+        // const esp = await this.estimatorService.getEstimatedProvider(agreementId);
+
+        // ctx
+        //   .L()
+        //   .info(
+        //     `Provider: ${esp.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
+        //   );
       } catch (error) {
         if (this.sessionManager.isWorkStopped()) {
           // we can safely assume that the error is due to the work being stopped

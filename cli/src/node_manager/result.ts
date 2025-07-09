@@ -10,15 +10,16 @@ export interface VanityResult {
   estimatedComplexity: number;
 }
 
-export interface VanityResults {
-  results: VanityResult[];
+export interface GolemCompletedJob {
+  jobId: string;
   provider: ProviderInfo;
-  providerType: ProcessingUnitType;
-  iter: {
-    jobId: string;
-    duration?: number;
-  };
+  durationSeconds: number; // in seconds
   status: "success" | "error" | "not_found";
+}
+
+export interface VanityResults extends GolemCompletedJob {
+  results: VanityResult[];
+  providerType: ProcessingUnitType;
 }
 
 interface ComplexityFunction {
@@ -63,10 +64,8 @@ export function ParseVanityResults(
     results: results,
     provider: pInfo,
     providerType: pType,
-    iter: {
-      jobId: jobId,
-      duration: durationSeconds,
-    },
+    jobId: jobId,
+    durationSeconds: durationSeconds,
     status: "not_found",
   };
 }
