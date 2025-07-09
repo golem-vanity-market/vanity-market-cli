@@ -133,7 +133,7 @@ export function JobDetails({ jobId }: JobDetailsProps) {
               <AlertDescription>{errorResults?.message}</AlertDescription>
             </Alert>
           )}
-          {results && (
+          {results && results.length > 0 && (
             <div className="rounded-md border">
               <Table>
                 <TableHeader>
@@ -163,6 +163,14 @@ export function JobDetails({ jobId }: JobDetailsProps) {
               </Table>
             </div>
           )}
+          {results &&
+            results.length === 0 &&
+            !isLoadingResults &&
+            !isErrorResults && (
+              <div className="text-center text-muted-foreground py-8">
+                No results found yet.
+              </div>
+            )}
         </CardContent>
       </Card>
     </div>
