@@ -9,6 +9,7 @@ import { displaySummary, displayTotalSummary } from "./ui/displaySummary";
 import { ProofEntryResult } from "./estimator/proof";
 import { validateProof } from "./validator";
 import { ResultsService } from "./results_service";
+import { VanityResult } from "./node_manager/result";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
@@ -21,6 +22,11 @@ export interface EstimatorServiceOptions {
 export interface ReportCostResponse {
   accepted: boolean;
   reason: string;
+}
+
+interface EstimatedVanityResults {
+  r: VanityResult;
+  provedDifficulty: number;
 }
 
 export class EstimatorService {
@@ -67,11 +73,11 @@ export class EstimatorService {
     }
   }
 
-  public async forceProcess() {
-    await this.process();
-  }
+  // public async forceProcess() {
+  //   await this.process();
+  // }
 
-  private async process(): Promise<void> {
+  public async process(): Promise<void> {
     const proofQueue = this.proofQueue;
     this.proofQueue = []; // Clear the proof queue after processing
     for (const entry of proofQueue) {
@@ -128,15 +134,16 @@ export class EstimatorService {
       }
     }
   }
+
   private async runProcessLoop(): Promise<void> {
-    while (true) {
-      // Process the inQueue entries before checking the stop condition
-      await this.process();
-      if (this.isStopping) {
-        break;
-      }
-      await sleep(this.options.processLoopSecs);
-    }
+    //   while (true) {
+    //     // Process the inQueue entries before checking the stop condition
+    //     await this.process();
+    //     if (this.isStopping) {
+    //       break;
+    //     }
+    //     await sleep(this.options.processLoopSecs);
+    //   }
   }
 
   private get messageLoopSecs(): number {
@@ -144,20 +151,20 @@ export class EstimatorService {
   }
 
   private async runMessageLoop(): Promise<void> {
-    if (this.options.disableMessageLoop) {
-      return;
-    }
-    while (true) {
-      if (this.isStopping) {
-        break;
-      }
-      if (this.totalEstimator) {
-        displaySummary(this.estimators);
-        this.ctx.consoleInfo("---------------------------");
-        displayTotalSummary(this.totalEstimator);
-      }
-      await sleep(this.messageLoopSecs);
-    }
+    // if (this.options.disableMessageLoop) {
+    //   return;
+    // }
+    // while (true) {
+    //   if (this.isStopping) {
+    //     break;
+    //   }
+    //   if (this.totalEstimator) {
+    //     displaySummary(this.estimators);
+    //     this.ctx.consoleInfo("---------------------------");
+    //     displayTotalSummary(this.totalEstimator);
+    //   }
+    //   await sleep(this.messageLoopSecs);
+    // }
   }
 
   public reportCosts(jobId: string, cost: number): ReportCostResponse {
@@ -188,9 +195,6 @@ export class EstimatorService {
   }
 
   public pushProofToQueue(result: ProofEntryResult): boolean {
-    if (this.isStopping) {
-      return false;
-    }
     this.proofQueue.push(result);
     return true;
   }
