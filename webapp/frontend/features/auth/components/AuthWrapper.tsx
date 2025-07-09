@@ -6,6 +6,7 @@ import {
 } from "@rainbow-me/rainbowkit";
 import { apiClient, setAccessToken } from "@/lib/api";
 import { createSiweMessage } from "viem/siwe";
+import { useRouter } from "next/router";
 
 export default function AuthWrapper({
   children,
@@ -13,6 +14,7 @@ export default function AuthWrapper({
   children: React.ReactNode;
 }) {
   const { data: user, isLoading, refetch } = useAuth();
+  const router = useRouter();
 
   const authAdapter = useMemo(() => {
     return createAuthenticationAdapter({
@@ -66,10 +68,11 @@ export default function AuthWrapper({
         } finally {
           setAccessToken("");
           await refetch();
+          router.push("/");
         }
       },
     });
-  }, [refetch]);
+  }, [refetch, router]);
 
   const authState = !!user
     ? "authenticated"

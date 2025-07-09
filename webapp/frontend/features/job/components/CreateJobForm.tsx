@@ -1,5 +1,3 @@
-"use client";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Button } from "@/components/ui/button";
@@ -17,9 +15,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { JobInputSchema, type JobInput } from "@contracts/job.contract";
 import { toast } from "sonner";
 import useCreateJob from "../hooks/useCreateJob";
+import { useRouter } from "next/router";
 
 export function CreateJobForm() {
   const createJobMutation = useCreateJob();
+  const router = useRouter();
 
   const form = useForm<JobInput>({
     resolver: zodResolver(JobInputSchema),
@@ -40,6 +40,7 @@ export function CreateJobForm() {
           description: `Job ID: ${newJob.id}`,
         });
         form.reset();
+        router.push(`/jobs/`);
       },
       onError: (error) => {
         toast.error("Failed to create job", {
