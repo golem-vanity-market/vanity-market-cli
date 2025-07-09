@@ -7,7 +7,7 @@ import {
   ResourceRentalPool,
 } from "@golem-sdk/golem-js";
 import { AppContext } from "../app_context";
-import { GenerationParams } from "../scheduler";
+import { GenerationParams } from "../params";
 import {
   BaseRentalConfig,
   CPURentalConfig,

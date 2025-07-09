@@ -1,22 +1,10 @@
-import { GenerationPrefix } from "./prefix";
 import { BudgetMonitor } from "./budget";
 import {
   GolemSessionManager,
   OnErrorHandler,
 } from "./node_manager/golem_session";
 import { AppContext } from "./app_context";
-
-/**
- * Interface for task generation parameters
- */
-export interface GenerationParams {
-  publicKey: string;
-  vanityAddressPrefix: GenerationPrefix;
-  budgetGlm: number;
-  numberOfWorkers: number;
-  singlePassSeconds: number;
-  numResults: bigint;
-}
+import { GenerationParams } from "./params";
 
 /**
  * The purpose of the Scheduler is to continuously generate tasks until either enough addresses are found or the budget is exhausted.

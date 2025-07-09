@@ -6,7 +6,8 @@ import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { ethers, hexlify } from "ethers";
-import { GenerationParams, Scheduler } from "./scheduler";
+import { Scheduler } from "./scheduler";
+import { GenerationParams } from "./params";
 import { GenerationPrefix } from "./prefix";
 import {
   GolemSessionManager,
