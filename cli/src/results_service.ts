@@ -33,7 +33,6 @@ export class ResultsService {
     estimatorService: EstimatorService,
     resultJsonPath: string,
   ): Promise<void> {
-    await estimatorService.forceProcess();
     const entries = await this.results();
     writeFileSync(resultJsonPath, JSON.stringify({ entries }, null, 2));
   }
