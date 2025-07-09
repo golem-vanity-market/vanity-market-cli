@@ -1,5 +1,5 @@
 import { initContract } from "@ts-rest/core";
-import { z } from "zod";
+import * as z from "zod/v4";
 
 const c = initContract();
 

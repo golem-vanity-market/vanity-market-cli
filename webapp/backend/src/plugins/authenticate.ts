@@ -1,30 +1,69 @@
-import type { FastifyRequest, FastifyReply } from "fastify";
+import type {
+  FastifyRequest,
+  FastifyReply,
+  HookHandlerDoneFunction,
+} from "fastify";
 import fp from "fastify-plugin";
-import type { User } from "../contracts/auth.contract.ts";
+import jwtPlugin from "@fastify/jwt";
+import config from "../config.ts";
+import { db } from "../lib/db/index.ts";
+import { refreshTokensTable } from "../lib/db/schema.ts";
+import { and, eq, gte } from "drizzle-orm";
+
+declare module "@fastify/jwt" {
+  interface FastifyJWT {
+    payload: { walletAddress: `0x${string}`; token: string };
+    user: {
+      walletAddress: `0x${string}`;
+      token: string;
+    };
+  }
+}
 
 declare module "fastify" {
-  interface FastifyRequest {
-    user: User;
+  interface FastifyInstance {
+    authenticate: (
+      request: FastifyRequest,
+      reply: FastifyReply,
+      done: HookHandlerDoneFunction
+    ) => Promise<void>;
   }
 }
 
 async function authenticate(request: FastifyRequest, reply: FastifyReply) {
   try {
-    // TODO: verify JWT auth here
-    request.user = {
-      id: 1,
-      address: "0x1234567890abcdef1234567890abcdef12345678",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    if (!request.headers.authorization) {
+      throw new Error("Authorization header is missing");
+    }
+    await request.jwtVerify();
   } catch (err) {
     reply.status(401).send({ message: "Unauthorized" });
   }
 }
 
 export default fp(async (fastify) => {
-  // Decorate the request object so we can assign `request.user`
-  fastify.decorate("user", null);
-  // Register the main authentication function as a hook or decorator
-  fastify.addHook("preHandler", authenticate);
+  fastify.register(jwtPlugin, {
+    secret: config.JWT_SECRET,
+    cookie: {
+      cookieName: config.COOKIE_NAME,
+      signed: false, // We are not signing the cookie itself, but the JWT inside
+    },
+    // This function is called for every JWT verification
+    // For refresh tokens, it checks if the token is valid and not expired
+    trusted: async (request, decodedToken) => {
+      const token = decodedToken.token;
+      if (!token) return false;
+      const tokenRecord = await db
+        .select()
+        .from(refreshTokensTable)
+        .where(
+          and(
+            eq(refreshTokensTable.token, token),
+            gte(refreshTokensTable.expiresAt, new Date())
+          )
+        );
+      return tokenRecord.length > 0;
+    },
+  });
+  fastify.decorate("authenticate", authenticate);
 });
