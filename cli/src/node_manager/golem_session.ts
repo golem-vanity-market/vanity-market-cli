@@ -345,7 +345,13 @@ export class GolemSessionManager {
         provider,
       );
       if (!cmdResults) {
+        // TODO: inform estiator and reputation model
         ctx.L().error("No results found in the output");
+        return;
+      }
+      if (cmdResults.results.length === 0) {
+        // TODO: inform estiator and reputation model
+        ctx.L().info("No results found in the output");
         return;
       }
       ctx
@@ -363,6 +369,9 @@ export class GolemSessionManager {
           jobId: cmdResults.iter.jobId,
           cpu: cmdResults.providerType,
         });
+
+        
+
         ctx.L().debug("Found address:", addr);
       }
     } catch (error) {
@@ -370,6 +379,7 @@ export class GolemSessionManager {
         ctx.L().info("Work was stopped by user");
         return;
       }
+      // TODO: inform estiator and reputation model
       ctx.L().error(`Error during profanity_cuda execution: ${error}`);
       throw new Error("Profanity execution failed");
     }
