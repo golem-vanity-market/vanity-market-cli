@@ -1,10 +1,36 @@
+import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
+import { Cuboid } from "lucide-react";
 
 export default function TopBar() {
   return (
-    <div className="flex items-center justify-between p-4 bg-gray-800 text-white">
-      <h1 className="text-xl font-bold">Golem Vanity Market</h1>
-      <ConnectButton />
-    </div>
+    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="container mx-auto flex h-14 items-center">
+        <div className="mr-4 flex items-center">
+          <Link href="/" className="mr-6 flex items-center space-x-2">
+            <Cuboid className="h-6 w-6" />
+            <span className="font-bold">Vanity Market</span>
+          </Link>
+          <nav className="hidden items-center space-x-6 text-sm font-medium md:flex">
+            <Link
+              href="/jobs"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              My Jobs
+            </Link>
+            <Link
+              href="/jobs/new"
+              className="transition-colors hover:text-foreground/80 text-foreground/60"
+            >
+              Create Job
+            </Link>
+          </nav>
+        </div>
+
+        <div className="flex flex-1 items-center justify-end space-x-4">
+          <ConnectButton />
+        </div>
+      </div>
+    </header>
   );
 }
