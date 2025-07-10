@@ -199,10 +199,4 @@ export class EstimatorService {
     this.isStopping = true;
     this.ctx.L().debug("Requesting stop of result service");
   }
-
-  async waitForFinish(): Promise<void> {
-    await this.messageLoop;
-    await this.processLoop;
-    this.ctx.L().debug("Result service finished");
-  }
 }

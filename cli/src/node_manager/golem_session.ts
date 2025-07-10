@@ -556,11 +556,4 @@ export class GolemSessionManager {
       throw new Error("Failed to drain rental pool");
     }
   }
-
-  public async stopServices(ctx: AppContext): Promise<void> {
-    ctx.L().debug("Stopping services...");
-    this.estimatorService.stop();
-    await this.estimatorService.waitForFinish();
-    ctx.L().debug("All services stopped...");
-  }
 }

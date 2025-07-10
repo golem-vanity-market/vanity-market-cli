@@ -353,14 +353,6 @@ async function handleGenerateCommand(options: any): Promise<void> {
           .L()
           .error("❌ Error disconnecting from Golem network:", disconnectError);
       }
-
-      // finally, stop all services in the worker pool
-      try {
-        await golemSessionManager.stopServices(appCtx);
-        appCtx.consoleInfo("✅ Stopped all services");
-      } catch (error) {
-        appCtx.L().error("❌ Error stopping services:", error);
-      }
     }
 
     // and shut down OpenTelemetry
