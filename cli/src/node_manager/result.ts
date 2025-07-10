@@ -10,14 +10,14 @@ export interface VanityResult {
   estimatedComplexity: number;
 }
 
-export interface GolemCompletedJob {
+export interface IterationInfo {
   jobId: string;
   provider: ProviderInfo;
   durationSeconds: number; // in seconds
   status: "success" | "error" | "not_found";
 }
 
-export interface VanityResults extends GolemCompletedJob {
+export interface VanityResults extends IterationInfo {
   results: VanityResult[];
   providerType: ProcessingUnitType;
 }

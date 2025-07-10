@@ -23,7 +23,7 @@ import { VanityPaymentModule } from "./payment_module";
 import { ParseVanityResults } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
-import { GolemCompletedJob } from "./result";
+import { VanityResults } from "./result";
 /**
  * Parameters for the GolemSessionManager constructor
  */
@@ -270,7 +270,7 @@ export class GolemSessionManager {
     ctx: AppContext,
     rental: ResourceRental,
     generationParams: GenerationParams,
-  ): Promise<GolemCompletedJob> {
+  ): Promise<VanityResults> {
     const config = this.getConfigBasedOnProcessingUnitType();
 
     const agreementId = rental.agreement.id;
@@ -347,23 +347,27 @@ export class GolemSessionManager {
         provider,
       );
       if (!cmdResults) {
-        // TODO: inform estiator and reputation model
+        // TODO: inform estimator and reputation model
         ctx.L().error("No results found in the output");
         return {
           jobId: agreementId,
           provider,
           durationSeconds: generationParams.singlePassSeconds,
           status: "not_found",
+          results: [],
+          providerType: this.processingUnitType,
         };
       }
       if (cmdResults.results.length === 0) {
-        // TODO: inform estiator and reputation model
+        // TODO: inform estimator and reputation model
         ctx.L().info("No results found in the output");
         return {
           jobId: agreementId,
           provider,
           durationSeconds: generationParams.singlePassSeconds,
           status: "not_found",
+          results: [],
+          providerType: this.processingUnitType,
         };
       }
       ctx
@@ -405,6 +409,8 @@ export class GolemSessionManager {
           provider: rental.agreement.provider,
           durationSeconds: generationParams.singlePassSeconds,
           status: "error",
+          results: [],
+          providerType: this.processingUnitType,
         };
       }
       // TODO: inform estiator and reputation model
