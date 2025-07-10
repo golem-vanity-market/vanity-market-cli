@@ -45,16 +45,38 @@ This document contains essential information for managing the vanity.market proj
   - Sync project data with Google Sheets
   - Generate reports from spreadsheet data
   - Automate data entry and updates
+- **Lib**: use Google Sheets API v4 ()
 
-## Prettier
+## Code Formatting
 
-**IMPORTANT**: You MUST run prettier on ALL files you create or modify as part of your workflow.
+**IMPORTANT**: You MUST format ALL files you create or modify as part of your workflow.
+
+### Prettier (for supported file types)
+
+Use prettier for the following file types:
+
+- **JavaScript**: `.js`, `.jsx`, `.mjs`, `.cjs`
+- **TypeScript**: `.ts`, `.tsx`
+- **Web**: `.html`, `.css`, `.scss`, `.less`
+- **Data**: `.json`, `.yaml`, `.yml`
+- **Markup**: `.md`, `.vue`, `.svelte`
+- **Query**: `.graphql`, `.gql`
 
 ```bash
 npx prettier <FILE> --write
 ```
 
-Run this command on every file you create or edit before completing any task.
+### Ruff (for Python files)
+
+Use ruff for all Python files (`.py`):
+
+```bash
+uvx ruff format <FILE>
+```
+
+**Installation**: https://github.com/astral-sh/ruff
+
+Run the appropriate formatter on every file you create or edit before completing any task.
 
 ## Project Structure
 
