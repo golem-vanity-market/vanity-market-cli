@@ -382,6 +382,8 @@ export class GolemSessionManager {
 
         this.estimatorService.pushProofToQueue(entry);
 
+        // TODO: filter out proofs
+        // and take only those that match the user's pattern
         this.resultService.processValidatedEntry(
           entry,
           (jobId: string, address: string, addrDifficulty: number) => {
