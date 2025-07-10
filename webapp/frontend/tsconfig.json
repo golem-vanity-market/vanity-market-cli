@@ -22,7 +22,8 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./*"],
-      "@contracts": ["../shared/contracts/index.ts"]
+      "@contracts": ["../shared/contracts/index.ts"],
+      "@contracts/*": ["../shared/contracts/*"],
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "../shared/**/*.ts", "../shared/**/*.tsx"],

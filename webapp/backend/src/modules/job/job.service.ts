@@ -13,7 +13,7 @@ import {
   type SessionManagerParams,
 } from "@unoperate/golem-vaddr-cli/lib";
 import { jobResultsTable, jobsTable } from "../../lib/db/schema.ts";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import {
   JobSchema,
   JobResultSchema,
@@ -193,7 +193,7 @@ async function runJobInBackground(
 
 export async function createJob(
   input: JobInput,
-  userId: number
+  userAddress: `0x${string}`
 ): Promise<JobDetails> {
   // Validate inputs before even creating the DB record
   validateAndTransformInputs(input);
@@ -203,7 +203,7 @@ export async function createJob(
     .insert(jobsTable)
     .values({
       id: jobId,
-      userId,
+      userAddress,
       status: "pending",
       publicKey: input.publicKey,
       vanityAddressPrefix: input.vanityAddressPrefix,
@@ -236,12 +236,15 @@ export async function createJob(
 /**
  * Cancels a running job.
  */
-export async function cancelJob(jobId: string): Promise<JobDetails | null> {
+export async function cancelJob(
+  jobId: string,
+  userAddress: string
+): Promise<JobDetails | null> {
   const jobContext = activeJobs[jobId];
   const dbJob = await db
     .select()
     .from(jobsTable)
-    .where(eq(jobsTable.id, jobId))
+    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
     .limit(1)
     .then((rows) => rows[0]);
 
@@ -298,11 +301,14 @@ export async function cancelJob(jobId: string): Promise<JobDetails | null> {
 /**
  * Finds a job by its ID.
  */
-export async function findJobById(jobId: string): Promise<JobDetails | null> {
+export async function findJobById(
+  jobId: string,
+  userAddress: string
+): Promise<JobDetails | null> {
   const job = await db
     .select()
     .from(jobsTable)
-    .where(eq(jobsTable.id, jobId))
+    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
     .limit(1)
     .then((rows) => rows[0]);
 
@@ -328,12 +334,15 @@ export async function findJobById(jobId: string): Promise<JobDetails | null> {
 /**
  * Finds all jobs for a specific user.
  */
-export async function findJobsByUserId(userId: number): Promise<JobDetails[]> {
+export async function findJobsByUserId(
+  userAddress: `0x${string}`
+): Promise<JobDetails[]> {
   const jobs = await db
     .select()
     .from(jobsTable)
-    .where(eq(jobsTable.userId, userId))
+    .where(eq(jobsTable.userAddress, userAddress))
     .orderBy(desc(jobsTable.createdAt))
+    .limit(100) // Limit to 100 latest jobs
     .then((rows) => rows);
 
   return jobs.map((job) => {
@@ -355,7 +364,24 @@ export async function findJobsByUserId(userId: number): Promise<JobDetails[]> {
 /**
  * Fetches the results for a completed job.
  */
-export async function getJobResult(jobId: string): Promise<JobResult> {
+export async function getJobResult(
+  jobId: string,
+  userAddress: string
+): Promise<JobResult> {
+  // First check if the job belongs to the owner
+  const job = await db
+    .select()
+    .from(jobsTable)
+    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
+    .limit(1)
+    .then((rows) => rows[0]);
+
+  if (!job) {
+    throw new Error(
+      `Job with ID ${jobId} not found or you do not have permission to access it.`
+    );
+  }
+
   const results = await db
     .select()
     .from(jobResultsTable)

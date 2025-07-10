@@ -5,7 +5,7 @@
 Make sure you have at least Node.js 23 installed. Run the dev server with:
 
 ```bash
-node --watch src/index.ts
+node --watch src/server.ts
 ```
 
 ## Environment Variables

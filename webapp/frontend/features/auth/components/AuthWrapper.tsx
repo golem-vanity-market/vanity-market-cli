@@ -6,6 +6,8 @@ import {
 } from "@rainbow-me/rainbowkit";
 import { apiClient, setAccessToken } from "@/lib/api";
 import { createSiweMessage } from "viem/siwe";
+import { useRouter } from "next/router";
+import { useQueryClient } from "@tanstack/react-query";
 
 export default function AuthWrapper({
   children,
@@ -13,6 +15,8 @@ export default function AuthWrapper({
   children: React.ReactNode;
 }) {
   const { data: user, isLoading, refetch } = useAuth();
+  const queryClient = useQueryClient();
+  const router = useRouter();
 
   const authAdapter = useMemo(() => {
     return createAuthenticationAdapter({
@@ -65,11 +69,16 @@ export default function AuthWrapper({
           console.error("Logout failed", error);
         } finally {
           setAccessToken("");
-          await refetch();
+          // remove ALL cached data to avoid showing data from previous session
+          await queryClient.cancelQueries();
+          queryClient.clear();
+
+          // redirect back to home page
+          router.push("/");
         }
       },
     });
-  }, [refetch]);
+  }, [refetch, queryClient, router]);
 
   const authState = !!user
     ? "authenticated"
