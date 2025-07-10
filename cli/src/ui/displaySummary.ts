@@ -1,4 +1,4 @@
-import { Estimator } from "../estimator";
+import { Estimator } from "../estimator/estimator";
 import { displayDifficulty, displayTime } from "../utils/format";
 
 function getFaceEmoji(

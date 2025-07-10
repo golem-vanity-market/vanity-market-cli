@@ -1,4 +1,4 @@
-import { Estimator } from "./estimator";
+import { Estimator } from "./estimator/estimator";
 import { GenerationPrefix } from "./params";
 import { ProcessingUnitType } from "./node_manager/config";
 import { computePrefixDifficulty } from "./difficulty";
@@ -20,7 +20,7 @@ export interface ReportCostResponse {
   reason: string;
 }
 
-export interface CurrentProviderEstimate {
+export interface ProviderCurrentEstimate {
   jobId: string;
   name: string;
   estimatedSpeed: number;
@@ -79,7 +79,7 @@ export class EstimatorService {
 
   public async getCurrentEstimate(
     jobId: string,
-  ): Promise<CurrentProviderEstimate> {
+  ): Promise<ProviderCurrentEstimate> {
     await this.process(); // Ensure processing is done before getting the estimator
     const est = this.estimators.get(jobId);
     if (!est) {
