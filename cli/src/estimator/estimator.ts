@@ -1,4 +1,4 @@
-import { displayDifficulty, displayTime } from "./utils/format";
+import { displayDifficulty, displayTime } from "../utils/format";
 
 export interface EstimatorInfo {
   attempts: number;

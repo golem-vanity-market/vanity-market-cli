@@ -1,12 +1,9 @@
-import { sleep } from "@golem-sdk/golem-js";
-import { Estimator } from "./estimator";
-import { GenerationPrefix } from "./prefix";
+import { Estimator } from "./estimator/estimator";
+import { GenerationPrefix } from "./params";
 import { ProcessingUnitType } from "./node_manager/config";
-import { displayDifficulty } from "./utils/format";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
-import { displaySummary, displayTotalSummary } from "./ui/displaySummary";
-import { ProofEntryResult } from "./model/proof";
+import { ProofEntryResult } from "./estimator/proof";
 import { validateProof } from "./validator";
 import { ResultsService } from "./results_service";
 
@@ -23,8 +20,17 @@ export interface ReportCostResponse {
   reason: string;
 }
 
+export interface ProviderCurrentEstimate {
+  jobId: string;
+  name: string;
+  estimatedSpeed: number;
+  totalSuccesses: number;
+  remainingTimeSec: number;
+  unfortunateIteration: number; // Number of iterations that were not successful
+}
+
 export class EstimatorService {
-  private proofQueue: ProofEntryResult[] = [];
+  private proofQueue: Map<string, ProofEntryResult[]> = new Map();
 
   private savedProofs: Map<string, null> = new Map();
   private isStopping = false;
@@ -35,14 +41,10 @@ export class EstimatorService {
   private totalEstimator: Estimator | null = null;
   private options;
   private ctx;
-  private messageLoop;
-  private processLoop;
 
   constructor(ctx: AppContext, opt: EstimatorServiceOptions) {
     this.ctx = ctx;
     this.options = opt;
-    this.processLoop = this.runProcessLoop();
-    this.messageLoop = this.runMessageLoop();
   }
 
   public getEstimator(jobId: string): Estimator {
@@ -64,16 +66,47 @@ export class EstimatorService {
     if (!this.estimators.has(jobId)) {
       const est = new Estimator(diff, providerName);
       this.estimators.set(jobId, est);
+
+      const queue: ProofEntryResult[] = [];
+      this.proofQueue.set(jobId, queue);
     }
   }
 
-  public async forceProcess() {
-    await this.process();
+  // public async forceProcess() {
+  //   await this.process();
+  // }
+
+  public async getCurrentEstimate(
+    jobId: string,
+  ): Promise<ProviderCurrentEstimate> {
+    await this.process(jobId); // Ensure processing is done before getting the estimator
+    const est = this.estimators.get(jobId);
+    if (!est) {
+      throw new Error(`Estimator for job ${jobId} not found.`);
+    }
+    const info = est.currentInfo();
+    const unfortunateIteration = Math.floor(
+      info.attempts / est.estimateAttemptsGivenProbability(0.5),
+    );
+    return {
+      jobId,
+      name: info.provName || "Unknown",
+      estimatedSpeed: info.estimatedSpeed?.speed || 0,
+      totalSuccesses: info.totalSuccesses || 0,
+      remainingTimeSec: info.remainingTimeSec || 0,
+      unfortunateIteration,
+    };
   }
 
-  private async process(): Promise<void> {
-    const proofQueue = this.proofQueue;
-    this.proofQueue = []; // Clear the proof queue after processing
+  public async process(jobId: string): Promise<void> {
+    const proofQueue = this.proofQueue.get(jobId);
+    this.proofQueue.set(jobId, []); // Clear the proof queue after processing
+
+    if (!proofQueue) {
+      this.ctx.L().error(`No proof queue found for job ${jobId}.`);
+      throw new Error(`No proof queue found for job ${jobId}.`);
+    }
+
     for (const entry of proofQueue) {
       if (await validateProof(entry)) {
         let prover: string = "N/A";
@@ -92,15 +125,6 @@ export class EstimatorService {
           throw "Estimator not found for job: " + entry.jobId;
         }
         const proverDifficulty = computePrefixDifficulty(prover);
-
-        await this.options.resultService.processValidatedEntry(
-          entry,
-          (jobId: string, address: string, addrDifficulty: number) => {
-            this.ctx.consoleInfo(
-              `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
-            );
-          },
-        );
 
         if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
           this.totalEstimator?.addProvedWork(proverDifficulty, true);
@@ -128,36 +152,9 @@ export class EstimatorService {
       }
     }
   }
-  private async runProcessLoop(): Promise<void> {
-    while (true) {
-      // Process the inQueue entries before checking the stop condition
-      await this.process();
-      if (this.isStopping) {
-        break;
-      }
-      await sleep(this.options.processLoopSecs);
-    }
-  }
 
   private get messageLoopSecs(): number {
     return this.options.messageLoopSecs || 30.0;
-  }
-
-  private async runMessageLoop(): Promise<void> {
-    if (this.options.disableMessageLoop) {
-      return;
-    }
-    while (true) {
-      if (this.isStopping) {
-        break;
-      }
-      if (this.totalEstimator) {
-        displaySummary(this.estimators);
-        this.ctx.consoleInfo("---------------------------");
-        displayTotalSummary(this.totalEstimator);
-      }
-      await sleep(this.messageLoopSecs);
-    }
   }
 
   public reportCosts(jobId: string, cost: number): ReportCostResponse {
@@ -188,21 +185,18 @@ export class EstimatorService {
   }
 
   public pushProofToQueue(result: ProofEntryResult): boolean {
-    if (this.isStopping) {
-      return false;
+    const jId = result.jobId;
+    const queue = this.proofQueue.get(jId);
+    if (!queue) {
+      this.ctx.L().error(`No proof queue found for job ${jId}.`);
+      throw new Error(`No proof queue found for job ${jId}.`);
     }
-    this.proofQueue.push(result);
+    queue.push(result);
     return true;
   }
 
   stop(): void {
     this.isStopping = true;
     this.ctx.L().debug("Requesting stop of result service");
-  }
-
-  async waitForFinish(): Promise<void> {
-    await this.messageLoop;
-    await this.processLoop;
-    this.ctx.L().debug("Result service finished");
   }
 }

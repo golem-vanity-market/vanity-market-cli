@@ -7,7 +7,7 @@ import {
   ResourceRentalPool,
 } from "@golem-sdk/golem-js";
 import { AppContext } from "../app_context";
-import { GenerationParams } from "../scheduler";
+import { GenerationParams } from "../params";
 import {
   BaseRentalConfig,
   CPURentalConfig,
@@ -20,7 +20,10 @@ import { isNativeError } from "util/types";
 import { EstimatorService } from "../estimator_service";
 import { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
-
+import { parseVanityResults } from "./result";
+import { ProofEntryResult } from "../estimator/proof";
+import { displayDifficulty } from "../utils/format";
+import { VanityResults, IterationInfo } from "./result";
 /**
  * Parameters for the GolemSessionManager constructor
  */
@@ -267,7 +270,7 @@ export class GolemSessionManager {
     ctx: AppContext,
     rental: ResourceRental,
     generationParams: GenerationParams,
-  ): Promise<void> {
+  ): Promise<VanityResults> {
     const config = this.getConfigBasedOnProcessingUnitType();
 
     const agreementId = rental.agreement.id;
@@ -333,34 +336,69 @@ export class GolemSessionManager {
        */
       const stdout = res.stdout ? String(res.stdout) : "";
 
-      for (let line of stdout.split("\n")) {
-        try {
-          line = line.trim();
-          if (line.startsWith("0x")) {
-            const salt = line.split(",")[0].trim();
-            const addr = line.split(",")[1].trim();
-            const pubKey = line.split(",")[2].trim();
-
-            ctx.L().debug("Found address:", addr);
-
-            this.estimatorService.pushProofToQueue({
-              addr,
-              salt,
-              pubKey,
-              provider,
-              jobId: agreementId,
-              cpu: this.processingUnitType,
-            });
-          }
-        } catch (e) {
-          ctx.L().error(`Error parsing result line: ${e}`);
-        }
+      const cmdResults = parseVanityResults(
+        ctx,
+        stdout.split("\n"),
+        agreementId,
+        this.processingUnitType,
+        generationParams.singlePassSeconds,
+        generationParams.vanityAddressPrefix.fullPrefix(),
+        computePrefixDifficulty,
+        provider,
+      );
+      if (cmdResults.results.length === 0) {
+        // TODO: inform estimator and reputation model
+        ctx.L().info("No results found in the output");
+        return cmdResults;
       }
+      ctx
+        .L()
+        .info(
+          `Found ${cmdResults.results.length} results for job ${agreementId}`,
+        );
+      for (const r in cmdResults.results) {
+        // TODO: validation
+
+        const addr = cmdResults.results[r].address;
+
+        const entry: ProofEntryResult = {
+          addr: addr,
+          salt: cmdResults.results[r].salt,
+          pubKey: cmdResults.results[r].pubKey,
+          provider: cmdResults.provider,
+          jobId: cmdResults.jobId,
+          cpu: cmdResults.providerType,
+        };
+
+        this.estimatorService.pushProofToQueue(entry);
+
+        // TODO: filter out proofs
+        // and take only those that match the user's pattern
+        this.resultService.processValidatedEntry(
+          entry,
+          (jobId: string, address: string, addrDifficulty: number) => {
+            ctx.consoleInfo(
+              `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
+            );
+          },
+        );
+        ctx.L().debug("Found address:", addr);
+      }
+      // Process the results
+      return cmdResults;
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
         ctx.L().info("Work was stopped by user");
-        return;
+        return {
+          jobId: agreementId,
+          provider: rental.agreement.provider,
+          durationSeconds: generationParams.singlePassSeconds,
+          status: "error",
+          results: [],
+          providerType: this.processingUnitType,
+        };
       }
+      // TODO: inform estiator and reputation model
       ctx.L().error(`Error during profanity_cuda execution: ${error}`);
       throw new Error("Profanity execution failed");
     }
@@ -381,10 +419,10 @@ export class GolemSessionManager {
     ctx: AppContext,
     generationParams: GenerationParams,
     onError: OnErrorHandler,
-  ): Promise<void> {
+  ): Promise<IterationInfo | null> {
     if (this.stopWorkAC.signal.aborted) {
       ctx.L().info("Work was stopped by user");
-      return;
+      return null;
     }
     if (!this.golemNetwork || !this.allocation || !this.rentalPool) {
       ctx
@@ -403,16 +441,17 @@ export class GolemSessionManager {
     const providerName = rental.agreement.provider.name;
 
     let shouldKeepRental: boolean;
+    let r: VanityResults | null = null;
     try {
       /*console.log(
         `🔨 Acquired provider ${providerName} from the pool, running the generation command on them ...`,
       );*/
-      await this.runCommand(ctx, rental, generationParams);
+      r = await this.runCommand(ctx, rental, generationParams);
 
       if (this.isWorkStopped()) {
-        ctx.L().info("Work was stopped by user, not processing results");
+        ctx.L().info("Work was stopped by user");
         await this.rentalPool.release(rental);
-        return;
+        return r;
       }
 
       ctx.L().info("Command finished successfully");
@@ -465,6 +504,7 @@ export class GolemSessionManager {
         "Rental did not complete successfully, check logs for details",
       );
     }
+    return r;
   }
 
   public async disconnectFromGolemNetwork(ctx: AppContext): Promise<void> {
@@ -505,12 +545,5 @@ export class GolemSessionManager {
       ctx.L().error("Critical error during pool cleanup:", error);
       throw new Error("Failed to drain rental pool");
     }
-  }
-
-  public async stopServices(ctx: AppContext): Promise<void> {
-    ctx.L().debug("Stopping services...");
-    this.estimatorService.stop();
-    await this.estimatorService.waitForFinish();
-    ctx.L().debug("All services stopped...");
   }
 }

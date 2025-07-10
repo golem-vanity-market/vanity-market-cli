@@ -1,11 +1,14 @@
 // Don't import anything before it!
 import { shutdownOpenTelemetry } from "./instrumentation";
+import { trace, metrics } from "@opentelemetry/api";
+import { MetricsCollector } from "./metrics_collector";
 import { Command } from "commander";
 import { readFileSync, existsSync } from "fs";
 import { resolve } from "path";
 import { ethers, hexlify } from "ethers";
-import { GenerationParams, Scheduler } from "./scheduler";
-import { GenerationPrefix } from "./prefix";
+import { Scheduler } from "./scheduler";
+import { GenerationParams } from "./params";
+import { GenerationPrefix } from "./params";
 import {
   GolemSessionManager,
   SessionManagerParams,
@@ -269,12 +272,12 @@ function validateGenerateOptions(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleGenerateCommand(options: any): Promise<void> {
   const logger = pinoLogger({
-    name: "golem-vaddr-cli",
+    name: APP_NAME,
     transport: {
       targets: [
         {
           target: "pino-opentelemetry-transport",
-          level: "info",
+          level: process.env.OTEL_LOG_LEVEL || "info",
           options: {
             severityNumberMap: {
               trace: 1,
@@ -292,7 +295,14 @@ async function handleGenerateCommand(options: any): Promise<void> {
     },
   });
 
-  const appCtx = new AppContext(ROOT_CONTEXT).WithLogger(logger);
+  const tracer = trace.getTracer(APP_NAME, APP_VERSION);
+  const meter = metrics.getMeter(APP_NAME, APP_VERSION);
+  const mCollector = MetricsCollector.newCollector(meter);
+
+  const appCtx = new AppContext(ROOT_CONTEXT)
+    .WithLogger(logger)
+    .WithTracer(tracer)
+    .WithCollector(mCollector);
 
   let golemSessionManager: GolemSessionManager | null = null;
   let isShuttingDown = false;
@@ -342,14 +352,6 @@ async function handleGenerateCommand(options: any): Promise<void> {
         appCtx
           .L()
           .error("❌ Error disconnecting from Golem network:", disconnectError);
-      }
-
-      // finally, stop all services in the worker pool
-      try {
-        await golemSessionManager.stopServices(appCtx);
-        appCtx.consoleInfo("✅ Stopped all services");
-      } catch (error) {
-        appCtx.L().error("❌ Error stopping services:", error);
       }
     }
 
@@ -491,7 +493,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       generateOptions.minOffersTimeoutSec,
     );
 
-    const scheduler = new Scheduler(golemSessionManager);
+    const scheduler = new Scheduler(golemSessionManager, estimatorService);
     await scheduler.runGenerationProcess(appCtx, generationParams);
 
     // Normal completion, initiate shutdown.

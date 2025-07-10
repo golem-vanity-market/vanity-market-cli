@@ -54,8 +54,11 @@ temp/
 /cli/generated.pub
 
 .env
-results.csv
-results.json
+
+# result files that CLI generates 
+results*.csv
+results*.json
+results/
 
 *.sqlite
 

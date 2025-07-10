@@ -1,4 +1,4 @@
-import { Estimator, formatEstimatorInfo } from "../estimator";
+import { Estimator, formatEstimatorInfo } from "./estimator";
 
 export function estimatorLuckHistogram(silent = false, printHist = true) {
   const simulatedDifficulty = 10000;

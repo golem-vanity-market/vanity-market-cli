@@ -1,4 +1,4 @@
-import { ProofEntryResult } from "./model/proof";
+import { ProofEntryResult } from "./estimator/proof";
 
 export async function validateProof(
   _entry: ProofEntryResult,

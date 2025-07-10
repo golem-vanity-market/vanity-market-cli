@@ -1,28 +1,20 @@
-import { GenerationPrefix } from "./prefix";
 import { BudgetMonitor } from "./budget";
 import {
   GolemSessionManager,
   OnErrorHandler,
 } from "./node_manager/golem_session";
 import { AppContext } from "./app_context";
-
-/**
- * Interface for task generation parameters
- */
-export interface GenerationParams {
-  publicKey: string;
-  vanityAddressPrefix: GenerationPrefix;
-  budgetGlm: number;
-  numberOfWorkers: number;
-  singlePassSeconds: number;
-  numResults: bigint;
-}
+import { GenerationParams } from "./params";
+import { EstimatorService } from "./estimator_service";
 
 /**
  * The purpose of the Scheduler is to continuously generate tasks until either enough addresses are found or the budget is exhausted.
  */
 export class Scheduler {
-  constructor(private readonly sessionManager: GolemSessionManager) {}
+  constructor(
+    private readonly sessionManager: GolemSessionManager,
+    private readonly estimator: EstimatorService,
+  ) {}
 
   public async runGenerationProcess(
     ctx: AppContext,
@@ -100,7 +92,26 @@ export class Scheduler {
       try {
         // A single provider runs one iteration. When it's done, the loop
         // will check conditions again and start another if needed.
-        await this.sessionManager.runSingleIteration(ctx, params, onError);
+        const iterInfo = await this.sessionManager.runSingleIteration(
+          ctx,
+          params,
+          onError,
+        );
+
+        if (iterInfo == null) {
+          ctx.L().info("No provider available, trying again.");
+          console.log("No provider available, trying again.");
+          continue;
+        }
+        const esp = await this.estimator.getCurrentEstimate(iterInfo.jobId);
+
+        ctx
+          .L()
+          .info(
+            `Provider: ${iterInfo.provider.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
+          );
+
+        // TODO: add here the reputation model update
       } catch (error) {
         if (this.sessionManager.isWorkStopped()) {
           // we can safely assume that the error is due to the work being stopped

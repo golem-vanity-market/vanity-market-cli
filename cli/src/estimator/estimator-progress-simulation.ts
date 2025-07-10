@@ -1,4 +1,4 @@
-import { Estimator } from "../estimator";
+import { Estimator } from "./estimator";
 // @ts-expect-error This is library import
 import cliProgress from "cli-progress";
 import { sleep } from "@golem-sdk/golem-js";

@@ -2,8 +2,8 @@
 
 ## Important Rules
 
-- **NEVER use `git add .`** - Always add files explicitly
-- Use specific file paths when adding files to git
+- **NEVER use `git add .` or other `git add` options like `-A` or `-u`** - Always add files explicitly
+- You **MUST ALWAYS** specify file paths when adding files to git
 - Be selective about what gets committed
 
 ## Correct Usage

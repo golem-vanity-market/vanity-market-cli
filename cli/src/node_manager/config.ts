@@ -2,7 +2,7 @@
  * Configuration for CPU and GPU rentals
  */
 
-import { GenerationParams } from "../scheduler";
+import { GenerationParams } from "../params";
 import { ExeUnit, Allocation, MarketOrderSpec } from "@golem-sdk/golem-js";
 import { selectCheapestProvider } from "./selector";
 

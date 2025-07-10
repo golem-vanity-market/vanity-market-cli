@@ -1,5 +1,16 @@
 import { getBytes, hexlify } from "ethers";
 
+/**
+ * Interface for task generation parameters
+ */
+export interface GenerationParams {
+  publicKey: string;
+  vanityAddressPrefix: GenerationPrefix;
+  budgetGlm: number;
+  numberOfWorkers: number;
+  singlePassSeconds: number;
+  numResults: bigint;
+}
 export class GenerationPrefix {
   val: Uint8Array<ArrayBufferLike>;
   original: string;

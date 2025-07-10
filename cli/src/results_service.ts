@@ -1,8 +1,8 @@
 import { appendFile } from "fs/promises";
-import { GenerationPrefix } from "./prefix";
+import { GenerationPrefix } from "./params";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
-import { ProofEntryResult } from "./model/proof";
+import { ProofEntryResult } from "./estimator/proof";
 import { writeFileSync } from "fs";
 import { EstimatorService } from "./estimator_service";
 
@@ -33,7 +33,6 @@ export class ResultsService {
     estimatorService: EstimatorService,
     resultJsonPath: string,
   ): Promise<void> {
-    await estimatorService.forceProcess();
     const entries = await this.results();
     writeFileSync(resultJsonPath, JSON.stringify({ entries }, null, 2));
   }

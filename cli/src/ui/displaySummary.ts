@@ -1,4 +1,4 @@
-import { Estimator } from "../estimator";
+import { Estimator } from "../estimator/estimator";
 import { displayDifficulty, displayTime } from "../utils/format";
 
 function getFaceEmoji(
@@ -29,7 +29,7 @@ function getFaceEmoji(
   }
 }
 
-function displayEstimatorSummary(est: Estimator, label: string): void {
+export function displayEstimatorSummary(est: Estimator, label: string): void {
   const info = est.currentInfo();
   const unfortunateIteration = Math.floor(
     info.attempts / est.estimateAttemptsGivenProbability(0.5),
