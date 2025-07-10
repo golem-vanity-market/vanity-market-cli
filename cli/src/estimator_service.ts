@@ -41,14 +41,10 @@ export class EstimatorService {
   private totalEstimator: Estimator | null = null;
   private options;
   private ctx;
-  private messageLoop;
-  private processLoop;
 
   constructor(ctx: AppContext, opt: EstimatorServiceOptions) {
     this.ctx = ctx;
     this.options = opt;
-    this.processLoop = this.runProcessLoop();
-    this.messageLoop = this.runMessageLoop();
   }
 
   public getEstimator(jobId: string): Estimator {
@@ -157,36 +153,8 @@ export class EstimatorService {
     }
   }
 
-  private async runProcessLoop(): Promise<void> {
-    //   while (true) {
-    //     // Process the inQueue entries before checking the stop condition
-    //     await this.process();
-    //     if (this.isStopping) {
-    //       break;
-    //     }
-    //     await sleep(this.options.processLoopSecs);
-    //   }
-  }
-
   private get messageLoopSecs(): number {
     return this.options.messageLoopSecs || 30.0;
-  }
-
-  private async runMessageLoop(): Promise<void> {
-    // if (this.options.disableMessageLoop) {
-    //   return;
-    // }
-    // while (true) {
-    //   if (this.isStopping) {
-    //     break;
-    //   }
-    //   if (this.totalEstimator) {
-    //     displaySummary(this.estimators);
-    //     this.ctx.consoleInfo("---------------------------");
-    //     displayTotalSummary(this.totalEstimator);
-    //   }
-    //   await sleep(this.messageLoopSecs);
-    // }
   }
 
   public reportCosts(jobId: string, cost: number): ReportCostResponse {
