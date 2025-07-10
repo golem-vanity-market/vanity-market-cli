@@ -20,7 +20,7 @@ import { isNativeError } from "util/types";
 import { EstimatorService } from "../estimator_service";
 import { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
-import { ParseVanityResults } from "./result";
+import { parseVanityResults } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
 import { VanityResults, IterationInfo } from "./result";
@@ -336,7 +336,7 @@ export class GolemSessionManager {
        */
       const stdout = res.stdout ? String(res.stdout) : "";
 
-      const cmdResults = ParseVanityResults(
+      const cmdResults = parseVanityResults(
         ctx,
         stdout.split("\n"),
         agreementId,
@@ -346,18 +346,6 @@ export class GolemSessionManager {
         computePrefixDifficulty,
         provider,
       );
-      if (!cmdResults) {
-        // TODO: inform estimator and reputation model
-        ctx.L().error("No results found in the output");
-        return {
-          jobId: agreementId,
-          provider,
-          durationSeconds: generationParams.singlePassSeconds,
-          status: "not_found",
-          results: [],
-          providerType: this.processingUnitType,
-        };
-      }
       if (cmdResults.results.length === 0) {
         // TODO: inform estimator and reputation model
         ctx.L().info("No results found in the output");
@@ -369,6 +357,8 @@ export class GolemSessionManager {
           `Found ${cmdResults.results.length} results for job ${agreementId}`,
         );
       for (const r in cmdResults.results) {
+        // TODO: validation
+
         const addr = cmdResults.results[r].address;
 
         const entry: ProofEntryResult = {

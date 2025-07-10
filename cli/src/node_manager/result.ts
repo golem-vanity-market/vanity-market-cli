@@ -26,7 +26,7 @@ interface ComplexityFunction {
   (pattern: string): number;
 }
 
-export function ParseVanityResults(
+export function parseVanityResults(
   ctx: AppContext,
   lines: string[],
   jobId: string,
@@ -35,7 +35,7 @@ export function ParseVanityResults(
   pattern: string,
   complexFunc: ComplexityFunction,
   pInfo: ProviderInfo,
-): VanityResults | null {
+): VanityResults {
   const results: VanityResult[] = [];
 
   for (let line of lines) {
@@ -89,7 +89,7 @@ export function ParseVanityResult(
   const salt = parts[0].trim();
   const address = parts[1].trim();
   const pubKey = parts[2].trim();
-  const pattern = keyPattern;
+  const pattern = keyPattern; // TODO recognize for which pattern this result is (results and proofs)
 
   return {
     address,
