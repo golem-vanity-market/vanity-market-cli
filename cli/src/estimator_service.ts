@@ -30,7 +30,7 @@ export interface ProviderCurrentEstimate {
 }
 
 export class EstimatorService {
-  private proofQueue: ProofEntryResult[] = [];
+  private proofQueue: Map<string, ProofEntryResult[]> = new Map();
 
   private savedProofs: Map<string, null> = new Map();
   private isStopping = false;
@@ -70,6 +70,9 @@ export class EstimatorService {
     if (!this.estimators.has(jobId)) {
       const est = new Estimator(diff, providerName);
       this.estimators.set(jobId, est);
+
+      const queue: ProofEntryResult[] = [];
+      this.proofQueue.set(jobId, queue);
     }
   }
 
@@ -80,7 +83,7 @@ export class EstimatorService {
   public async getCurrentEstimate(
     jobId: string,
   ): Promise<ProviderCurrentEstimate> {
-    await this.process(); // Ensure processing is done before getting the estimator
+    await this.process(jobId); // Ensure processing is done before getting the estimator
     const est = this.estimators.get(jobId);
     if (!est) {
       throw new Error(`Estimator for job ${jobId} not found.`);
@@ -99,9 +102,15 @@ export class EstimatorService {
     };
   }
 
-  public async process(): Promise<void> {
-    const proofQueue = this.proofQueue;
-    this.proofQueue = []; // Clear the proof queue after processing
+  public async process(jobId: string): Promise<void> {
+    const proofQueue = this.proofQueue.get(jobId);
+    this.proofQueue.set(jobId, []); // Clear the proof queue after processing
+
+    if (!proofQueue) {
+      this.ctx.L().error(`No proof queue found for job ${jobId}.`);
+      throw new Error(`No proof queue found for job ${jobId}.`);
+    }
+
     for (const entry of proofQueue) {
       if (await validateProof(entry)) {
         let prover: string = "N/A";
@@ -208,7 +217,13 @@ export class EstimatorService {
   }
 
   public pushProofToQueue(result: ProofEntryResult): boolean {
-    this.proofQueue.push(result);
+    const jId = result.jobId;
+    const queue = this.proofQueue.get(jId);
+    if (!queue) {
+      this.ctx.L().error(`No proof queue found for job ${jId}.`);
+      throw new Error(`No proof queue found for job ${jId}.`);
+    }
+    queue.push(result);
     return true;
   }
 
