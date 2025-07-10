@@ -66,7 +66,7 @@ export function ParseVanityResults(
     providerType: pType,
     jobId: jobId,
     durationSeconds: durationSeconds,
-    status: "not_found",
+    status: results.length > 0 ? "success" : "not_found",
   };
 }
 
