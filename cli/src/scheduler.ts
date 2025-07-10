@@ -93,26 +93,28 @@ export class Scheduler {
       try {
         // A single provider runs one iteration. When it's done, the loop
         // will check conditions again and start another if needed.
-        const provInfo = await this.sessionManager.runSingleIteration(
+        const interInfo = await this.sessionManager.runSingleIteration(
           ctx,
           params,
           onError,
         );
 
-        if (provInfo == null) {
+        if (interInfo == null) {
           ctx.L().info("No provider available, trying again.");
           console.log("No provider available, trying again.");
           continue;
         }
-        const esp = await this.estimator.getEstimator(provInfo.id);
+        const esp = await this.estimator.getEstimator(interInfo.jobId);
 
         ctx
           .L()
           .info(
-            `Provider: ${provInfo.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
+            `Provider: ${interInfo.provider.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
           );
 
         displayEstimatorSummary(esp, provInfo.name);
+
+        // TODO: add here the reputation model update
       } catch (error) {
         if (this.sessionManager.isWorkStopped()) {
           // we can safely assume that the error is due to the work being stopped

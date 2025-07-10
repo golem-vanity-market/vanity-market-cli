@@ -23,7 +23,7 @@ import { VanityPaymentModule } from "./payment_module";
 import { ParseVanityResults } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
-import { VanityResults } from "./result";
+import { VanityResults, IterationInfo } from "./result";
 /**
  * Parameters for the GolemSessionManager constructor
  */
@@ -429,10 +429,10 @@ export class GolemSessionManager {
     ctx: AppContext,
     generationParams: GenerationParams,
     onError: OnErrorHandler,
-  ): Promise<ProviderInfo | void> {
+  ): Promise<IterationInfo | null> {
     if (this.stopWorkAC.signal.aborted) {
       ctx.L().info("Work was stopped by user");
-      return;
+      return null;
     }
     if (!this.golemNetwork || !this.allocation || !this.rentalPool) {
       ctx
@@ -451,16 +451,17 @@ export class GolemSessionManager {
     const providerName = rental.agreement.provider.name;
 
     let shouldKeepRental: boolean;
+    let r: VanityResults | null = null;
     try {
       /*console.log(
         `🔨 Acquired provider ${providerName} from the pool, running the generation command on them ...`,
       );*/
-      await this.runCommand(ctx, rental, generationParams);
+      r = await this.runCommand(ctx, rental, generationParams);
 
       if (this.isWorkStopped()) {
-        ctx.L().info("Work was stopped by user, not processing results");
+        ctx.L().info("Work was stopped by user");
         await this.rentalPool.release(rental);
-        return;
+        return r;
       }
 
       ctx.L().info("Command finished successfully");
@@ -513,6 +514,7 @@ export class GolemSessionManager {
         "Rental did not complete successfully, check logs for details",
       );
     }
+    return r;
   }
 
   public async disconnectFromGolemNetwork(ctx: AppContext): Promise<void> {
