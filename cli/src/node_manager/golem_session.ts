@@ -361,14 +361,7 @@ export class GolemSessionManager {
       if (cmdResults.results.length === 0) {
         // TODO: inform estimator and reputation model
         ctx.L().info("No results found in the output");
-        return {
-          jobId: agreementId,
-          provider,
-          durationSeconds: generationParams.singlePassSeconds,
-          status: "not_found",
-          results: [],
-          providerType: this.processingUnitType,
-        };
+        return cmdResults;
       }
       ctx
         .L()
