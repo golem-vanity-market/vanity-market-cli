@@ -16,6 +16,7 @@ export class AppContext {
     const newCtx = new AppContext(this._activeContext);
     newCtx.logger = logger;
     newCtx.tracer = this.tracer;
+    newCtx.collector = this.collector;
     return newCtx;
   }
 
@@ -23,14 +24,15 @@ export class AppContext {
     const newCtx = new AppContext(this._activeContext);
     newCtx.tracer = tracer;
     newCtx.logger = this.logger;
+    newCtx.collector = this.collector;
     return newCtx;
   }
 
   public WithCollector(collector: MetricsCollector): AppContext {
     const newCtx = new AppContext(this._activeContext);
     newCtx.collector = collector;
-    newCtx.logger = this.logger; // Preserve the logger
-    newCtx.tracer = this.tracer; // Preserve the tracer
+    newCtx.logger = this.logger;
+    newCtx.tracer = this.tracer;
     return newCtx;
   }
 
