@@ -6,7 +6,6 @@ import {
 import { AppContext } from "./app_context";
 import { GenerationParams } from "./params";
 import { EstimatorService } from "./estimator_service";
-import { displayEstimatorSummary } from "./ui/displaySummary";
 
 /**
  * The purpose of the Scheduler is to continuously generate tasks until either enough addresses are found or the budget is exhausted.
@@ -93,26 +92,24 @@ export class Scheduler {
       try {
         // A single provider runs one iteration. When it's done, the loop
         // will check conditions again and start another if needed.
-        const interInfo = await this.sessionManager.runSingleIteration(
+        const iterInfo = await this.sessionManager.runSingleIteration(
           ctx,
           params,
           onError,
         );
 
-        if (interInfo == null) {
+        if (iterInfo == null) {
           ctx.L().info("No provider available, trying again.");
           console.log("No provider available, trying again.");
           continue;
         }
-        const esp = await this.estimator.getEstimator(interInfo.jobId);
+        const esp = await this.estimator.getCurrentEstimate(iterInfo.jobId);
 
         ctx
           .L()
           .info(
-            `Provider: ${interInfo.provider.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
+            `Provider: ${iterInfo.provider.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
           );
-
-        displayEstimatorSummary(esp, provInfo.name);
 
         // TODO: add here the reputation model update
       } catch (error) {

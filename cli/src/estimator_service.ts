@@ -20,12 +20,13 @@ export interface ReportCostResponse {
   reason: string;
 }
 
-export interface EstimatedProvider {
+export interface CurrentProviderEstimate {
   jobId: string;
   name: string;
   estimatedSpeed: number;
   totalSuccesses: number;
   remainingTimeSec: number;
+  unfortunateIteration: number; // Number of iterations that were not successful
 }
 
 export class EstimatorService {
@@ -76,19 +77,25 @@ export class EstimatorService {
   //   await this.process();
   // }
 
-  public async getEstimatedProvider(jobId: string): Promise<EstimatedProvider> {
+  public async getCurrentEstimate(
+    jobId: string,
+  ): Promise<CurrentProviderEstimate> {
     await this.process(); // Ensure processing is done before getting the estimator
     const est = this.estimators.get(jobId);
     if (!est) {
       throw new Error(`Estimator for job ${jobId} not found.`);
     }
     const info = est.currentInfo();
+    const unfortunateIteration = Math.floor(
+      info.attempts / est.estimateAttemptsGivenProbability(0.5),
+    );
     return {
       jobId,
       name: info.provName || "Unknown",
       estimatedSpeed: info.estimatedSpeed?.speed || 0,
       totalSuccesses: info.totalSuccesses || 0,
       remainingTimeSec: info.remainingTimeSec || 0,
+      unfortunateIteration,
     };
   }
 
