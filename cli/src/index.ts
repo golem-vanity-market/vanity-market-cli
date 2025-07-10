@@ -501,7 +501,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       generateOptions.minOffersTimeoutSec,
     );
 
-    const scheduler = new Scheduler(golemSessionManager);
+    const scheduler = new Scheduler(golemSessionManager, estimatorService);
     await scheduler.runGenerationProcess(appCtx, generationParams);
 
     // Normal completion, initiate shutdown.
