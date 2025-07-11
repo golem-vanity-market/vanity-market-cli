@@ -66,7 +66,35 @@ async function runJobInBackground(
 ) {
   let golemSessionManager: GolemSessionManager | null = null;
   let appContext: AppContext | null = null;
-  let resultsCollector: NodeJS.Timeout | null = null;
+  let resultService: ResultsService | null = null;
+
+  const seenResults = new Set<string>();
+  const collectResults = async () => {
+    if (!resultService) return;
+    const results = await resultService.results();
+    if (!results) return;
+    if (results.length > 0) {
+      const newResults = results.filter((r) => !seenResults.has(r.addr));
+      newResults.forEach((r) => seenResults.add(r.addr));
+      if (newResults.length > 0) {
+        await db.insert(jobResultsTable).values(
+          newResults.map((r) => ({
+            jobId,
+            addr: r.addr,
+            salt: r.salt,
+            pubKey: r.pubKey,
+            providerId: r.provider.id,
+            providerName: r.provider.name,
+            providerWalletAddress: r.provider.walletAddress,
+          }))
+        );
+        appContext
+          ?.L()
+          .info(`Saved ${newResults.length} new results for job ${jobId}`);
+      }
+    }
+  };
+  const resultsCollector = setInterval(collectResults, 5000); // Collect results every 5 seconds
 
   try {
     const validated = validateAndTransformInputs(input);
@@ -87,7 +115,7 @@ async function runJobInBackground(
 
     const rentalDurationSecs = 15 / 60;
 
-    const resultService = new ResultsService(appContext, {
+    resultService = new ResultsService(appContext, {
       vanityPrefix: validated.vanityAddressPrefix,
       csvOutput: null,
     });
@@ -110,7 +138,7 @@ async function runJobInBackground(
     };
     golemSessionManager = new GolemSessionManager(sessionParams);
 
-    const scheduler = new Scheduler(golemSessionManager);
+    const scheduler = new Scheduler(golemSessionManager, estimatorService);
 
     // Store the session in our active jobs map for potential cancellation
     activeJobs[jobId] = { golemSessionManager, scheduler };
@@ -130,33 +158,10 @@ async function runJobInBackground(
       numResults: BigInt(input.numResults),
     };
 
-    const seenResults = new Set<string>();
-    resultsCollector = setInterval(async () => {
-      const results = await resultService.results();
-      if (!results) return;
-      if (results.length > 0) {
-        const newResults = results.filter((r) => !seenResults.has(r.addr));
-        newResults.forEach((r) => seenResults.add(r.addr));
-        if (newResults.length > 0) {
-          await db.insert(jobResultsTable).values(
-            newResults.map((r) => ({
-              jobId,
-              addr: r.addr,
-              salt: r.salt,
-              pubKey: r.pubKey,
-              providerId: r.provider.id,
-              providerName: r.provider.name,
-              providerWalletAddress: r.provider.walletAddress,
-            }))
-          );
-          appContext
-            ?.L()
-            .info(`Saved ${newResults.length} new results for job ${jobId}`);
-        }
-      }
-    }, 5000); // Collect results every 5 seconds
-
     await scheduler.runGenerationProcess(appContext, generationParams);
+
+    // collect the final set of results
+    await collectResults();
 
     // 5. Mark job as completed
     await db
@@ -183,7 +188,6 @@ async function runJobInBackground(
       rootLogger.info(`Cleaning up resources for job ${jobId}`);
       await golemSessionManager.drainPool(appContext);
       await golemSessionManager.disconnectFromGolemNetwork(appContext);
-      await golemSessionManager.stopServices(appContext);
       rootLogger.info(`Resources cleaned up for job ${jobId}`);
     }
     // Remove from active jobs map to prevent memory leaks
