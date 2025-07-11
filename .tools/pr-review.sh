@@ -72,7 +72,7 @@ echo "Step 4: Executing review in separate claude process..."
 cd "temp/golem-vanity.market-$BRANCH_NAME/$REVIEW_DIR"
 
 echo "Running claude review in $(pwd)..."
-claude -p "do a careful review and store the review in REVIEW_PR$PR_NUMBER.md" --allowedTools "Read,Write,Bash,Glob,Grep,LS"
+claude -p "do a careful review and store the review in REVIEW_PR$PR_NUMBER.md" -d --allowedTools "Read,Write,Bash,Glob,Grep,LS"
 
 # Step 5: Copy Review Back
 echo "Step 5: Copying review back to original repository..."
