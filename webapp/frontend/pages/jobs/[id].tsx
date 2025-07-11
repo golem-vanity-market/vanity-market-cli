@@ -34,7 +34,7 @@ export default function JobDetailsPage() {
   return (
     <>
       <Head>
-        <title>Job Details - {id}</title>
+        <title>{`Job Details - ${id}`}</title>
       </Head>
       <main className="container mx-auto max-w-4xl space-y-6 p-4 md:p-8">
         <div>
