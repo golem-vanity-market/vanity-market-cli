@@ -8,6 +8,14 @@ Make sure you have at least Node.js 23 installed. Run the dev server with:
 node --watch src/server.ts
 ```
 
+### Log Readability
+
+Fastify uses pino under the hood, so you can use any pino-compatible tool to filter or prettify the logs, for example:
+
+```bash
+node --watch src/server.ts | npx pino-pretty
+```
+
 ## Environment Variables
 
 Copy the `.env.template` file to `.env` and fill in the required values. 
