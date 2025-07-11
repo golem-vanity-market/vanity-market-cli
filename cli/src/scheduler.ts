@@ -6,6 +6,7 @@ import {
 import { AppContext } from "./app_context";
 import { GenerationParams } from "./params";
 import { EstimatorService } from "./estimator_service";
+import { getProviderEstimatorSummaryMessage } from "./ui/displaySummary";
 
 /**
  * The purpose of the Scheduler is to continuously generate tasks until either enough addresses are found or the budget is exhausted.
@@ -110,6 +111,10 @@ export class Scheduler {
           .info(
             `Provider: ${iterInfo.provider.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
           );
+
+        ctx.consoleInfo(
+          getProviderEstimatorSummaryMessage(esp, iterInfo.provider.name),
+        );
 
         // TODO: add here the reputation model update
       } catch (error) {

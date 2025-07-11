@@ -6,6 +6,7 @@ import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";
 import { validateProof } from "./validator";
 import { ResultsService } from "./results_service";
+import { EstimatorInfo } from "./estimator/estimator";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
@@ -20,21 +21,16 @@ export interface ReportCostResponse {
   reason: string;
 }
 
-export interface ProviderCurrentEstimate {
+export interface ProviderCurrentEstimate extends EstimatorInfo {
   jobId: string;
-  name: string;
-  estimatedSpeed: number;
-  totalSuccesses: number;
-  remainingTimeSec: number;
-  unfortunateIteration: number; // Number of iterations that were not successful
+  unfortunateIteration: number;
+  costPerHour?: number;
 }
 
 export class EstimatorService {
   private proofQueue: Map<string, ProofEntryResult[]> = new Map();
 
   private savedProofs: Map<string, null> = new Map();
-  private isStopping = false;
-  private isFinished = false;
 
   private estimators: Map<string, Estimator> = new Map();
   private costs: Map<string, number> = new Map();
@@ -90,10 +86,8 @@ export class EstimatorService {
     );
     return {
       jobId,
-      name: info.provName || "Unknown",
-      estimatedSpeed: info.estimatedSpeed?.speed || 0,
-      totalSuccesses: info.totalSuccesses || 0,
-      remainingTimeSec: info.remainingTimeSec || 0,
+      ...info,
+      costPerHour: info.estimatedSpeed?.costPerHour || 0,
       unfortunateIteration,
     };
   }
@@ -193,10 +187,5 @@ export class EstimatorService {
     }
     queue.push(result);
     return true;
-  }
-
-  stop(): void {
-    this.isStopping = true;
-    this.ctx.L().debug("Requesting stop of result service");
   }
 }

@@ -360,7 +360,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       await shutdownOpenTelemetry();
       appCtx.consoleInfo("✅ OpenTelemetry shut down successfully");
     } catch (err) {
-      console.error("❌ Error shutting down OpenTelemetry", err);
+      console.info("❌ Error shutting down OpenTelemetry", err);
     }
 
     process.exit(exitCode);
@@ -393,7 +393,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       "🚀 Starting vanity address generation with the following parameters:\n" +
         `   Public Key File: ${generateOptions.publicKeyPath}\n` +
         `   Public Key: ${validatedOptions.publicKey.toHex()}\n` +
-        `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix}\n` +
+        `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix.fullPrefix()}\n` +
         `   Budget (GLM): ${validatedOptions.budgetGlm}\n` +
         `   Worker Type: ${validatedOptions.processingUnitType}\n\n` +
         `✓ All parameters validated successfully\n` +

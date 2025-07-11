@@ -200,7 +200,7 @@ function createSDKConfig() {
       exportTimeoutMillis: 2000,
     }),
     logRecordProcessors: [new SimpleLogRecordProcessor(fileLogExporter)],
-    shutdownTimeout: 5000,
+    shutdownTimeout: 8000,
     resource: resourceFromAttributes({
       [ATTR_SERVICE_NAME]: APP_NAME,
       [ATTR_SERVICE_VERSION]: APP_VERSION,
