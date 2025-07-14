@@ -25,7 +25,7 @@ git fetch
 
 # Get PR details
 PR_INFO=$(gh pr view "$PR_NUMBER" --json headRefName,title,files)
-BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName')
+BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName' | tr '/' '-')
 PR_TITLE=$(echo "$PR_INFO" | jq -r '.title')
 
 echo "PR Title: $PR_TITLE"

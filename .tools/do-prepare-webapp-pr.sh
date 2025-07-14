@@ -14,7 +14,7 @@ fi
 PR_NUMBER="$1"
 
 PR_INFO=$(gh pr view "$PR_NUMBER" --json headRefName,title,files)
-BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName')
+BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName' | tr '/' '-')
 
 echo "Copy .env files to worktree..."
 cp webapp/backend/.env temp/golem-vanity.market-$BRANCH_NAME/webapp/backend/.env
