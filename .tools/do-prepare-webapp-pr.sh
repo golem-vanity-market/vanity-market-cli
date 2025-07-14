@@ -22,6 +22,7 @@ cp webapp/frontend/.env temp/golem-vanity.market-$BRANCH_NAME/webapp/frontend/.e
 
 pushd temp/golem-vanity.market-$BRANCH_NAME/cli
 npm install || true
+npm run build || true
 popd
 
 pushd temp/golem-vanity.market-$BRANCH_NAME/webapp/shared
