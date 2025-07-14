@@ -14,26 +14,27 @@ fi
 PR_NUMBER="$1"
 
 PR_INFO=$(gh pr view "$PR_NUMBER" --json headRefName,title,files)
-BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName' | tr '/' '-')
+BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName')
+BRANCH_DIR_POSTFIX=$(echo "$PR_INFO" | jq -r '.headRefName' | tr '/' '-')
 
 echo "Copy .env files to worktree..."
-cp webapp/backend/.env temp/golem-vanity.market-$BRANCH_NAME/webapp/backend/.env
-cp webapp/frontend/.env temp/golem-vanity.market-$BRANCH_NAME/webapp/frontend/.env
+cp webapp/backend/.env temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/webapp/backend/.env
+cp webapp/frontend/.env temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/webapp/frontend/.env
 
-pushd temp/golem-vanity.market-$BRANCH_NAME/cli
+pushd temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/cli
 npm install || true
 npm run build || true
 popd
 
-pushd temp/golem-vanity.market-$BRANCH_NAME/webapp/shared
+pushd temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/webapp/shared
 npm install || true
 popd
 
-pushd temp/golem-vanity.market-$BRANCH_NAME/webapp/backend
+pushd temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/webapp/backend
 npm install || true
 popd
 
-pushd temp/golem-vanity.market-$BRANCH_NAME/webapp/frontend
+pushd temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/webapp/frontend
 npm install || true
 popd
 
