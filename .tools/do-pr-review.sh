@@ -73,12 +73,21 @@ echo "Step 4: Executing review in separate claude process..."
 cd "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/$REVIEW_DIR"
 
 echo "Running claude review in $(pwd)..."
-claude -p "do a careful, direct, and brutaly honest review and store the review in REVIEW_PR$PR_NUMBER.md. Use subagents." -d --allowedTools "Read,Write,Bash,Glob,Grep,LS"
+claude \
+    -d \
+    --allowedTools "Read,Write,Bash,Glob,Grep,LS" \
+    -p <<-EOF
+Read the guidelines in CLAUDE.md.
+Carefuly review the code changes in github PR ${PR_NUMBER} (this branch), use gh cli if needed. Use subagents for detailed analysis.
+Act as a critical and brutally honest senior software engineer. Think hard.
+Write the report to CLAUDE_REVIEW_PR${PR_NUMBER}.md.
+If you see an opportunity to improve, include code fragments in the report showing how to improve the code.
+EOF
 
 # Step 5: Copy Review Back
 echo "Step 5: Copying review back to original repository..."
-if [ -f "REVIEW_PR$PR_NUMBER.md" ]; then
-    mv "REVIEW_PR$PR_NUMBER.md" "../../../CLAUDE_REVIEW_PR$PR_NUMBER.md"
+if [ -f "CLAUDE_REVIEW_PR$PR_NUMBER.md" ]; then
+    mv "CLAUDE_REVIEW_PR$PR_NUMBER.md" "../../../CLAUDE_REVIEW_PR$PR_NUMBER.md"
     echo "Review completed and saved to CLAUDE_REVIEW_PR$PR_NUMBER.md"
 else
     echo "Warning: Review file not found"
