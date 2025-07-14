@@ -77,8 +77,8 @@ claude -p "do a careful, direct, and brutaly honest review and store the review 
 # Step 5: Copy Review Back
 echo "Step 5: Copying review back to original repository..."
 if [ -f "REVIEW_PR$PR_NUMBER.md" ]; then
-    cp "REVIEW_PR$PR_NUMBER.md" "../../../REVIEW_PR$PR_NUMBER.md"
-    echo "Review completed and saved to REVIEW_PR$PR_NUMBER.md"
+    mv "REVIEW_PR$PR_NUMBER.md" "../../../CLAUDE_REVIEW_PR$PR_NUMBER.md"
+    echo "Review completed and saved to CLAUDE_REVIEW_PR$PR_NUMBER.md"
 else
     echo "Warning: Review file not found"
     exit 1
