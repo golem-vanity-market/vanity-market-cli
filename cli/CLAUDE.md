@@ -122,3 +122,9 @@ The `.claude/scripts/` directory contains bash scripts that execute in response 
 - **Cryptocurrencies**: Ethereum and CREATE1 addresses
 - **Pattern Types**: Prefix, suffix, regex
 - **Validation**: 1-10 character patterns, alphanumeric, case-insensitive
+
+# important-instruction-reminders
+
+## File Handling Guidelines
+
+- **GEMINI Files**: Ignore all files starting with "GEMINI" (e.g., GEMINI_REVIEW.md, GEMINI_REVIEW_DETAILED.md) to avoid cross-contamination between AI tools when not explicitly needed for the task.
