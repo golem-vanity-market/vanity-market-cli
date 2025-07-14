@@ -9,4 +9,4 @@ export * from "./results_service";
 export * from "./estimator_service";
 export * from "./node_manager/golem_session";
 export * from "./node_manager/config";
-export { PublicKey } from "./index"; //TODO: move PublicKey to a separate file
+export { PublicKey } from "./app/optionsValidator"; //TODO: move PublicKey to a separate file

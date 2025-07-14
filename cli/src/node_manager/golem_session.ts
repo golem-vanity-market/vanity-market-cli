@@ -1,3 +1,4 @@
+// External imports
 import {
   Allocation,
   DraftOfferProposalPool,
@@ -6,24 +7,21 @@ import {
   ResourceRental,
   ResourceRentalPool,
 } from "@golem-sdk/golem-js";
+import { isNativeError } from "util/types";
+
+// Internal imports
 import { AppContext } from "../app_context";
-import { GenerationParams } from "../params";
-import {
-  BaseRentalConfig,
-  CPURentalConfig,
-  GPURentalConfig,
-  ProcessingUnitType,
-} from "./config";
+import { GenerationParams, ProcessingUnitType } from "../params";
+import { BaseRentalConfig, CPURentalConfig, GPURentalConfig } from "./config";
 import { computePrefixDifficulty } from "../difficulty";
 import { withTimeout } from "../utils/timeout";
-import { isNativeError } from "util/types";
 import { EstimatorService } from "../estimator_service";
 import { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
-import { parseVanityResults } from "./result";
+import { parseVanityResults, VanityResults, IterationInfo } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
-import { VanityResults, IterationInfo } from "./result";
+
 /**
  * Parameters for the GolemSessionManager constructor
  */

@@ -2,17 +2,9 @@
  * Configuration for CPU and GPU rentals
  */
 
-import { GenerationParams } from "../params";
+import { GenerationParams, ProcessingUnitType } from "../params";
 import { ExeUnit, Allocation, MarketOrderSpec } from "@golem-sdk/golem-js";
 import { selectCheapestProvider } from "./selector";
-
-/**
- * Supported processing unit types
- */
-export enum ProcessingUnitType {
-  CPU = "cpu",
-  GPU = "gpu",
-}
 
 /**
  * Configuration for a specific processing unit type

@@ -4,7 +4,6 @@ import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";
 import { writeFileSync } from "fs";
-import { EstimatorService } from "./estimator_service";
 
 export interface ResultsServiceOptions {
   csvOutput: string | null; // File name for CSV output
@@ -29,10 +28,7 @@ export class ResultsService {
     return this.savedAddr;
   }
 
-  public async saveResultsToFile(
-    estimatorService: EstimatorService,
-    resultJsonPath: string,
-  ): Promise<void> {
+  public async saveResultsToFile(resultJsonPath: string): Promise<void> {
     const entries = await this.results();
     writeFileSync(resultJsonPath, JSON.stringify({ entries }, null, 2));
   }

@@ -1,5 +1,6 @@
 import * as otl from "@opentelemetry/api";
 import { Logger } from "@golem-sdk/golem-js";
+import { pinoLogger } from "@golem-sdk/pino-logger";
 import { MetricsCollector } from "./metrics_collector";
 
 export class AppContext {
@@ -64,4 +65,40 @@ export class AppContext {
   public consoleError(message?: unknown, ...optionalParams: unknown[]): void {
     console.error(message, ...optionalParams);
   }
+}
+
+/**
+ * Creates a Pino logger configured with OpenTelemetry transport
+ *
+ * Overwrite the default console log level (through pino-pretty) with GOLEM_PINO_LOG_LEVEL.
+ *
+ * @param appName - The application name to use for the logger
+ * @returns Configured Pino logger with OpenTelemetry support
+ */
+export function getPinoLoggerWithOtel(
+  appName: string,
+  otelLoglevel: string,
+): Logger {
+  return pinoLogger({
+    name: appName,
+    transport: {
+      targets: [
+        {
+          target: "pino-opentelemetry-transport",
+          level: otelLoglevel,
+          options: {
+            severityNumberMap: {
+              trace: 1,
+              debug: 5,
+              info: 9,
+              warn: 13,
+              error: 17,
+              fatal: 21,
+            },
+          },
+        },
+        { target: "pino-pretty", options: { colorize: true }, level: "info" },
+      ],
+    },
+  });
 }

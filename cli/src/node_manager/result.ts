@@ -1,5 +1,5 @@
 import { ProviderInfo } from "@golem-sdk/golem-js";
-import { ProcessingUnitType } from "../node_manager/config";
+import { ProcessingUnitType } from "../params";
 import { AppContext } from "../app_context";
 
 export interface VanityResult {
