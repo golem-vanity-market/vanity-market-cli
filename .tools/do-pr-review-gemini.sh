@@ -1,9 +1,12 @@
 #!/bin/bash
 
 # PR Review Script
-# Usage: ./pr-review.sh <pr_number>
+# Usage: ./do-pr-review-gemini.sh <pr_number>
 
-set -e
+set -o nounset
+set -o errexit
+set -o pipefail
+set -x
 
 # Check if PR number is provided
 if [ -z "$1" ]; then
@@ -67,21 +70,28 @@ else
     echo "Most changes in Webapp directory"
 fi
 
-# Step 4: Execute Review in Separate Claude Process
-echo "Step 4: Executing review in separate claude process..."
+# Step 4: Execute Review in Separate Gemini Process
+echo "Step 4: Executing review in separate Gemini process..."
 cd "temp/golem-vanity.market-$BRANCH_NAME/$REVIEW_DIR"
 
-echo "Running claude review in $(pwd)..."
-claude -p "do a careful review and store the review in REVIEW_PR$PR_NUMBER.md" -d --allowedTools "Read,Write,Bash,Glob,Grep,LS"
+echo "Running Gemini review in $(pwd)..."
+gemini \
+    -y \
+    -p <<-EOF
+Read the guidelines in CLAUDE.md.
+Review the code changes in github PR ${PR_NUMBER} (this branch), use gh cli if needed.
+Act as a critical and brutally honest senior software engineer.
+Write the report to GEMINI_REVIEW_PR${PR_NUMBER}.md.
+If you see an opportunity to improve, include code fragments in the report showing how to improve the code.
+EOF
+
 
 # Step 5: Copy Review Back
 echo "Step 5: Copying review back to original repository..."
-if [ -f "REVIEW_PR$PR_NUMBER.md" ]; then
-    cp "REVIEW_PR$PR_NUMBER.md" "../../../REVIEW_PR$PR_NUMBER.md"
-    echo "Review completed and saved to REVIEW_PR$PR_NUMBER.md"
+if [ -f "GEMINI_REVIEW_PR$PR_NUMBER.md" ]; then
+    mv "GEMINI_REVIEW_PR$PR_NUMBER.md" "../../../GEMINI_REVIEW_PR$PR_NUMBER.md"
+    echo "Review completed and saved to GEMINI_EVIEW_PR$PR_NUMBER.md"
 else
     echo "Warning: Review file not found"
     exit 1
 fi
-
-echo "PR #$PR_NUMBER review completed successfully!"
