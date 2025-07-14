@@ -31,13 +31,32 @@ export class Scheduler {
       return false; // Destroy the rental
     };
 
-    const budgetMonitor = new BudgetMonitor(this.sessionManager);
+    const budgetMonitor = new BudgetMonitor(
+      this.sessionManager,
+      params.budgetGlm,
+    );
 
-    if (!(await budgetMonitor.hasSufficientBudget())) {
-      ctx.L().warn("Insufficient budget to start the work. Stopping.");
-      console.warn("⚠️ Insufficient budget to start the work. Stopping.");
-      return;
-    }
+    budgetMonitor.startMonitoring({
+      onAllocationAmendError: (error) => {
+        ctx.L().error("Error monitoring and amending budget:", error);
+        ctx.consoleError(
+          "⚠️ Cannot extend allocation, do you have enough GLMs? Stopping work ...",
+        );
+        this.sessionManager.stopWork("Cannot extend allocation");
+      },
+      onAllocationAmendSuccess: ({ timeout, budget }) => {
+        ctx
+          .L()
+          .info(
+            `Extended allocation to (timeout=${timeout}, budget=${budget})`,
+          );
+      },
+      onBudgetExhausted: () => {
+        ctx.L().info("Budget exhausted, stopping work ...");
+        ctx.consoleInfo("💰⚠️ Budget exhausted, stopping work ...");
+        this.sessionManager.stopWork("Budget exhausted");
+      },
+    });
 
     await budgetMonitor.displayBudgetInfo();
     console.log(
@@ -46,10 +65,12 @@ export class Scheduler {
 
     // Create and start multiple providers in parallel
     const workerPromises = Array.from({ length: params.numberOfWorkers }, () =>
-      this.workInLoop(ctx, params, onError, budgetMonitor),
+      this.workInLoop(ctx, params, onError),
     );
 
     await Promise.allSettled(workerPromises);
+
+    budgetMonitor.stop();
 
     console.log(
       `✅ Generation process completed. Found ${this.sessionManager.noResults}/${params.numResults} addresses.`,
@@ -65,7 +86,6 @@ export class Scheduler {
     ctx: AppContext,
     params: GenerationParams,
     onError: OnErrorHandler,
-    budgetMonitor: BudgetMonitor,
   ): Promise<void> {
     // This loop continues as long as the overall job is not done
     while (!this.sessionManager.isWorkStopped()) {
@@ -81,13 +101,6 @@ export class Scheduler {
         );
         this.sessionManager.stopWork("Target number of results reached"); // Stop all other providers
         break; // Exit the loop if the target is reached
-      }
-
-      // Check budget before this worker starts a new task
-      if (!(await budgetMonitor.hasSufficientBudget())) {
-        ctx.L().warn("Insufficient budget to continue work. Stopping.");
-        this.sessionManager.stopWork("Insufficient budget"); // Stop all other providers
-        break; // Exit this worker's loop
       }
 
       try {

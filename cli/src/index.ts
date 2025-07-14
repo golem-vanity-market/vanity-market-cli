@@ -436,12 +436,6 @@ async function handleGenerateCommand(options: any): Promise<void> {
       numResults: options.numResults,
     };
 
-    const estimatedRentalDurationSeconds = Math.max(
-      15 * 60, // minimum rental duration on golem is 15 minutes, otherwise providers won't even consider the offer
-      (Number(generationParams.numResults) * estimatedSecondsToFindOneAddress) /
-        generationParams.numberOfWorkers,
-    );
-
     const formatDateForFilename = (date = new Date()) => {
       return date
         .toISOString()
@@ -467,7 +461,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
     });
     const sessionManagerParams: SessionManagerParams = {
       numberOfWorkers: generationParams.numberOfWorkers,
-      rentalDurationSeconds: estimatedRentalDurationSeconds,
+      rentalDurationSeconds: 15 / 60, // for all cost calculations assume we're renting a provider for 15 minutes at a time
       budgetGlm: generationParams.budgetGlm,
       processingUnitType: validatedOptions.processingUnitType,
       estimatorService,
