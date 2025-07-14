@@ -21,6 +21,8 @@ export const UserSchema = z.object({
 
 export type User = z.infer<typeof UserSchema>;
 
+export const anonymousSessionIdSchema = z.uuidv4();
+
 export const authContract = c.router({
   getNonce: {
     method: "POST",

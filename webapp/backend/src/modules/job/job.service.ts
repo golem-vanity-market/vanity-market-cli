@@ -23,6 +23,7 @@ import {
 } from "../../../../shared/contracts/job.contract.ts";
 import { fastifyLogger } from "../../lib/logger.ts";
 import { db } from "../../lib/db/index.ts";
+import type { Identity } from "../../plugins/authenticate.ts";
 
 // context of an active job stored in memory
 interface ActiveJobContext {
@@ -195,9 +196,20 @@ async function runJobInBackground(
   }
 }
 
+function getOwnerWhereClause(jobOwner: Identity) {
+  switch (jobOwner.type) {
+    case "user":
+      return eq(jobsTable.userAddress, jobOwner.walletAddress);
+    case "anonymous":
+      return eq(jobsTable.anonymousSessionId, jobOwner.sessionId);
+    default:
+      throw new Error("Invalid job owner type");
+  }
+}
+
 export async function createJob(
   input: JobInput,
-  userAddress: `0x${string}`
+  jobOwner: Identity
 ): Promise<JobDetails> {
   // Validate inputs before even creating the DB record
   validateAndTransformInputs(input);
@@ -207,7 +219,9 @@ export async function createJob(
     .insert(jobsTable)
     .values({
       id: jobId,
-      userAddress,
+      userAddress: jobOwner.type === "user" ? jobOwner.walletAddress : null,
+      anonymousSessionId:
+        jobOwner.type === "anonymous" ? jobOwner.sessionId : null,
       status: "pending",
       publicKey: input.publicKey,
       vanityAddressPrefix: input.vanityAddressPrefix,
@@ -242,13 +256,14 @@ export async function createJob(
  */
 export async function cancelJob(
   jobId: string,
-  userAddress: string
+  jobOwner: Identity
 ): Promise<JobDetails | null> {
   const jobContext = activeJobs[jobId];
+  const ownerWhereClause = getOwnerWhereClause(jobOwner);
   const dbJob = await db
     .select()
     .from(jobsTable)
-    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
+    .where(and(eq(jobsTable.id, jobId), ownerWhereClause))
     .limit(1)
     .then((rows) => rows[0]);
 
@@ -307,12 +322,13 @@ export async function cancelJob(
  */
 export async function findJobById(
   jobId: string,
-  userAddress: string
+  jobOwner: Identity
 ): Promise<JobDetails | null> {
+  const ownerWhereClause = getOwnerWhereClause(jobOwner);
   const job = await db
     .select()
     .from(jobsTable)
-    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
+    .where(and(eq(jobsTable.id, jobId), ownerWhereClause))
     .limit(1)
     .then((rows) => rows[0]);
 
@@ -336,15 +352,16 @@ export async function findJobById(
 }
 
 /**
- * Finds all jobs for a specific user.
+ * Finds all jobs for a specific user (or anonymous session id).
  */
-export async function findJobsByUserId(
-  userAddress: `0x${string}`
+export async function findJobsByOwner(
+  jobOwner: Identity
 ): Promise<JobDetails[]> {
+  const ownerWhereClause = getOwnerWhereClause(jobOwner);
   const jobs = await db
     .select()
     .from(jobsTable)
-    .where(eq(jobsTable.userAddress, userAddress))
+    .where(ownerWhereClause)
     .orderBy(desc(jobsTable.createdAt))
     .limit(100) // Limit to 100 latest jobs
     .then((rows) => rows);
@@ -370,13 +387,14 @@ export async function findJobsByUserId(
  */
 export async function getJobResult(
   jobId: string,
-  userAddress: string
+  jobOwner: Identity
 ): Promise<JobResult> {
   // First check if the job belongs to the owner
+  const ownerWhereClause = getOwnerWhereClause(jobOwner);
   const job = await db
     .select()
     .from(jobsTable)
-    .where(and(eq(jobsTable.id, jobId), eq(jobsTable.userAddress, userAddress)))
+    .where(and(eq(jobsTable.id, jobId), ownerWhereClause))
     .limit(1)
     .then((rows) => rows[0]);
 

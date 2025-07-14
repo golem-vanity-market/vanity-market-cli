@@ -1,7 +1,11 @@
-import { noncesTable, refreshTokensTable } from "./../../lib/db/schema.ts";
+import {
+  jobsTable,
+  noncesTable,
+  refreshTokensTable,
+  usersTable,
+} from "./../../lib/db/schema.ts";
 import { db } from "../../lib/db/index.ts";
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import { usersTable } from "../../lib/db/schema.ts";
 import { eq, and, gte } from "drizzle-orm";
 import { verifyMessage } from "viem";
 import { generateSiweNonce, parseSiweMessage } from "viem/siwe";
@@ -21,77 +25,95 @@ export async function verifySignatureAndLogin(
   fastify: FastifyInstance,
   message: string,
   signature: `0x${string}`,
-  reply: FastifyReply
+  reply: FastifyReply,
+  anonymousSessionId?: string
 ) {
-  try {
-    const fields = parseSiweMessage(message);
-    if (!fields.nonce || !fields.address) {
-      throw new Error("Invalid message format");
-    }
-    const nonce = await db
-      .select()
-      .from(noncesTable)
-      .where(
-        and(
-          eq(noncesTable.nonce, fields.nonce),
-          gte(noncesTable.expiresAt, new Date())
+  return db.transaction(async (tx) => {
+    try {
+      const fields = parseSiweMessage(message);
+      if (!fields.nonce || !fields.address) {
+        throw new Error("Invalid message format");
+      }
+      const nonce = await tx
+        .select()
+        .from(noncesTable)
+        .where(
+          and(
+            eq(noncesTable.nonce, fields.nonce),
+            gte(noncesTable.expiresAt, new Date())
+          )
         )
-      )
-      .limit(1)
-      .then((rows) => rows[0]);
-    if (!nonce) {
-      throw new Error("Invalid or expired nonce");
-    }
-    const address = fields.address.toLowerCase() as `0x${string}`;
-    const isValidSignature = verifyMessage({ address, message, signature });
-    if (!isValidSignature) {
-      throw new Error("Invalid signature");
-    }
-    // invalidate the nonce
-    await db.delete(noncesTable).where(eq(noncesTable.nonce, fields.nonce));
-    // find or create user
-    let user = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.address, address))
-      .limit(1)
-      .then((rows) => rows[0]);
-    if (!user) {
-      user = await db
-        .insert(usersTable)
-        .values({
-          address,
-        })
-        .returning()
+        .limit(1)
         .then((rows) => rows[0]);
-    }
-    const token = randomUUID();
-    const refreshToken = await reply.jwtSign(
-      { walletAddress: address, token },
-      {
-        expiresIn: "30d",
+      if (!nonce) {
+        throw new Error("Invalid or expired nonce");
       }
-    );
-    await db.insert(refreshTokensTable).values({
-      token,
-      userAddress: address,
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days expiration
-    });
+      const address = fields.address.toLowerCase() as `0x${string}`;
+      const isValidSignature = verifyMessage({ address, message, signature });
+      if (!isValidSignature) {
+        throw new Error("Invalid signature");
+      }
+      // invalidate the nonce
+      await tx.delete(noncesTable).where(eq(noncesTable.nonce, fields.nonce));
+      // find or create user
+      let user = await tx
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.address, address))
+        .limit(1)
+        .then((rows) => rows[0]);
+      if (!user) {
+        user = await tx
+          .insert(usersTable)
+          .values({
+            address,
+          })
+          .returning()
+          .then((rows) => rows[0]);
+        if (!user) {
+          throw new Error("Failed to create user");
+        }
+      }
+      // merge jobs created by the anonymous session id that the user provided
+      if (anonymousSessionId) {
+        await tx
+          .update(jobsTable)
+          .set({
+            userAddress: user.address,
+            anonymousSessionId: null,
+          })
+          .where(eq(jobsTable.anonymousSessionId, anonymousSessionId));
+      }
+      // create refresh token
+      const token = randomUUID();
+      const refreshToken = await reply.jwtSign(
+        { walletAddress: address, token },
+        {
+          expiresIn: "30d",
+        }
+      );
+      await tx.insert(refreshTokensTable).values({
+        token,
+        userAddress: address,
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days expiration
+      });
 
-    const accessToken = await reply.jwtSign(
-      { walletAddress: address, token },
-      {
-        expiresIn: "15m",
-      }
-    );
-    return {
-      accessToken,
-      refreshToken,
-    };
-  } catch (error) {
-    fastify.log.error(error);
-    throw new Error("Authentication failed");
-  }
+      const accessToken = await reply.jwtSign(
+        { walletAddress: address, token },
+        {
+          expiresIn: "15m",
+        }
+      );
+      return {
+        accessToken,
+        refreshToken,
+      };
+    } catch (error) {
+      fastify.log.error(error);
+      tx.rollback();
+      throw new Error("Authentication failed");
+    }
+  });
 }
 
 export async function getCurrentUser(request: FastifyRequest) {
