@@ -2,6 +2,8 @@ import { ProviderInfo } from "@golem-sdk/golem-js";
 import { ProcessingUnitType } from "../params";
 import { AppContext } from "../app_context";
 
+export type CommandStatus = "success" | "not_found" | "stopped";
+
 export interface VanityResult {
   address: string;
   salt: string;
@@ -11,32 +13,35 @@ export interface VanityResult {
 }
 
 export interface IterationInfo {
-  jobId: string;
+  agreementId: string;
   provider: ProviderInfo;
+  providerType: ProcessingUnitType;
   durationSeconds: number; // in seconds
-  status: "success" | "error" | "not_found";
+  status: CommandStatus;
 }
 
-export interface VanityResults extends IterationInfo {
+export interface CommandResult extends IterationInfo {
   results: VanityResult[];
-  providerType: ProcessingUnitType;
+  failedLines: string[];
 }
 
 interface ComplexityFunction {
   (pattern: string): number;
 }
 
+export interface ParsedResults {
+  results: VanityResult[];
+  failedLines: string[];
+}
+
 export function parseVanityResults(
   ctx: AppContext,
   lines: string[],
-  jobId: string,
-  pType: ProcessingUnitType,
-  durationSeconds: number,
   pattern: string,
   complexFunc: ComplexityFunction,
-  pInfo: ProviderInfo,
-): VanityResults {
+): ParsedResults {
   const results: VanityResult[] = [];
+  const failedLines: string[] = [];
 
   for (let line of lines) {
     try {
@@ -44,30 +49,19 @@ export function parseVanityResults(
       if (line.startsWith("0x")) {
         const r = ParseVanityResult(ctx, line, pattern, complexFunc);
         if (r == null) {
-          ctx
-            .L()
-            .warn(
-              `Invalid vanity result line from provider ${pInfo.name}:`,
-              line,
-            );
+          ctx.L().warn(`Invalid vanity result line from provider:`, line);
+          failedLines.push(line);
           continue;
         }
         results.push(r);
       }
     } catch (error) {
       console.error("Error parsing vanity result line:", line, error);
+      failedLines.push(line);
       continue;
     }
   }
-
-  return {
-    results: results,
-    provider: pInfo,
-    providerType: pType,
-    jobId: jobId,
-    durationSeconds: durationSeconds,
-    status: results.length > 0 ? "success" : "not_found",
-  };
+  return { results, failedLines };
 }
 
 export function ParseVanityResult(

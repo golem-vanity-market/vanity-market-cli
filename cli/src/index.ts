@@ -66,9 +66,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
 
       if (options.resultsFile) {
         try {
-          await golemSessionManager.resultService.saveResultsToFile(
-            options.resultsFile,
-          );
+          await golemSessionManager.saveResultsToFile(options.resultsFile);
           appCtx.consoleInfo(
             `✅ Results saved to file: ${options.resultsFile}`,
           );
@@ -207,7 +205,6 @@ async function handleGenerateCommand(options: any): Promise<void> {
       resultService,
     });
     const sessionManagerParams: SessionManagerParams = {
-      numberOfWorkers: generationParams.numberOfWorkers,
       rentalDurationSeconds: estimatedRentalDurationSeconds,
       budgetGlm: generationParams.budgetGlm,
       processingUnitType: validatedOptions.processingUnitType,

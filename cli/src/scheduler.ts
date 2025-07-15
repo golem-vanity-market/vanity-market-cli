@@ -104,7 +104,9 @@ export class Scheduler {
           console.log("No provider available, trying again.");
           continue;
         }
-        const esp = await this.estimator.getCurrentEstimate(iterInfo.jobId);
+        const esp = await this.estimator.getCurrentEstimate(
+          iterInfo.agreementId,
+        );
 
         ctx
           .L()
