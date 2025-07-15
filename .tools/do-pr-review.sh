@@ -72,6 +72,8 @@ fi
 echo "Step 4: Executing review in separate claude process..."
 cd "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/$REVIEW_DIR"
 
+# https://www.anthropic.com/engineering/claude-code-best-practices
+# https://github.com/anthropics/claude-code-base-action
 echo "Running claude review in $(pwd)..."
 claude \
     -d \
@@ -79,7 +81,7 @@ claude \
     -p <<-EOF
 Read the guidelines in CLAUDE.md.
 Carefuly review the code changes in github PR ${PR_NUMBER} (this branch), use gh cli if needed. Use subagents for detailed analysis.
-Act as a critical and brutally honest senior software engineer. Think hard.
+Act as a critical and brutally honest senior software engineer. Think harder.
 Write the report to CLAUDE_REVIEW_PR${PR_NUMBER}.md.
 If you see an opportunity to improve, include code fragments in the report showing how to improve the code.
 EOF
