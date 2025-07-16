@@ -14,7 +14,6 @@ Simple utility to download Google Docs content using the Google Docs API.
 2. **Set up authentication:**
 
    Choose one of the following methods:
-
    - `gcloud auth application-default login --scopes='https://www.googleapis.com/auth/documents.readonly','https://www.googleapis.com/auth/drive.readonly','https://www.googleapis.com/auth/cloud-platform'`
    - `export GOOGLE_APPLICATION_CREDENTIALS=/home/eb/.config/gcloud/application_default_credentials.json`
 
@@ -41,6 +40,7 @@ uv run download_doc.py 1uQCl548xVI7DX_ykY_yxzahHhkkv8ODGJtpJk1FIeLg --output=des
 ## Finding Document ID
 
 The document ID is the long string in the Google Docs URL:
+
 ```
 https://docs.google.com/document/d/1uQCl548xVI7DX_ykY_yxzahHhkkv8ODGJtpJk1FIeLg/edit
                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
