@@ -1,6 +1,5 @@
 import { type Logger } from "@golem-sdk/golem-js";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
-import { validateProcessingUnit } from "@unoperate/golem-vaddr-cli";
 import {
   AppContext,
   EstimatorService,
@@ -11,6 +10,7 @@ import {
   Scheduler,
   type GenerationParams,
   type SessionManagerParams,
+  validateProcessingUnit,
 } from "@unoperate/golem-vaddr-cli/lib";
 import { jobResultsTable, jobsTable } from "../../lib/db/schema.ts";
 import { and, desc, eq } from "drizzle-orm";
@@ -130,9 +130,8 @@ async function runJobInBackground(
     });
 
     const sessionParams: SessionManagerParams = {
-      numberOfWorkers: input.numWorkers,
       rentalDurationSeconds: rentalDurationSecs,
-      budgetGlm: input.budgetGlm,
+      budgetInitial: 1,
       processingUnitType: validated.processingUnitType,
       estimatorService,
       resultService,
@@ -153,7 +152,9 @@ async function runJobInBackground(
     const generationParams: GenerationParams = {
       publicKey: validated.publicKey.toTruncatedHex(),
       vanityAddressPrefix: validated.vanityAddressPrefix,
-      budgetGlm: input.budgetGlm,
+      budgetInitial: 1,
+      budgetLimit: input.budgetGlm,
+      budgetTopUp: 0.5,
       numberOfWorkers: input.numWorkers,
       singlePassSeconds: 20, // Default
       numResults: BigInt(input.numResults),

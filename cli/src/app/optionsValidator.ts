@@ -148,7 +148,7 @@ class PublicKey {
  * @returns ProcessingUnitType enum value
  * @throws {GenerateCmdOptValidationError} When processing unit type is invalid
  */
-function validateProcessingUnit(
+export function validateProcessingUnit(
   processingUnitType?: string,
 ): ProcessingUnitType {
   if (!processingUnitType) {
