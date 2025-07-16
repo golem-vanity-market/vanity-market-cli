@@ -183,7 +183,7 @@ export function JobDetails({ jobId }: JobDetailsProps) {
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="end">
                             <KeystoreDownloader
-                              salt={result.addr}
+                              salt={result.salt}
                               onSuccess={() => {
                                 setIsPopoverOpen(false);
                               }}
