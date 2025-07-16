@@ -25,12 +25,7 @@ Let me fetch the data from both sources and create a comprehensive summary.
 
 ## Step 1: Fetch completed work from JIRA
 
-Use Atlassian MCP tools.
-
-**CRITICAL**: When using Atlassian MCP searchJiraIssuesUsingJql, convert the timezone to UTC and use the exact datetime format. For example:
-
-- {{start_date}} "2025-07-10 14:30 CET" becomes "2025-07-10 12:30" in UTC
-- {{end_date}} "2025-07-16 13:00 CET" becomes "2025-07-16 11:00" in UTC
+Use Atlassian MCP tools. The JIRA instance is configured to use Central European Time (CET/CEST).
 
 Definition of completed:
 
@@ -42,7 +37,6 @@ I'll search for JIRA issues that are "In progress" and top 3 from the TODO colum
 
 **CRITICAL**: For "IN PROGRESS" tasks, use JQL query at the exact {{end_date}} time:
 
-- Convert {{end_date}} to UTC format
 - Use JQL: `project = GOL AND status = "IN PROGRESS"`
 
 ## Step 3: Fetch what we implemented from GitHub
