@@ -1,5 +1,10 @@
 import { ApiFetcherArgs, initClient, tsRestFetchApi } from "@ts-rest/core";
 import { contract } from "@contracts";
+import { getAnonymousSessionId } from "./anonymousSession";
+
+const anonymousSessionHeader =
+  process.env.NEXT_PUBLIC_ANONYMOUS_SESSION_ID_HEADER_NAME ||
+  "vanity-session-id";
 
 let accessToken = "";
 
@@ -14,6 +19,7 @@ export const apiClient = initClient(contract, {
   baseUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001",
   baseHeaders: {
     Authorization: () => (accessToken ? `Bearer ${accessToken}` : ""),
+    [anonymousSessionHeader]: () => getAnonymousSessionId(),
   },
   credentials: "include",
   api: async (args: ApiFetcherArgs) => {

@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { int, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, int, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 export const usersTable = sqliteTable("user", {
   address: text("address", { length: 42 }).primaryKey(),
@@ -24,26 +24,37 @@ export const refreshTokensTable = sqliteTable("refresh_tokens", {
   expiresAt: int("expires_at", { mode: "timestamp" }).notNull(),
 });
 
-export const jobsTable = sqliteTable("job", {
-  id: text("id").primaryKey(), // Using text for UUIDs
-  userAddress: text("user_address")
-    .notNull()
-    .references(() => usersTable.address, { onDelete: "cascade" }),
-  status: text("status", {
-    enum: ["pending", "processing", "completed", "failed", "cancelled"],
-  }).notNull(),
-  publicKey: text("public_key").notNull(),
-  vanityAddressPrefix: text("vanity_address_prefix").notNull(),
-  numWorkers: int("num_workers").notNull(),
-  budgetGlm: real("budget_glm").notNull(),
-  processingUnit: text("processing_unit", { enum: ["cpu", "gpu"] }).notNull(),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(current_timestamp)`),
-  updatedAt: text("updated_at")
-    .notNull()
-    .default(sql`(current_timestamp)`),
-});
+export const jobsTable = sqliteTable(
+  "job",
+  {
+    id: text("id").primaryKey(),
+    // jobs can be owned by either a logged-in user on tied to an anonymous session id
+    userAddress: text("user_address").references(() => usersTable.address, {
+      onDelete: "cascade",
+    }),
+    anonymousSessionId: text("anonymous_session_id"),
+    status: text("status", {
+      enum: ["pending", "processing", "completed", "failed", "cancelled"],
+    }).notNull(),
+    publicKey: text("public_key").notNull(),
+    vanityAddressPrefix: text("vanity_address_prefix").notNull(),
+    numWorkers: int("num_workers").notNull(),
+    budgetGlm: real("budget_glm").notNull(),
+    processingUnit: text("processing_unit", { enum: ["cpu", "gpu"] }).notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(current_timestamp)`),
+  },
+  (table) => [
+    check(
+      "one_owner",
+      sql`((${table.userAddress} IS NOT NULL AND ${table.anonymousSessionId} IS NULL) OR (${table.userAddress} IS NULL AND ${table.anonymousSessionId} IS NOT NULL))`
+    ),
+  ]
+);
 
 export const jobResultsTable = sqliteTable("job_result", {
   id: int("id").primaryKey({ autoIncrement: true }),

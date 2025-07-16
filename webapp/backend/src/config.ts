@@ -9,6 +9,7 @@ const envSchema = z.object({
   JWT_SECRET: z.string(),
   PORT: z.coerce.number().default(3001),
   COOKIE_NAME: z.string().default("refresh_token"),
+  ANONYMOUS_SESSION_ID_HEADER_NAME: z.string().default("vanity-session-id"),
   IS_PRODUCTION: z.coerce.boolean().default(IS_PRODUCTION),
   CORS_ORIGIN: z.string(),
   BIND_ADDRESS: z.string().default("0.0.0.0"),

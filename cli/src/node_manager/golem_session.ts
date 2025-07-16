@@ -1,3 +1,4 @@
+// External imports
 import {
   Allocation,
   DraftOfferProposalPool,
@@ -6,31 +7,30 @@ import {
   ResourceRental,
   ResourceRentalPool,
 } from "@golem-sdk/golem-js";
+import { isNativeError } from "util/types";
+
+// Internal imports
 import { AppContext } from "../app_context";
-import { GenerationParams } from "../params";
-import {
-  BaseRentalConfig,
-  CPURentalConfig,
-  GPURentalConfig,
-  ProcessingUnitType,
-} from "./config";
+import { GenerationParams, ProcessingUnitType } from "../params";
+import { BaseRentalConfig, CPURentalConfig, GPURentalConfig } from "./config";
 import { computePrefixDifficulty } from "../difficulty";
 import { withTimeout } from "../utils/timeout";
-import { isNativeError } from "util/types";
 import { EstimatorService } from "../estimator_service";
 import { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
-import { parseVanityResults } from "./result";
+import {
+  parseVanityResults,
+  IterationInfo,
+  ParsedResults,
+  CommandResult,
+} from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
-import { VanityResults, IterationInfo } from "./result";
+
 /**
  * Parameters for the GolemSessionManager constructor
  */
 export interface SessionManagerParams {
-  /** Number of workers to allocate */
-  numberOfWorkers: number;
-
   /** Rental duration in seconds */
   rentalDurationSeconds: number;
 
@@ -58,31 +58,26 @@ export type OnErrorHandler = (payload: {
  * running commands and collecting results.
  */
 export class GolemSessionManager {
-  private numberOfWorkers: number;
   private rentalDurationSeconds: number;
   private budgetInitial: number;
   private processingUnitType: ProcessingUnitType;
   private golemNetwork?: GolemNetwork;
   private allocation?: Allocation;
   private rentalPool?: ResourceRentalPool;
-  private _estimatorService: EstimatorService;
-  private _resultService: ResultsService;
+  private estimatorService: EstimatorService;
+  private resultService: ResultsService;
   private stopWorkAC: AbortController = new AbortController();
 
   constructor(params: SessionManagerParams) {
-    this.numberOfWorkers = params.numberOfWorkers;
     this.rentalDurationSeconds = params.rentalDurationSeconds;
     this.budgetInitial = params.budgetInitial;
     this.processingUnitType = params.processingUnitType;
-    this._estimatorService = params.estimatorService;
-    this._resultService = params.resultService;
+    this.estimatorService = params.estimatorService;
+    this.resultService = params.resultService;
   }
 
-  public get estimatorService(): EstimatorService {
-    return this._estimatorService;
-  }
-  public get resultService(): ResultsService {
-    return this._resultService;
+  public saveResultsToFile(filePath: string): void {
+    this.resultService.saveResultsToFile(filePath);
   }
 
   public get noResults(): number {
@@ -90,7 +85,7 @@ export class GolemSessionManager {
   }
 
   public async connectToGolemNetwork(ctx: AppContext): Promise<void> {
-    VanityPaymentModule.estimatorService = this._estimatorService;
+    VanityPaymentModule.estimatorService = this.estimatorService;
     VanityPaymentModule.ctx = ctx;
     this.golemNetwork = new GolemNetwork({
       logger: ctx.L(),
@@ -270,18 +265,10 @@ export class GolemSessionManager {
     ctx: AppContext,
     rental: ResourceRental,
     generationParams: GenerationParams,
-  ): Promise<VanityResults> {
+  ): Promise<CommandResult> {
     const config = this.getConfigBasedOnProcessingUnitType();
 
     const agreementId = rental.agreement.id;
-
-    await this.estimatorService.initJobIfNotInitialized(
-      agreementId,
-      rental.agreement.provider.name,
-      computePrefixDifficulty(
-        generationParams.vanityAddressPrefix.fullPrefix(),
-      ),
-    );
 
     try {
       // Get or create the exe unit
@@ -336,69 +323,53 @@ export class GolemSessionManager {
        */
       const stdout = res.stdout ? String(res.stdout) : "";
 
-      const cmdResults = parseVanityResults(
+      const parsedResults: ParsedResults = parseVanityResults(
         ctx,
         stdout.split("\n"),
-        agreementId,
-        this.processingUnitType,
-        generationParams.singlePassSeconds,
         generationParams.vanityAddressPrefix.fullPrefix(),
         computePrefixDifficulty,
-        provider,
       );
-      if (cmdResults.results.length === 0) {
+
+      const cmdResult: CommandResult = {
+        agreementId,
+        provider,
+        durationSeconds: generationParams.singlePassSeconds,
+        results: parsedResults.results,
+        failedLines: parsedResults.failedLines,
+        status: "success",
+        providerType: this.processingUnitType,
+      };
+
+      if (cmdResult.failedLines.length > 0) {
+        ctx.L().error("failed to parse lines:", cmdResult.failedLines);
+        throw new Error("Failed to parse result lines");
+      }
+
+      if (cmdResult.results.length === 0) {
         // TODO: inform estimator and reputation model
         ctx.L().info("No results found in the output");
-        return cmdResults;
+        cmdResult.status = "not_found";
+        return cmdResult;
       }
       ctx
         .L()
         .info(
-          `Found ${cmdResults.results.length} results for job ${agreementId}`,
+          `Found ${cmdResult.results.length} results for job ${agreementId}`,
         );
-      for (const r in cmdResults.results) {
-        // TODO: validation
-
-        const addr = cmdResults.results[r].address;
-
-        const entry: ProofEntryResult = {
-          addr: addr,
-          salt: cmdResults.results[r].salt,
-          pubKey: cmdResults.results[r].pubKey,
-          provider: cmdResults.provider,
-          jobId: cmdResults.jobId,
-          cpu: cmdResults.providerType,
-        };
-
-        this.estimatorService.pushProofToQueue(entry);
-
-        // TODO: filter out proofs
-        // and take only those that match the user's pattern
-        this.resultService.processValidatedEntry(
-          entry,
-          (jobId: string, address: string, addrDifficulty: number) => {
-            ctx.consoleInfo(
-              `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
-            );
-          },
-        );
-        ctx.L().debug("Found address:", addr);
-      }
-      // Process the results
-      return cmdResults;
+      return cmdResult;
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
         ctx.L().info("Work was stopped by user");
         return {
-          jobId: agreementId,
+          agreementId,
           provider: rental.agreement.provider,
-          durationSeconds: generationParams.singlePassSeconds,
-          status: "error",
+          durationSeconds: 0,
+          status: "stopped",
           results: [],
+          failedLines: [],
           providerType: this.processingUnitType,
         };
       }
-      // TODO: inform estiator and reputation model
       ctx.L().error(`Error during profanity_cuda execution: ${error}`);
       throw new Error("Profanity execution failed");
     }
@@ -441,12 +412,16 @@ export class GolemSessionManager {
     const providerName = rental.agreement.provider.name;
 
     let shouldKeepRental: boolean;
-    let r: VanityResults | null = null;
+    let r: CommandResult | null = null;
     try {
+      await this.initEstimatorForRental(rental, generationParams);
       /*console.log(
         `🔨 Acquired provider ${providerName} from the pool, running the generation command on them ...`,
       );*/
       r = await this.runCommand(ctx, rental, generationParams);
+
+      // TODO: should throw an error if the resuts failed verficication
+      this.processCommandResult(ctx, r);
 
       if (this.isWorkStopped()) {
         ctx.L().info("Work was stopped by user");
@@ -505,6 +480,51 @@ export class GolemSessionManager {
       );
     }
     return r;
+  }
+
+  private async initEstimatorForRental(
+    rental: ResourceRental,
+    generationParams: GenerationParams,
+  ) {
+    await this.estimatorService.initJobIfNotInitialized(
+      rental.agreement.id,
+      rental.agreement.provider.name,
+      computePrefixDifficulty(
+        generationParams.vanityAddressPrefix.fullPrefix(),
+      ),
+    );
+  }
+
+  private processCommandResult(ctx: AppContext, cmd: CommandResult): void {
+    // TODO: inform estimator and reputation model that there were no results
+
+    for (const r in cmd.results) {
+      // TODO: validation
+      const addr = cmd.results[r].address;
+
+      const entry: ProofEntryResult = {
+        addr: addr,
+        salt: cmd.results[r].salt,
+        pubKey: cmd.results[r].pubKey,
+        provider: cmd.provider,
+        jobId: cmd.agreementId,
+        cpu: cmd.providerType,
+      };
+
+      this.estimatorService.pushProofToQueue(entry);
+
+      // TODO: filter out proofs
+      // and take only those that match the user's pattern
+      this.resultService.processValidatedEntry(
+        entry,
+        (jobId: string, address: string, addrDifficulty: number) => {
+          ctx.consoleInfo(
+            `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
+          );
+        },
+      );
+      ctx.L().debug("Found address:", addr);
+    }
   }
 
   public async disconnectFromGolemNetwork(ctx: AppContext): Promise<void> {

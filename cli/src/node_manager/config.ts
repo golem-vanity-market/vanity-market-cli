@@ -2,17 +2,9 @@
  * Configuration for CPU and GPU rentals
  */
 
-import { GenerationParams } from "../params";
+import { GenerationParams, ProcessingUnitType } from "../params";
 import { ExeUnit, Allocation, MarketOrderSpec } from "@golem-sdk/golem-js";
 import { selectCheapestProvider } from "./selector";
-
-/**
- * Supported processing unit types
- */
-export enum ProcessingUnitType {
-  CPU = "cpu",
-  GPU = "gpu",
-}
 
 /**
  * Configuration for a specific processing unit type
@@ -189,7 +181,26 @@ export class CPURentalConfig extends BaseRentalConfig {
     // Create multiple prefix instances for parallel processing
     const prefixes = ` ${prefix}`.repeat(cpuCount);
 
-    return `parallel profanity_cuda --cpu -k ${this.config.kernelCount} -g ${this.config.groupCount} -r ${this.config.roundCount} -b ${params.singlePassSeconds} -z ${params.publicKey} -p {} :::${prefixes}`;
+    const commandParts = [
+      "parallel",
+      "profanity_cuda",
+      "--cpu",
+      "-k",
+      this.config.kernelCount.toString(),
+      "-g",
+      this.config.groupCount.toString(),
+      "-r",
+      this.config.roundCount.toString(),
+      "-b",
+      params.singlePassSeconds.toString(),
+      "-z",
+      params.publicKey,
+      "-p",
+      "{}",
+      `:::${prefixes}`,
+    ];
+
+    return commandParts.join(" ");
   }
 }
 
@@ -223,6 +234,22 @@ export class GPURentalConfig extends BaseRentalConfig {
   public generateCommand(params: GenerationParams): string {
     const prefix = params.vanityAddressPrefix.toArg();
 
-    return `profanity_cuda -k ${this.config.kernelCount} -g ${this.config.groupCount} -r ${this.config.roundCount} -p ${prefix} -b ${params.singlePassSeconds} -z ${params.publicKey}`;
+    const commandParts = [
+      "profanity_cuda",
+      "-k",
+      this.config.kernelCount.toString(),
+      "-g",
+      this.config.groupCount.toString(),
+      "-r",
+      this.config.roundCount.toString(),
+      "-p",
+      prefix,
+      "-b",
+      params.singlePassSeconds.toString(),
+      "-z",
+      params.publicKey,
+    ];
+
+    return commandParts.join(" ");
   }
 }

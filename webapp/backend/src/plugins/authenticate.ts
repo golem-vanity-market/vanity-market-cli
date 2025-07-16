@@ -9,6 +9,17 @@ import config from "../config.ts";
 import { db } from "../lib/db/index.ts";
 import { refreshTokensTable } from "../lib/db/schema.ts";
 import { and, eq, gte } from "drizzle-orm";
+import { anonymousSessionIdSchema } from "../../../shared/contracts/auth.contract.ts";
+
+export type Identity =
+  | {
+      type: "user";
+      walletAddress: `0x${string}`;
+    }
+  | {
+      type: "anonymous";
+      sessionId: string;
+    };
 
 declare module "@fastify/jwt" {
   interface FastifyJWT {
@@ -21,21 +32,80 @@ declare module "@fastify/jwt" {
 }
 
 declare module "fastify" {
+  interface FastifyRequest {
+    userIdentity?: Identity;
+  }
+
   interface FastifyInstance {
-    authenticate: (
+    // Strict authenticator for signed-in users ONLY
+    requireUser: (
+      request: FastifyRequest,
+      reply: FastifyReply,
+      done: HookHandlerDoneFunction
+    ) => Promise<void>;
+    // Requires some form of identity (signed-in or anonymous)
+    requireAnyIdentity: (
       request: FastifyRequest,
       reply: FastifyReply,
       done: HookHandlerDoneFunction
     ) => Promise<void>;
   }
 }
-
-async function authenticate(request: FastifyRequest, reply: FastifyReply) {
-  try {
-    if (!request.headers.authorization) {
-      throw new Error("Authorization header is missing");
-    }
+/**
+ * Attempts to determine the identity of a request.
+ * - If an Authorization header is present, it MUST be a valid JWT.
+ * - If no Authorization header is present, it checks for an anonymous session ID.
+ * - Returns null otherwise
+ */
+async function getIdentity(request: FastifyRequest): Promise<Identity | null> {
+  if (request.headers.authorization) {
     await request.jwtVerify();
+    return {
+      type: "user",
+      walletAddress: request.user.walletAddress,
+    };
+  }
+
+  const sessionId = request.headers[config.ANONYMOUS_SESSION_ID_HEADER_NAME];
+  const parseResults = anonymousSessionIdSchema.safeParse(sessionId);
+  if (parseResults.success) {
+    return {
+      type: "anonymous",
+      sessionId: parseResults.data,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Hook to require any form of identity (user or anonymous session)
+ */
+async function requireAnyIdentity(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  try {
+    const identity = await getIdentity(request);
+    if (!identity) {
+      throw new Error("Unauthorized");
+    }
+    request.userIdentity = identity;
+  } catch (err) {
+    reply.status(401).send({ message: "Unauthorized" });
+  }
+}
+
+/**
+ * Hook to require a signed-in user.
+ */
+async function requireUser(request: FastifyRequest, reply: FastifyReply) {
+  try {
+    const identity = await getIdentity(request);
+    if (!identity || identity.type !== "user") {
+      throw new Error("Unauthorized");
+    }
+    request.userIdentity = identity;
   } catch (err) {
     reply.status(401).send({ message: "Unauthorized" });
   }
@@ -65,5 +135,7 @@ export default fp(async (fastify) => {
       return tokenRecord.length > 0;
     },
   });
-  fastify.decorate("authenticate", authenticate);
+
+  fastify.decorate("requireUser", requireUser);
+  fastify.decorate("requireAnyIdentity", requireAnyIdentity);
 });

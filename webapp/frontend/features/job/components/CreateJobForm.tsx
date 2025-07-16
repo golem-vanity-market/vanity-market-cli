@@ -12,24 +12,32 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { JobInputSchema, type JobInput } from "@contracts/job.contract";
+import {
+  JobInputSchema,
+  UnconnectedJobInputSchema,
+  type JobInput,
+} from "@contracts/job.contract";
 import { toast } from "sonner";
 import useCreateJob from "../hooks/useCreateJob";
 import { useRouter } from "next/router";
+import { useAccount } from "wagmi";
 
 export function CreateJobForm() {
   const createJobMutation = useCreateJob();
   const router = useRouter();
+  const { isConnected } = useAccount();
+
+  const activeSchema = isConnected ? JobInputSchema : UnconnectedJobInputSchema;
 
   const form = useForm<JobInput>({
-    resolver: zodResolver(JobInputSchema),
+    resolver: zodResolver(activeSchema),
     defaultValues: {
       publicKey: "",
       vanityAddressPrefix: "0x",
-      budgetGlm: 10,
-      processingUnit: "cpu",
-      numResults: 1,
-      numWorkers: 5,
+      budgetGlm: 1,
+      processingUnit: "cpu", // "cpu" is a safe default for both states.
+      numResults: 10,
+      numWorkers: 3,
     },
   });
 
@@ -76,17 +84,23 @@ export function CreateJobForm() {
             <FormItem>
               <FormLabel>Vanity Prefix</FormLabel>
               <FormControl>
-                <Input placeholder="0xdeadbeef" {...field} />
+                <Input
+                  placeholder="0xabc123"
+                  {...field}
+                  maxLength={!isConnected ? 8 : undefined}
+                />
               </FormControl>
               <FormDescription>
                 The desired prefix for your Ethereum address (e.g., 0xaa,
                 0x1234).
+                {!isConnected &&
+                  " Connect your wallet to generate addresses with prefix longer than 6 characters."}
               </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-3 items-start">
           <FormField
             control={form.control}
             name="budgetGlm"
@@ -102,6 +116,7 @@ export function CreateJobForm() {
                     }
                   />
                 </FormControl>
+
                 <FormMessage />
               </FormItem>
             )}
@@ -119,8 +134,14 @@ export function CreateJobForm() {
                     onChange={(e) =>
                       field.onChange(parseInt(e.target.value, 10) || 0)
                     }
+                    max={!isConnected ? 10 : undefined}
                   />
                 </FormControl>
+                {!isConnected && (
+                  <FormDescription>
+                    Connect your wallet to generate more than 10 results
+                  </FormDescription>
+                )}
                 <FormMessage />
               </FormItem>
             )}
@@ -138,8 +159,15 @@ export function CreateJobForm() {
                     onChange={(e) =>
                       field.onChange(parseInt(e.target.value, 10) || 0)
                     }
+                    max={!isConnected ? 3 : 10}
                   />
                 </FormControl>
+                {!isConnected && (
+                  <FormDescription>
+                    Connect your wallet to use more than 3 workers at the same
+                    time
+                  </FormDescription>
+                )}
                 <FormMessage />
               </FormItem>
             )}
@@ -165,9 +193,17 @@ export function CreateJobForm() {
                   </FormItem>
                   <FormItem className="flex items-center space-x-3 space-y-0">
                     <FormControl>
-                      <RadioGroupItem value="gpu" />
+                      <RadioGroupItem value="gpu" disabled={!isConnected} />
                     </FormControl>
-                    <FormLabel className="font-normal">GPU</FormLabel>
+                    <FormLabel className="font-normal">
+                      GPU
+                      {!isConnected && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          (Connect wallet to use)
+                        </span>
+                      )}
+                    </FormLabel>
                   </FormItem>
                 </RadioGroup>
               </FormControl>

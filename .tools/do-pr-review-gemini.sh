@@ -26,6 +26,7 @@ git fetch
 # Get PR details
 PR_INFO=$(gh pr view "$PR_NUMBER" --json headRefName,title,files)
 BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName')
+BRANCH_DIR_POSTFIX=$(echo "$PR_INFO" | jq -r '.headRefName' | tr '/' '-')
 PR_TITLE=$(echo "$PR_INFO" | jq -r '.title')
 
 echo "PR Title: $PR_TITLE"
@@ -36,12 +37,12 @@ echo "Step 2: Creating worktree..."
 mkdir -p temp
 
 # Remove existing worktree if it exists
-if [ -d "temp/golem-vanity.market-$BRANCH_NAME" ]; then
+if [ -d "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" ]; then
     echo "Removing existing worktree..."
-    git worktree remove "temp/golem-vanity.market-$BRANCH_NAME" --force
+    git worktree remove "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" --force
 fi
 
-git worktree add "temp/golem-vanity.market-$BRANCH_NAME" "$BRANCH_NAME"
+git worktree add "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" "$BRANCH_NAME"
 
 # Step 3: Analyze Changes and Determine Review Directory
 echo "Step 3: Analyzing changes..."
@@ -72,7 +73,7 @@ fi
 
 # Step 4: Execute Review in Separate Gemini Process
 echo "Step 4: Executing review in separate Gemini process..."
-cd "temp/golem-vanity.market-$BRANCH_NAME/$REVIEW_DIR"
+cd "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/$REVIEW_DIR"
 
 echo "Running Gemini review in $(pwd)..."
 gemini \

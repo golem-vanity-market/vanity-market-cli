@@ -1,5 +1,3 @@
-"use client";
-
 import {
   Table,
   TableBody,
@@ -11,16 +9,17 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, LoaderIcon } from "lucide-react";
 import useJobs from "../hooks/useJobs";
 import { JobStatusBadge } from "./JobBadge";
 
 export function JobsList() {
-  const { data: jobs, isLoading, isError, error } = useJobs();
+  const { data: jobs, isPending, isFetching, isError, error } = useJobs();
 
-  if (isLoading) {
+  if (isPending) {
     return (
       <div className="space-y-2">
+        <Skeleton className="h-10 w-full" />
         {Array.from({ length: 3 }).map((_, i) => (
           <Skeleton key={i} className="h-12 w-full" />
         ))}
@@ -40,20 +39,25 @@ export function JobsList() {
     );
   }
 
-  if (!jobs || jobs.length === 0) {
+  if (jobs.length === 0) {
     return (
-      <div className="text-center text-muted-foreground">
-        {`You haven't created any jobs yet.`}
+      <div className="flex flex-col items-center justify-center rounded-md border border-dashed p-8 text-center">
+        <span className="text-lg font-semibold">No Jobs Created Yet</span>
       </div>
     );
   }
 
   return (
     <div className="rounded-md border">
-      <Table>
+      <Table className={isFetching ? "opacity-60 transition-opacity" : ""}>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[280px]">Job ID</TableHead>
+            <TableHead className="w-[280px]">
+              <div className="flex items-center gap-2">
+                Job ID
+                {isFetching && <LoaderIcon className="h-4 w-4 animate-spin" />}
+              </div>
+            </TableHead>
             <TableHead>Prefix</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Created</TableHead>

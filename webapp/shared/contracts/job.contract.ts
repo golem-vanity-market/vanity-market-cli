@@ -12,6 +12,25 @@ export const JobInputSchema = z.object({
   numWorkers: z.number().int().positive(),
 });
 
+/**
+ * Stricter schema for requesting jobs without having a wallet connected
+ */
+export const UnconnectedJobInputSchema = JobInputSchema.extend({
+  processingUnit: z.literal("cpu", {
+    message: "Only CPU is available for not connected users.",
+  }),
+  // max 8 = "0x" + 6 user selected
+  vanityAddressPrefix: JobInputSchema.shape.vanityAddressPrefix.max(8, {
+    message: "Prefix can be a maximum of 6 characters for not connected users.",
+  }),
+  numWorkers: JobInputSchema.shape.numWorkers.max(3, {
+    message: "Maximum of 3 workers for not connected users.",
+  }),
+  numResults: JobInputSchema.shape.numResults.max(10, {
+    message: "Maximum of 10 results for not connected users.",
+  }),
+});
+
 export const JobSchema = z.object({
   id: z.string().uuid(),
   status: z.enum(["pending", "processing", "completed", "failed", "cancelled"]),

@@ -5,7 +5,7 @@ import {
   validateGenerateOptions,
   readPublicKeyFromFile,
   GenerateCmdOptions,
-} from "../index";
+} from "../app/optionsValidator";
 import { APP_NAME } from "../version";
 
 describe("Vanity Address Generator CLI - Step 2", () => {

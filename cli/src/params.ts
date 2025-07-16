@@ -13,6 +13,7 @@ export interface GenerationParams {
   singlePassSeconds: number;
   numResults: bigint;
 }
+
 export class GenerationPrefix {
   val: Uint8Array<ArrayBufferLike>;
   original: string;
@@ -41,4 +42,13 @@ export class GenerationPrefix {
   toArg(): string {
     return BigInt(hexlify(this.val.slice().reverse())).toString(10);
   }
+}
+
+/**
+ * Supported processing unit types
+ */
+
+export enum ProcessingUnitType {
+  CPU = "cpu",
+  GPU = "gpu",
 }

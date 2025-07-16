@@ -16,7 +16,11 @@ export async function buildApp() {
     origin: config.CORS_ORIGIN,
     credentials: true,
     methods: ["GET", "POST", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      config.ANONYMOUS_SESSION_ID_HEADER_NAME,
+    ],
   });
   app.register(cookiePlugin);
 

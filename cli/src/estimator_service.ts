@@ -1,10 +1,9 @@
 import { Estimator } from "./estimator/estimator";
 import { GenerationPrefix } from "./params";
-import { ProcessingUnitType } from "./node_manager/config";
+import { ProcessingUnitType } from "./params";
 import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";
-import { validateProof } from "./validator";
 import { ResultsService } from "./results_service";
 import { EstimatorInfo } from "./estimator/estimator";
 
@@ -102,48 +101,44 @@ export class EstimatorService {
     }
 
     for (const entry of proofQueue) {
-      if (await validateProof(entry)) {
-        let prover: string = "N/A";
+      let prover: string = "N/A";
 
-        if (entry.cpu == ProcessingUnitType.GPU) {
-          prover = this.options.vanityPrefix.toHex().slice(0, 10);
-        } else if (entry.cpu == ProcessingUnitType.CPU) {
-          prover = this.options.vanityPrefix.toHex().slice(0, 8);
-        } else {
-          this.ctx.L().error(`Unsupported worker type: ${entry.cpu}`);
-        }
+      if (entry.cpu == ProcessingUnitType.GPU) {
+        prover = this.options.vanityPrefix.toHex().slice(0, 10);
+      } else if (entry.cpu == ProcessingUnitType.CPU) {
+        prover = this.options.vanityPrefix.toHex().slice(0, 8);
+      } else {
+        this.ctx.L().error(`Unsupported worker type: ${entry.cpu}`);
+      }
 
-        const estimator = this.estimators.get(entry.jobId);
-        if (!estimator) {
-          this.ctx.L().error(`Estimator for job ${entry.jobId} not found.`);
-          throw "Estimator not found for job: " + entry.jobId;
-        }
-        const proverDifficulty = computePrefixDifficulty(prover);
+      const estimator = this.estimators.get(entry.jobId);
+      if (!estimator) {
+        this.ctx.L().error(`Estimator for job ${entry.jobId} not found.`);
+        throw "Estimator not found for job: " + entry.jobId;
+      }
+      const proverDifficulty = computePrefixDifficulty(prover);
 
-        if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
-          this.totalEstimator?.addProvedWork(proverDifficulty, true);
-          estimator.addProvedWork(proverDifficulty, true);
-        } else if (entry.addr.startsWith(prover)) {
-          /*displayUserMessage(
+      if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
+        this.totalEstimator?.addProvedWork(proverDifficulty, true);
+        estimator.addProvedWork(proverDifficulty, true);
+      } else if (entry.addr.startsWith(prover)) {
+        /*displayUserMessage(
             `Adding proof: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(proverDifficulty)}`,
           );*/
-          this.totalEstimator?.addProvedWork(proverDifficulty);
-          estimator.addProvedWork(proverDifficulty);
-        } else {
-          // empty address
-        }
-        if (this.savedProofs.has(entry.addr.toLowerCase())) {
-          this.ctx
-            .L()
-            .warn(
-              `Duplicate proof entry found for address: ${entry.addr.toLowerCase()}`,
-            );
-          continue; // Skip duplicate entries
-        }
-        this.savedProofs.set(entry.addr.toLowerCase(), null);
+        this.totalEstimator?.addProvedWork(proverDifficulty);
+        estimator.addProvedWork(proverDifficulty);
       } else {
-        console.warn("Invalid proof entry, skipping:", entry);
+        // empty address
       }
+      if (this.savedProofs.has(entry.addr.toLowerCase())) {
+        this.ctx
+          .L()
+          .warn(
+            `Duplicate proof entry found for address: ${entry.addr.toLowerCase()}`,
+          );
+        continue; // Skip duplicate entries
+      }
+      this.savedProofs.set(entry.addr.toLowerCase(), null);
     }
   }
 

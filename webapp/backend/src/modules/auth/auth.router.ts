@@ -29,12 +29,17 @@ export const authRouter = s.router(contract.auth, {
           body: { message: "Message and signature are required" },
         };
       }
+      const sessionIdHeader =
+        request.headers[config.ANONYMOUS_SESSION_ID_HEADER_NAME];
       const { accessToken, refreshToken } =
         await AuthService.verifySignatureAndLogin(
           request.server,
           message,
           signature,
-          reply
+          reply,
+          typeof sessionIdHeader === "object"
+            ? sessionIdHeader[0]
+            : sessionIdHeader
         );
       reply.setCookie(config.COOKIE_NAME, refreshToken, {
         httpOnly: true,
@@ -60,7 +65,7 @@ export const authRouter = s.router(contract.auth, {
       }
     },
     hooks: {
-      onRequest: (req, ...rest) => req.server.authenticate(req, ...rest),
+      onRequest: (req, ...rest) => req.server.requireUser(req, ...rest),
     },
   },
   refresh: async ({ request, reply }) => {
@@ -92,7 +97,7 @@ export const authRouter = s.router(contract.auth, {
       }
     },
     hooks: {
-      onRequest: (req, ...rest) => req.server.authenticate(req, ...rest),
+      onRequest: (req, ...rest) => req.server.requireUser(req, ...rest),
     },
   },
 });
