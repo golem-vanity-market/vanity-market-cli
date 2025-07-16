@@ -37,7 +37,7 @@ window.addEventListener("message", async (event) => {
         const masterWallet = ethers.Wallet.fromEncryptedJsonSync(encryptedJson, passphrase);
         
         postReply("success", {
-            publicKey: masterWallet.publicKey,
+            publicKey: masterWallet.signingKey.publicKey,
         });
         break;
       }
@@ -55,7 +55,7 @@ window.addEventListener("message", async (event) => {
         localStorage.setItem(LOCAL_STORAGE_KEY, encryptedJson);
         
         postReply("success", {
-          publicKey: masterWallet.publicKey,
+          publicKey: masterWallet.signingKey.publicKey,
         });
         break;
       }
@@ -76,11 +76,10 @@ window.addEventListener("message", async (event) => {
             throw new Error("Invalid passphrase for the stored master key.");
         }
 
-        const derivedPrivateKey = ethers.utils.solidityKeccak256(
-            ["bytes32", "bytes32"],
-            [masterWallet.privateKey, salt]
-        );
-        const vanityWallet = new ethers.Wallet(derivedPrivateKey);
+        const privateKeyNumber = BigInt(masterWallet.privateKey.toString().trim());
+        const privateKeySum = BigInt(salt) + privateKeyNumber;
+        const privateKeyHex = "0x" + privateKeySum.toString(16).padStart(64, '0');
+        const vanityWallet = new ethers.Wallet(privateKeyHex);
         const finalEncryptedJson = await vanityWallet.encrypt(downloadPassword);
 
         // trigger download

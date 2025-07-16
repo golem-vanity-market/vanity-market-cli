@@ -21,11 +21,22 @@ import { toast } from "sonner";
 import useCreateJob from "../hooks/useCreateJob";
 import { useRouter } from "next/router";
 import { useAccount } from "wagmi";
+import { useKeystore } from "@/features/keystore/hooks/useKeystore";
+import { KeyIcon } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useState } from "react";
+import { KeystoreUnlocker } from "@/features/keystore/components/KeystoreUnlocker";
 
 export function CreateJobForm() {
   const createJobMutation = useCreateJob();
   const router = useRouter();
   const { isConnected } = useAccount();
+  const { isReady: isKeystoreReady } = useKeystore();
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const activeSchema = isConnected ? JobInputSchema : UnconnectedJobInputSchema;
 
@@ -67,9 +78,31 @@ export function CreateJobForm() {
           render={({ field }) => (
             <FormItem>
               <FormLabel>Public Key</FormLabel>
-              <FormControl>
-                <Input placeholder="0x04..." {...field} />
-              </FormControl>
+              <div className="flex w-full items-center gap-2">
+                <FormControl>
+                  <Input placeholder="0x04..." {...field} />
+                </FormControl>
+                <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      disabled={!isKeystoreReady}
+                      type="button"
+                      onClick={() => setIsPopoverOpen(!isPopoverOpen)}
+                    >
+                      <KeyIcon /> Import from local keystore
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto">
+                    <KeystoreUnlocker
+                      onPublicKeyRetrieved={(publicKey) => {
+                        field.onChange(publicKey);
+                        setIsPopoverOpen(false);
+                      }}
+                      onClose={() => setIsPopoverOpen(false)}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
               <FormDescription>
                 Your uncompressed public key (starting with 0x04).
               </FormDescription>
