@@ -13,6 +13,9 @@ if (!KEYSTORE_ORIGIN) {
   );
 }
 
+// deals with trailing slashes etc
+const PARSED_KEYSTORE_ORIGIN = new URL(KEYSTORE_ORIGIN).origin;
+
 type Action = {
   checkForExistingKey: {
     payload: undefined;
@@ -85,7 +88,11 @@ export function KeystoreProvider({ children }: { children: React.ReactNode }) {
       action: T,
       payload: Action[T]["payload"]
     ) => {
-      if (!isReady || !iframeRef.current?.contentWindow || !KEYSTORE_ORIGIN) {
+      if (
+        !isReady ||
+        !iframeRef.current?.contentWindow ||
+        !PARSED_KEYSTORE_ORIGIN
+      ) {
         throw new Error("Iframe not ready");
       }
       const { promise, resolve, reject } =
@@ -96,7 +103,7 @@ export function KeystoreProvider({ children }: { children: React.ReactNode }) {
       pendingRequests.current.set(messageId, { resolve, reject, action });
       iframeRef.current.contentWindow.postMessage(
         { action, payload, messageId },
-        KEYSTORE_ORIGIN
+        PARSED_KEYSTORE_ORIGIN
       );
       return promise;
     },
@@ -105,7 +112,7 @@ export function KeystoreProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent<ActionResponse>) => {
-      if (event.origin !== KEYSTORE_ORIGIN) {
+      if (event.origin !== PARSED_KEYSTORE_ORIGIN) {
         return;
       }
 
@@ -142,7 +149,7 @@ export function KeystoreProvider({ children }: { children: React.ReactNode }) {
     <KeystoreContext.Provider value={value}>
       <iframe
         ref={iframeRef}
-        src={KEYSTORE_ORIGIN}
+        src={PARSED_KEYSTORE_ORIGIN}
         title="Secure Keystore"
         style={{ display: "none" }}
         onLoad={() => {
