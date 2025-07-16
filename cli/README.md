@@ -42,7 +42,7 @@ export OTEL_CONFIG_FILE=
 npx @unoperate/golem-vaddr-cli@1.0.1 generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x6666 \
-  --budget-glm 6 \
+  --budget-limit 6 \
   --processing-unit cpu \
   --results-file results.json \
   --num-workers 2
@@ -57,7 +57,7 @@ You can also authenticate for a single command:
 NPM_TOKEN=YOUR_GITHUB_TOKEN npx @unoperate/golem-vaddr-cli@1.0.1 generate \
   --public-key my-public-key.txt \
   --vanity-address-prefix 0xvanity \
-  --budget-glm 1000 \
+  --budget-limit 1000 \
   --processing-unit cpu \
   --results-file results.json
 ```
@@ -89,7 +89,7 @@ npm run dev hello
 The `generate` command requires three arguments:
 
 ```bash
-npm run dev -- generate --public-key <path-to-key-file> --vanity-address-prefix <prefix> --budget-glm <amount> --processing-unit <cpu|gpu> --results-file <output-file>
+npm run dev -- generate --public-key <path-to-key-file> --vanity-address-prefix <prefix> --budget-limit <amount> --processing-unit <cpu|gpu> --results-file <output-file>
 ```
 
 #### Example Usage
@@ -106,7 +106,7 @@ echo "0x04d4a96d675423cc05f60409c48b084a53d3fa0ac59957939f526505c43f975b77fabab7
 npm run dev -- generate \
   --public-key my-public-key.txt \
   --vanity-address-prefix 0xvanity \
-  --budget-glm 1000 \
+  --budget-limit 1000 \
   --processing-unit cpu \
   --results-file results.json
 ```
@@ -121,7 +121,7 @@ npm run build
 node dist/index.js generate \
   --public-key my-public-key.txt \
   --vanity-address-prefix 0xvanity \
-  --budget-glm 1000 \
+  --budget-limit 1000 \
   --processing-unit cpu \
   --results-file results.json
 ```
@@ -132,7 +132,7 @@ node dist/index.js generate \
 | ------------------------- | --------- | --------------------------------------------------------------- | ------------ |
 | `--public-key`            | file path | Path to file containing the public key (Ethereum format: 0x...) | `my-key.txt` |
 | `--vanity-address-prefix` | string    | Desired vanity prefix for the generated address (max 20 chars)  | `vanity`     |
-| `--budget-glm`            | number    | Budget in GLM tokens for the generation process (1-1,000,000)   | `1000`       |
+| `--budget-limit`          | number    | Budget in GLM tokens for the generation process (1-1,000,000)   | `1000`       |
 
 ## Public Key File Format
 
@@ -208,7 +208,7 @@ export OTEL_CONFIG_FILE=monitoring/otel-config.yaml
 npm run dev -- generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x6666 \
-  --budget-glm 6 \
+  --budget-limit 6 \
   --processing-unit cpu \
   --results-file results.json \
   --num-workers 2
@@ -231,7 +231,7 @@ A complete monitoring stack is available in the `monitoring/` directory. See `mo
 Windows
 
 ```
-bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x33333333 --budget-glm 1 --results-file results.json --processing-unit cpu --min-offers-timeout-sec 1 --num-workers 3
+bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x33333333 --budget-limit 1 --results-file results.json --processing-unit cpu --min-offers-timeout-sec 1 --num-workers 3
 ```
 
 Linux/WSL
@@ -241,7 +241,7 @@ Linux/WSL
 npm run dev -- generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x333333 \
-  --budget-glm 1 \
+  --budget-limit 1 \
   --results-file results.json \
   --processing-unit cpu
 
@@ -249,7 +249,7 @@ npm run dev -- generate \
 npm run dev -- generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x12345678 \
-  --budget-glm 10 \
+  --budget-limit 10 \
   --processing-unit gpu \
   --results-file results.json \
   --num-workers 1
@@ -258,7 +258,7 @@ npm run dev -- generate \
 npm run dev -- generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x123456 \
-  --budget-glm 15 \
+  --budget-limit 15 \
   --processing-unit cpu \
   --num-workers 4 \
   --min-offers 3 \
@@ -270,7 +270,7 @@ set OTEL_CONFIG_FILE=monitoring/otel-config.yaml
 npm run dev -- generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x666666 \
-  --budget-glm 6 \
+  --budget-limit 6 \
   --processing-unit cpu \
   --results-file tmp_result.json \
   --num-workers 2
@@ -279,7 +279,7 @@ npm run dev -- generate \
 OTEL_CONFIG_FILE=monitoring/otel-config.yaml npm run dev -- generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x666666 \
-  --budget-glm 6 \
+  --budget-limit 6 \
   --processing-unit cpu \
   --results-file tmp_result.json \
   --num-workers 2
