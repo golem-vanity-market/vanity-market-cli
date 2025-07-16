@@ -46,7 +46,6 @@ export interface GenerateCmdOptions {
   publicKey?: string; // The actual public key content
   publicKeyPath?: string; // Path to the public key file
   vanityAddressPrefix?: string;
-  budgetGlm?: number;
   prefix?: string;
   resultsFile?: string; // Path to save results
   processingUnit?: string; // Processing unit type ('cpu' or 'gpu')
@@ -56,6 +55,9 @@ export interface GenerateCmdOptions {
   nonInteractive: boolean; // Run in non-interactive mode
   minOffers: number; // Minimum offers to wait for
   minOffersTimeoutSec: number; // Timeout for waiting for enough offers (`minOffers`)
+  budgetInitial: number;
+  budgetTopUp: number;
+  budgetLimit?: number;
 }
 
 /**
@@ -63,7 +65,9 @@ export interface GenerateCmdOptions {
  */
 interface GenerateOptionsValidated {
   publicKey: PublicKey; // The actual public key content
-  budgetGlm?: number;
+  budgetInitial: number;
+  budgetTopUp: number;
+  budgetLimit: number;
   vanityAddressPrefix: GenerationPrefix;
   processingUnitType: ProcessingUnitType;
 }
@@ -183,7 +187,7 @@ function validateProcessingUnit(
 
 /**
  * Validates generate command options with comprehensive error checking
- * @param options - The options object containing publicKey, vanityAddressPrefix, budgetGlm, and processingUnitType
+ * @param options - The options object containing publicKey, vanityAddressPrefix, budgetInitial, budgetTopUp, budgetLimit, and processingUnitType
  * @throws {ValidationError} When validation fails
  */
 function validateGenerateOptions(
@@ -225,20 +229,32 @@ function validateGenerateOptions(
   }
 
   // Validate budget constraints
-  if (options.budgetGlm === undefined || options.budgetGlm === null) {
-    throw new ValidationError("Budget is required", "budgetGlm");
-  }
+  const validateBudget = (optionName: string, optionValue: unknown) => {
+    if (optionValue === undefined || optionValue === null) {
+      throw new ValidationError("Budget is required", optionName);
+    }
+    const valueAsNumber = parseFloat(optionValue.toString());
+    if (isNaN(valueAsNumber)) {
+      throw new ValidationError("Budget must be a number", optionName);
+    }
+    if (valueAsNumber <= 0) {
+      throw new ValidationError("Budget must be a positive number", optionName);
+    }
+    if (valueAsNumber > MAX_BUDGET_GLM) {
+      throw new ValidationError(
+        `Budget exceeds maximum allowed. Maximum is ${MAX_BUDGET_GLM} GLM`,
+        optionName,
+      );
+    }
+    return valueAsNumber;
+  };
 
-  if (options.budgetGlm <= 0) {
-    throw new ValidationError("Budget must be a positive number", "budgetGlm");
-  }
-
-  if (options.budgetGlm > MAX_BUDGET_GLM) {
-    throw new ValidationError(
-      `Budget exceeds maximum allowed. Maximum is ${MAX_BUDGET_GLM} GLM`,
-      "budgetGlm",
-    );
-  }
+  const parsedBudgetInitial = validateBudget(
+    "budgetInitial",
+    options.budgetInitial,
+  );
+  const parsedBudgetTopUp = validateBudget("budgetTopUp", options.budgetTopUp);
+  const parsedBudgetLimit = validateBudget("budgetLimit", options.budgetLimit);
 
   if (options.minOffers < 0 || isNaN(options.minOffers)) {
     throw new ValidationError(
@@ -260,7 +276,9 @@ function validateGenerateOptions(
   return {
     publicKey: publicKey,
     vanityAddressPrefix: new GenerationPrefix(options.vanityAddressPrefix),
-    budgetGlm: options.budgetGlm,
+    budgetInitial: parsedBudgetInitial,
+    budgetTopUp: parsedBudgetTopUp,
+    budgetLimit: parsedBudgetLimit,
     processingUnitType: processingUnitType,
   };
 }
@@ -377,7 +395,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
       publicKey: publicKey,
       publicKeyPath: options.publicKey,
       vanityAddressPrefix: options.vanityAddressPrefix,
-      budgetGlm: parseFloat(options.budgetGlm),
+      budgetInitial: options.budgetInitial,
+      budgetLimit: options.budgetLimit,
+      budgetTopUp: options.budgetTopUp,
       resultsFile: options.resultsFile,
       processingUnit: options.processingUnit,
       numResults: BigInt(options.numResults),
@@ -394,7 +414,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
         `   Public Key File: ${generateOptions.publicKeyPath}\n` +
         `   Public Key: ${validatedOptions.publicKey.toHex()}\n` +
         `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix.fullPrefix()}\n` +
-        `   Budget (GLM): ${validatedOptions.budgetGlm}\n` +
+        `   Budget Limit: ${validatedOptions.budgetLimit}\n` +
         `   Worker Type: ${validatedOptions.processingUnitType}\n\n` +
         `✓ All parameters validated successfully\n` +
         `✓ OpenTelemetry tracing enabled for generation process\n`,
@@ -428,7 +448,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
     const generationParams: GenerationParams = {
       publicKey: validatedOptions.publicKey.toTruncatedHex(),
       vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
-      budgetGlm: validatedOptions.budgetGlm!,
+      budgetInitial: validatedOptions.budgetInitial,
+      budgetTopUp: validatedOptions.budgetTopUp,
+      budgetLimit: validatedOptions.budgetLimit,
       numberOfWorkers: parseInt(options.numWorkers),
       singlePassSeconds: options.singlePassSec
         ? parseInt(options.singlePassSec)
@@ -462,7 +484,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
     const sessionManagerParams: SessionManagerParams = {
       numberOfWorkers: generationParams.numberOfWorkers,
       rentalDurationSeconds: 15 / 60, // for all cost calculations assume we're renting a provider for 15 minutes at a time
-      budgetGlm: generationParams.budgetGlm,
+      budgetInitial: generationParams.budgetInitial,
       processingUnitType: validatedOptions.processingUnitType,
       estimatorService,
       resultService,
@@ -527,10 +549,6 @@ function main(): void {
       "--vanity-address-prefix <prefix>",
       "Desired vanity prefix for the generated address",
     )
-    .requiredOption(
-      "--budget-glm <amount>",
-      "Budget in GLM tokens for the generation process",
-    )
     .option(
       "--single-pass-sec <singlePassSec>",
       "How long single pass should take in seconds (default: 20)",
@@ -567,6 +585,20 @@ function main(): void {
       "--min-offers-timeout-sec <minOffersTimeoutSec>",
       "Timeout in seconds for waiting for enough offers (default: 30)",
       "30", // Default value
+    )
+    .option(
+      "--budget-initial <budgetInitial>",
+      "The initial GLM amount for the payment allocation. This is topped up as needed, up to the budget limit.",
+      "1",
+    )
+    .option(
+      "--budget-top-up <budgetTopUp>",
+      "The amount in GLM to add to the allocation when its balance runs low. This incremental funding helps manage spending.",
+      "1",
+    )
+    .option(
+      "--budget-limit <budgetLimit>",
+      "The total budget cap in GLM for the entire generation process. Work stops when this limit is reached.",
     )
     .action(handleGenerateCommand);
 

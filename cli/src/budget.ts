@@ -1,19 +1,13 @@
 import { Allocation } from "@golem-sdk/golem-js";
 import { GolemSessionManager } from "./node_manager/golem_session";
+import { AppContext } from "./app_context";
 
-type AmendSuccessCallback = ({
-  timeout,
-  budget,
-}: {
-  timeout: string;
-  budget: number;
-}) => void;
+type AmendSuccessCallback = (allocation: Allocation) => void;
 type AmendErrorCallback = (error: unknown) => void;
 type BudgetExhaustedCallback = () => void;
 
 export class BudgetMonitor {
   private budgetAlertThreshold: number = 0.2; // Default threshold for low budget alert (0.2 GLM)
-  private topUpAmount: number = 1.0; // Number of GLMs to top up when budget gets low
   private timeoutAmendAmountSec: number = 15 * 60; // Number of second to extend the allocation (15 minutes)
   private monitorIntervalMs: number = 60_000; // How often the check runs
   private isStopped: boolean = false;
@@ -21,6 +15,7 @@ export class BudgetMonitor {
 
   constructor(
     private readonly sessionManager: GolemSessionManager,
+    private readonly budgetTopUp: number,
     private readonly budgetLimit: number,
   ) {}
 
@@ -51,7 +46,11 @@ export class BudgetMonitor {
     const shouldAmendBudget =
       Number(allocation.remainingAmount) < this.budgetAlertThreshold;
     const newBudget = shouldAmendBudget
-      ? Number(allocation.totalAmount) + this.topUpAmount
+      ? // increase by top up amount, but not higher than limit
+        Math.min(
+          Number(allocation.totalAmount) + this.budgetTopUp,
+          this.budgetLimit,
+        )
       : Number(allocation.totalAmount);
     const newAllocation = await this.sessionManager
       .getGolemNetwork()
@@ -59,10 +58,7 @@ export class BudgetMonitor {
         budget: newBudget,
         expirationSec: this.timeoutAmendAmountSec,
       });
-    return {
-      timeout: newAllocation.timeout || "<unknown>",
-      budget: Number(newAllocation.totalAmount),
-    };
+    return newAllocation;
   }
 
   public startMonitoring({
@@ -89,9 +85,9 @@ export class BudgetMonitor {
           }
           return;
         }
-        const { budget, timeout } = await this.checkAndAmendBudget(allocation);
+        const newAllocation = await this.checkAndAmendBudget(allocation);
         if (onAllocationAmendSuccess) {
-          onAllocationAmendSuccess({ timeout, budget });
+          onAllocationAmendSuccess(newAllocation);
         }
       } catch (error) {
         if (onAllocationAmendError) {
@@ -101,13 +97,12 @@ export class BudgetMonitor {
     }, this.monitorIntervalMs);
   }
 
-  public async displayBudgetInfo(): Promise<void> {
-    const allocationId = this.sessionManager.getAllocationId();
-    const allocation = await this.sessionManager
-      .getGolemNetwork()
-      .payment.getAllocation(allocationId);
-    console.log(
-      `Remaining budget: ${Number(allocation.remainingAmount).toFixed(3)} GLM (out of ${Number(allocation.totalAmount).toFixed(3)} GLM)`,
+  public displayBudgetInfo(ctx: AppContext, allocation: Allocation): void {
+    const remainingAmount = Number(allocation.remainingAmount).toFixed(2);
+    const totalAmount = Number(allocation.totalAmount).toFixed(2);
+    const limit = this.budgetLimit.toFixed(2);
+    ctx.consoleInfo(
+      `💰 Current allocation: ${remainingAmount}/${totalAmount} GLM (limit: ${limit})`,
     );
   }
 }

@@ -33,7 +33,8 @@ export class Scheduler {
 
     const budgetMonitor = new BudgetMonitor(
       this.sessionManager,
-      params.budgetGlm,
+      params.budgetTopUp,
+      params.budgetLimit,
     );
 
     budgetMonitor.startMonitoring({
@@ -44,12 +45,13 @@ export class Scheduler {
         );
         this.sessionManager.stopWork("Cannot extend allocation");
       },
-      onAllocationAmendSuccess: ({ timeout, budget }) => {
+      onAllocationAmendSuccess: (allocation) => {
         ctx
           .L()
           .info(
-            `Extended allocation to (timeout=${timeout}, budget=${budget})`,
+            `Extended allocation to (timeout=${allocation.timeout}, budget=${allocation.totalAmount})`,
           );
+        budgetMonitor.displayBudgetInfo(ctx, allocation);
       },
       onBudgetExhausted: () => {
         ctx.L().info("Budget exhausted, stopping work ...");
@@ -58,7 +60,6 @@ export class Scheduler {
       },
     });
 
-    await budgetMonitor.displayBudgetInfo();
     console.log(
       `🔨 Starting work with ${params.numberOfWorkers} concurrent providers...`,
     );

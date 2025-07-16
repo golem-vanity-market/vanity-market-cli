@@ -34,8 +34,8 @@ export interface SessionManagerParams {
   /** Rental duration in seconds */
   rentalDurationSeconds: number;
 
-  /** Budget in GLM tokens */
-  budgetGlm: number;
+  /** Initial allocation size in GLMs */
+  budgetInitial: number;
 
   /** Type of processing unit to use (CPU or GPU) */
   processingUnitType: ProcessingUnitType;
@@ -60,7 +60,7 @@ export type OnErrorHandler = (payload: {
 export class GolemSessionManager {
   private numberOfWorkers: number;
   private rentalDurationSeconds: number;
-  private budgetGlm: number;
+  private budgetInitial: number;
   private processingUnitType: ProcessingUnitType;
   private golemNetwork?: GolemNetwork;
   private allocation?: Allocation;
@@ -72,7 +72,7 @@ export class GolemSessionManager {
   constructor(params: SessionManagerParams) {
     this.numberOfWorkers = params.numberOfWorkers;
     this.rentalDurationSeconds = params.rentalDurationSeconds;
-    this.budgetGlm = params.budgetGlm;
+    this.budgetInitial = params.budgetInitial;
     this.processingUnitType = params.processingUnitType;
     this._estimatorService = params.estimatorService;
     this._resultService = params.resultService;
@@ -180,7 +180,7 @@ export class GolemSessionManager {
 
     try {
       this.allocation = await glm.payment.createAllocation({
-        budget: this.budgetGlm,
+        budget: this.budgetInitial,
         expirationSec: Math.round(rentalDurationWithPaymentsSeconds),
         paymentPlatform: "erc20-polygon-glm",
       });
