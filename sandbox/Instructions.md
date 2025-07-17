@@ -12,6 +12,12 @@ or for golem base
 python prepare-glm-base.py
 ```
 
+or for pre-release version
+
+```
+python prepare-pre-release.py
+```
+
 yagna (or base) folder should be created and binaries and .env files placed there.
 
 ### 2. Open terminal window 1 in folder yagna (or base) and run the following command
@@ -58,3 +64,22 @@ npm run crunch
 ```
 ./yagna payment process now --network polygon
 ```
+
+## Transferring accounts between yagna instances
+
+You can reuse the same private key in multiple yagna instances by exporting it first:
+
+```sh
+yagna id export --file-path=./key.json
+```
+
+And importing it with:
+
+```sh
+yagna id create --from-keystore ./key.json
+yagna id update --set-default 0x-your-imported-address
+```
+
+Restart yagna for the changes to take effect.
+
+Learn more in the [backup guide](https://docs.golem.network/docs/providers/wallet/backup) and [restoration guide](https://docs.golem.network/docs/providers/wallet/restoration)
