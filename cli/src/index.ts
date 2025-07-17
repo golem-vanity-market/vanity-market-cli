@@ -116,7 +116,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
       publicKey: publicKey,
       publicKeyPath: options.publicKey,
       vanityAddressPrefix: options.vanityAddressPrefix,
-      budgetGlm: parseFloat(options.budgetGlm),
+      budgetInitial: options.budgetInitial,
+      budgetLimit: options.budgetLimit,
+      budgetTopUp: options.budgetTopUp,
       resultsFile: options.resultsFile,
       processingUnit: options.processingUnit,
       numResults: BigInt(options.numResults),
@@ -133,7 +135,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
         `   Public Key File: ${generateOptions.publicKeyPath}\n` +
         `   Public Key: ${validatedOptions.publicKey.toHex()}\n` +
         `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix.fullPrefix()}\n` +
-        `   Budget (GLM): ${validatedOptions.budgetGlm}\n` +
+        `   Budget Limit: ${validatedOptions.budgetLimit}\n` +
         `   Worker Type: ${validatedOptions.processingUnitType}\n\n` +
         `✓ All parameters validated successfully\n` +
         `✓ OpenTelemetry tracing enabled for generation process\n`,
@@ -167,19 +169,15 @@ async function handleGenerateCommand(options: any): Promise<void> {
     const generationParams: GenerationParams = {
       publicKey: validatedOptions.publicKey.toTruncatedHex(),
       vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
-      budgetGlm: validatedOptions.budgetGlm!,
+      budgetInitial: validatedOptions.budgetInitial,
+      budgetTopUp: validatedOptions.budgetTopUp,
+      budgetLimit: validatedOptions.budgetLimit,
       numberOfWorkers: parseInt(options.numWorkers),
       singlePassSeconds: options.singlePassSec
         ? parseInt(options.singlePassSec)
         : 20, // Default single pass duration
       numResults: options.numResults,
     };
-
-    const estimatedRentalDurationSeconds = Math.max(
-      15 * 60, // minimum rental duration on golem is 15 minutes, otherwise providers won't even consider the offer
-      (Number(generationParams.numResults) * estimatedSecondsToFindOneAddress) /
-        generationParams.numberOfWorkers,
-    );
 
     const formatDateForFilename = (date = new Date()) => {
       return date
@@ -205,8 +203,8 @@ async function handleGenerateCommand(options: any): Promise<void> {
       resultService,
     });
     const sessionManagerParams: SessionManagerParams = {
-      rentalDurationSeconds: estimatedRentalDurationSeconds,
-      budgetGlm: generationParams.budgetGlm,
+      rentalDurationSeconds: 15 / 60, // for all cost calculations assume we're renting a provider for 15 minutes at a time
+      budgetInitial: generationParams.budgetInitial,
       processingUnitType: validatedOptions.processingUnitType,
       estimatorService,
       resultService,
@@ -271,10 +269,6 @@ function main(): void {
       "--vanity-address-prefix <prefix>",
       "Desired vanity prefix for the generated address",
     )
-    .requiredOption(
-      "--budget-glm <amount>",
-      "Budget in GLM tokens for the generation process",
-    )
     .option(
       "--single-pass-sec <singlePassSec>",
       "How long single pass should take in seconds (default: 20)",
@@ -311,6 +305,20 @@ function main(): void {
       "--min-offers-timeout-sec <minOffersTimeoutSec>",
       "Timeout in seconds for waiting for enough offers (default: 30)",
       "30", // Default value
+    )
+    .option(
+      "--budget-initial <budgetInitial>",
+      "The initial GLM amount for the payment allocation. This is topped up as needed, up to the budget limit.",
+      "1",
+    )
+    .option(
+      "--budget-top-up <budgetTopUp>",
+      "The amount in GLM to add to the allocation when its balance runs low. This incremental funding helps manage spending.",
+      "1",
+    )
+    .option(
+      "--budget-limit <budgetLimit>",
+      "The total budget cap in GLM for the entire generation process. Work stops when this limit is reached.",
     )
     .action(handleGenerateCommand);
 

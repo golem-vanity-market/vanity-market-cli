@@ -30,10 +30,10 @@ jobs:
 
       - working-directory: cli
         run: npm install
-      
+
       - working-directory: cli
         run: npm run prebuild
-      
+
       - working-directory: cli
         run: npm run test
 
@@ -129,7 +129,7 @@ jobs:
             npx @${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }} generate \
               --public-key my-public-key.txt \
               --vanity-address-prefix vanity \
-              --budget-glm 1000
+              --budget-limit 1000
             ```
           draft: false
           prerelease: false

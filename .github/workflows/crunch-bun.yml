@@ -104,7 +104,7 @@ jobs:
           bun src/index.ts generate \
             --public-key generated.pub \
             --vanity-address-prefix ${{ github.event.inputs.argument-prefix }} \
-            --budget-glm 1 \
+            --budget-limit 1 \
             --results-file results.json \
             --num-workers ${{ github.event.inputs.num-workers }} \
             --num-results ${{ github.event.inputs.num-results }} \
