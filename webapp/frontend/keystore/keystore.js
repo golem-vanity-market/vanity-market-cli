@@ -90,11 +90,15 @@ window.addEventListener("message", async (event) => {
         // trigger download
         const blob = new Blob([finalEncryptedJson], { type: "application/json" });
         const url = URL.createObjectURL(blob);
-        const a = document.getElementById("downloadAnchor");
-        
+
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.id = 'downloadAnchor';
         a.href = url;
         a.download = `${new Date().toISOString().replace(/:/g, '-')}--${vanityWallet.address}.json`;
+        document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
         
         URL.revokeObjectURL(url);
         
