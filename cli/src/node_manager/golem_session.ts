@@ -534,8 +534,13 @@ export class GolemSessionManager {
     }
 
     if (this.allocation) {
-      await this.golemNetwork.payment.releaseAllocation(this.allocation);
-      ctx.L().info("Released allocation");
+      try {
+        await this.golemNetwork.payment.releaseAllocation(this.allocation);
+        ctx.L().info("Released allocation");
+        //  error here shouldn't prevent the other cleanup steps from running
+      } catch (error) {
+        ctx.L().error("Failed to release allocation:", error);
+      }
     }
 
     try {
