@@ -64,3 +64,6 @@ results/
 
 # code generation
 cli/src/version.ts
+
+# tools
+dlf

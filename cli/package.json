@@ -36,7 +36,7 @@
     "cli"
   ],
   "author": "",
-  "license": "MIT",
+  "license": "GPL-3.0",
   "devDependencies": {
     "@eslint/js": "^9.28.0",
     "@golem-sdk/cli": "^2.11",
