@@ -34,7 +34,7 @@ interface GenerateCmdOptions {
   minOffersTimeoutSec: number; // Timeout for waiting for enough offers (`minOffers`)
   budgetInitial: number;
   budgetTopUp: number;
-  budgetLimit?: number;
+  budgetLimit: number;
 }
 
 /**
