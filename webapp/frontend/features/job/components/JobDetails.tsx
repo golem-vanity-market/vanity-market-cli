@@ -1,6 +1,3 @@
-// components/jobs/job-details.tsx
-"use client";
-
 import {
   Card,
   CardContent,
@@ -18,11 +15,17 @@ import {
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, CheckCircle2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Download } from "lucide-react";
 import { JobStatusBadge } from "./JobBadge";
 import useJobResults from "../hooks/useJobResults";
 import useJobDetails from "../hooks/useJobDetails";
 import { toast } from "sonner";
+import { useKeystore } from "@/features/keystore/hooks/useKeystore";
+import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { Popover, PopoverContent } from "@/components/ui/popover";
+import { PopoverTrigger } from "@radix-ui/react-popover";
+import { KeystoreDownloader } from "@/features/keystore/components/KeystoreDownloader";
 
 interface JobDetailsProps {
   jobId: string;
@@ -57,6 +60,10 @@ export function JobDetails({ jobId }: JobDetailsProps) {
     isError: isErrorResults,
     error: errorResults,
   } = useJobResults(jobId);
+
+  const { isReady: isKeystoreReady } = useKeystore();
+
+  const [isPopoverOpen, setIsPopoverOpen] = useState<string | false>(false);
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -140,6 +147,7 @@ export function JobDetails({ jobId }: JobDetailsProps) {
                   <TableRow>
                     <TableHead>Address</TableHead>
                     <TableHead>Salt</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -149,13 +157,39 @@ export function JobDetails({ jobId }: JobDetailsProps) {
                         className="font-mono hover:cursor-pointer"
                         onClick={() => copyToClipboard(result.addr)}
                       >
-                        {result.addr}
+                        {result.addr.slice(0, 20)} ...
                       </TableCell>
                       <TableCell
                         className="font-mono hover:cursor-pointer"
                         onClick={() => copyToClipboard(result.salt)}
                       >
                         {result.salt.slice(0, 20)}...
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Popover
+                          open={isPopoverOpen === result.addr}
+                          onOpenChange={(open) => {
+                            setIsPopoverOpen(open ? result.addr : false);
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="default"
+                              disabled={!isKeystoreReady}
+                            >
+                              <Download className="mr-2 h-4 w-4" />
+                              Combine with local keystore
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="end">
+                            <KeystoreDownloader
+                              salt={result.salt}
+                              onSuccess={() => {
+                                setIsPopoverOpen(false);
+                              }}
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </TableCell>
                     </TableRow>
                   ))}

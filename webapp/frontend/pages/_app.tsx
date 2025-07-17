@@ -8,6 +8,7 @@ import AuthWrapper from "@/features/auth/components/AuthWrapper";
 import { AppProps } from "next/app";
 import { Toaster } from "@/components/ui/sonner";
 import AppLayout from "@/features/layout/components/AppLayout";
+import { KeystoreProvider } from "@/features/keystore/components/KeystoreProvider";
 
 const queryClient = new QueryClient();
 
@@ -24,10 +25,12 @@ export default function MyApp({ Component, pageProps }: AppProps) {
       <QueryClientProvider client={queryClient}>
         <AuthWrapper>
           <RainbowKitProvider>
-            <AppLayout>
-              <Component {...pageProps} />
-            </AppLayout>
-            <Toaster />
+            <KeystoreProvider>
+              <AppLayout>
+                <Component {...pageProps} />
+              </AppLayout>
+              <Toaster />
+            </KeystoreProvider>
           </RainbowKitProvider>
         </AuthWrapper>
       </QueryClientProvider>
