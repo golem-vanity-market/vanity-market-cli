@@ -93,7 +93,7 @@ npm run dev -- generate --help
 
 ## Generating Your Keys
 
-To generate a vanity address, you first need a public and private key pair. The `golem-addr` CLI will use your **public key** (generated as `my-key.public` in the steps below) to search for a matching address on the Golem Network. Your private key remains securely on your machine.
+To generate a vanity address, you first need a public and private key pair. The CLI will use your **public key** (generated as `my-key.public` in the steps below) to search for a matching address on the Golem Network. Your private key remains securely on your machine.
 
 Use the following `openssl` commands to generate your keys. You can run these in the same directory where you've installed the CLI.
 
