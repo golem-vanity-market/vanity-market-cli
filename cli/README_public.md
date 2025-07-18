@@ -24,7 +24,7 @@ Before you begin, please ensure you have the following prerequisites installed a
 You'll need Node.js to run this tool. We recommend using Node Version Manager (nvm) to manage your Node.js versions.
 
 ```bash
-# Install and use Node.js version 22 with nvm (recommended)
+# Install and use Node.js version 22 (lts) with nvm (recommended)
 nvm install 22
 nvm use 22
 
