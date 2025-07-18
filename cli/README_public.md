@@ -125,7 +125,7 @@ To generate a vanity address with a specific prefix, run the following command:
 ```bash
 npm run start -- generate \
   --public-key ./my-key.public \
-  --vanity-address-prefix "1337" \
+  --vanity-address-prefix 0x1337 \
   --budget-glm 10
 ```
 
@@ -138,9 +138,9 @@ For faster results, you can leverage GPU providers on the Golem Network.
 ```bash
 npm run start -- generate \
   --public-key ./my-key.public \
-  --vanity-address-prefix "beef" \
+  --vanity-address-prefix 0xbeef \
   --processing-unit gpu \
-  --budget-limit 20 \
+  --budget-glm 20 \
   --num-workers 3
 ```
 
@@ -151,7 +151,7 @@ Find multiple vanity addresses and save them to a JSON file.
 ```bash
 npm run start -- generate \
   --public-key ./my-key.public \
-  --vanity-address-prefix "cafe" \
+  --vanity-address-prefix 0xcafe \
   --num-results 5 \
   --budget-glm 10 \
   --results-file vanity-addresses.json \
@@ -165,10 +165,11 @@ Customize the generation process for CPU-only workers with specific timing param
 ```bash
 npm run start -- generate \
   --public-key ./my-key.public \
-  --vanity-address-prefix "dead" \
+  --vanity-address-prefix 0xdead \
   --processing-unit cpu \
   --single-pass-sec 30 \
   --min-offers 10 \
+  --budget-glm 10 \
   --min-offers-timeout-sec 60
 ```
 
