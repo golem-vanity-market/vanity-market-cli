@@ -128,8 +128,10 @@ jobs:
             # Generate vanity address
             npx @${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }} generate \
               --public-key my-public-key.txt \
-              --vanity-address-prefix vanity \
-              --budget-limit 1000
+              --vanity-address-prefix 0xcafe \
+              --budget-limit 10 \
+              --processing-unit gpu \
+              --results-file results.json
             ```
           draft: false
           prerelease: false
