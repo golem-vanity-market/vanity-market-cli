@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { Cuboid } from "lucide-react";
+import { GLMBalance } from "./GLMBalance";
 
 export default function TopBar() {
   return (
@@ -27,8 +28,9 @@ export default function TopBar() {
           </nav>
         </div>
 
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          <ConnectButton />
+        <div className="flex flex-1 items-center justify-end gap-2">
+          <GLMBalance />
+          <ConnectButton showBalance={false} />
         </div>
       </div>
     </header>
