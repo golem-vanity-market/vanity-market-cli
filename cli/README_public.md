@@ -125,6 +125,7 @@ To generate a vanity address with a specific prefix, run the following command:
 ```bash
 npm run start -- generate \
   --public-key ./my-key.public \
+  --processing-unit cpu \
   --vanity-address-prefix 0x1337 \
   --budget-glm 10
 ```
@@ -151,6 +152,7 @@ Find multiple vanity addresses and save them to a JSON file.
 ```bash
 npm run start -- generate \
   --public-key ./my-key.public \
+  --processing-unit gpu \
   --vanity-address-prefix 0xcafe \
   --num-results 5 \
   --budget-glm 10 \
@@ -160,7 +162,7 @@ npm run start -- generate \
 
 #### CPU-Only Generation with Custom Timing
 
-Customize the generation process for CPU-only workers with specific timing parameters.
+Customize the generation process for CPU-only workers with specific timing parameters for getting offers.
 
 ```bash
 npm run start -- generate \
