@@ -103,7 +103,7 @@ Use the following `openssl` commands to generate your keys. You can run these in
     openssl ecparam -name secp256k1 -genkey -noout -out ec_private.pem
     ```
 
-2.  **Extract the public key**: This command derives the public key from your private key and saves it in a format that the `golem-addr` CLI can use. The resulting `my-key.public` file is what you will use in the usage examples below.
+2.  **Extract the public key**: This command derives the public key from your private key and saves it in a format that the CLI can use. The resulting `my-key.public` file is what you will use in the usage examples below.
 
     ```bash
     openssl ec -in ec_private.pem -pubout -outform DER | tail -c 65 | xxd -p -c 65 > my-key.public
