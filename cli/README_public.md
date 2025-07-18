@@ -84,6 +84,9 @@ npm install
 # Build the project
 npm run build
 
+# set up the env variable, use the template and fill the values
+cp .env.template .env
+
 # Run the tool locally to see available commands
 npm run dev -- generate --help
 ```
