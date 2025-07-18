@@ -208,7 +208,7 @@ function getOwnerWhereClause(jobOwner: Identity) {
   }
 }
 
-export async function createJob(
+async function createJob(
   input: JobInput,
   jobOwner: Identity
 ): Promise<JobDetails> {
@@ -237,7 +237,7 @@ export async function createJob(
 
   // Start the long-running task but DO NOT await it.
   // This makes the API request return immediately.
-  runJobInBackground(jobId, input, fastifyLogger);
+  JobService.runJobInBackground(jobId, input, fastifyLogger);
   const jobDetails: JobDetails = {
     id: job.id,
     status: job.status,
@@ -255,7 +255,7 @@ export async function createJob(
 /**
  * Cancels a running job.
  */
-export async function cancelJob(
+async function cancelJob(
   jobId: string,
   jobOwner: Identity
 ): Promise<JobDetails | null> {
@@ -321,7 +321,7 @@ export async function cancelJob(
 /**
  * Finds a job by its ID.
  */
-export async function findJobById(
+async function findJobById(
   jobId: string,
   jobOwner: Identity
 ): Promise<JobDetails | null> {
@@ -355,9 +355,7 @@ export async function findJobById(
 /**
  * Finds all jobs for a specific user (or anonymous session id).
  */
-export async function findJobsByOwner(
-  jobOwner: Identity
-): Promise<JobDetails[]> {
+async function findJobsByOwner(jobOwner: Identity): Promise<JobDetails[]> {
   const ownerWhereClause = getOwnerWhereClause(jobOwner);
   const jobs = await db
     .select()
@@ -386,7 +384,7 @@ export async function findJobsByOwner(
 /**
  * Fetches the results for a completed job.
  */
-export async function getJobResult(
+async function getJobResult(
   jobId: string,
   jobOwner: Identity
 ): Promise<JobResult> {
@@ -424,3 +422,12 @@ export async function getJobResult(
     }))
   );
 }
+
+export const JobService = {
+  createJob,
+  cancelJob,
+  findJobById,
+  findJobsByOwner,
+  getJobResult,
+  runJobInBackground,
+};

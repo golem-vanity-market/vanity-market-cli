@@ -1,6 +1,6 @@
 import { initServer } from "@ts-rest/fastify";
 import { contract } from "../../../../shared/contracts/index.ts";
-import * as JobService from "./job.service.ts";
+import { JobService } from "./job.service.ts";
 import { UnconnectedJobInputSchema } from "../../../../shared/contracts/job.contract.ts";
 
 const s = initServer();
