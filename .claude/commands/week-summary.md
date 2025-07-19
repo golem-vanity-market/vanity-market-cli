@@ -84,6 +84,17 @@ I'll create a markdown summary following the following format:
   - Overall development focus and technical impact
 
 - Section 5:
+  Title: Engineering Metrics
+  Content:
+  - Github:
+    - Use ../.claude/scripts/calculate_pr_metrics.py
+    - Avg time between opening and merging PR to main of all PR fetched in the step 3
+    - Avg time waiting for the first reviwew for all PRs fetched in the step 3
+  - Tasks:
+    - 3 oldest ticket in progress: - `[{Ticket Number}: {Ticket Name}]({LINK TO TICKET}): age in hours` 
+    - 3 oldest tickets in TODO - `[{Ticket Number}: {Ticket Name}]({LINK TO TICKET}): age in hours`
+
+- Section 6:
   Title: "Next week tasks"
   Content:
   - Fetched in the step 2.
