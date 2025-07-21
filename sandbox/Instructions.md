@@ -18,6 +18,13 @@ or for pre-release version
 python prepare-pre-release.py
 ```
 
+or for production (it relies on the binaries from the sandbox):
+
+```bash
+python prepare_prod.py
+# do not forget about setting up YAGNA_AUTOCONF_ID_SECRET
+```
+
 yagna (or base) folder should be created and binaries and .env files placed there.
 
 ### 2. Open terminal window 1 in folder yagna (or base) and run the following command
