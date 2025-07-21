@@ -23,9 +23,11 @@ import {
   IterationInfo,
   ParsedResults,
   CommandResult,
+  VanityResult,
 } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
+import { validateVanityResult } from "../validator";
 
 /**
  * Parameters for the GolemSessionManager constructor
@@ -421,7 +423,7 @@ export class GolemSessionManager {
       r = await this.runCommand(ctx, rental, generationParams);
 
       // TODO: should throw an error if the resuts failed verficication
-      this.processCommandResult(ctx, r);
+      this.processCommandResult(ctx, r, generationParams);
 
       if (this.isWorkStopped()) {
         ctx.L().info("Work was stopped by user");
@@ -495,7 +497,11 @@ export class GolemSessionManager {
     );
   }
 
-  private processCommandResult(ctx: AppContext, cmd: CommandResult): void {
+  private processCommandResult(
+    ctx: AppContext,
+    cmd: CommandResult,
+    generationParams: GenerationParams,
+  ): void {
     // TODO: inform estimator and reputation model that there were no results
 
     for (const r in cmd.results) {
@@ -513,18 +519,43 @@ export class GolemSessionManager {
 
       this.estimatorService.pushProofToQueue(entry);
 
-      // TODO: filter out proofs
-      // and take only those that match the user's pattern
-      this.resultService.processValidatedEntry(
-        entry,
-        (jobId: string, address: string, addrDifficulty: number) => {
-          ctx.consoleInfo(
-            `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
+      if (this.isRequestedPattern(cmd.results[r], generationParams)) {
+        const isValid = validateVanityResult(ctx, cmd.results[r]);
+        if (isValid.isValid === false) {
+          ctx
+            .L()
+            .error(
+              `Validation failed for result ${cmd.results[r]}: ${isValid.msg}`,
+            );
+          throw new Error(
+            `Validation failed for result (provider ${cmd.provider.name}) ${cmd.results[r]}: ${isValid.msg}`,
           );
-        },
-      );
+        }
+
+        // TODO: filter out proofs
+        // and take only those that match the user's pattern
+        this.resultService.processValidatedEntry(
+          entry,
+          (jobId: string, address: string, addrDifficulty: number) => {
+            ctx.consoleInfo(
+              `Found address: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(addrDifficulty)}`,
+            );
+          },
+        );
+      }
       ctx.L().debug("Found address:", addr);
     }
+  }
+
+  public isRequestedPattern(
+    result: VanityResult,
+    generationParams: GenerationParams,
+  ): boolean {
+    const pattern = generationParams.vanityAddressPrefix.fullPrefix();
+    if (result.address.startsWith(pattern)) {
+      return true;
+    }
+    return false;
   }
 
   public async disconnectFromGolemNetwork(ctx: AppContext): Promise<void> {
