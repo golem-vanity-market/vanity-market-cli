@@ -1,3 +1,3 @@
 # CLI Usage Examples
 
-generate: npm run dev -- generate --public-key my-public-key.txt --vanity-address-prefix vanity --budget-glm 1000
+generate: npm run dev -- generate --public-key my-key.txt --vanity-address-prefix 0xcafe77 --budget-limit 1000 --processing-unit gpu --results-file results.json
