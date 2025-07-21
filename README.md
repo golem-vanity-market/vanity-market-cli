@@ -1,24 +1,24 @@
-# vanity-market
+# Golem vanity-market
 
 ## Setting up the dev env
 
-For yagna setup see [sandbox/README.md]
+For yagna setup see [sandbox/README.md](sandbox/README.md)
 
 ### CLI
 
-see [cli/README.md]
+see [cli/README.md](cli/README.md)
 
 ### SaaS
 
-see [app/]
+see [webapp/](webapp/)
 
-### Common tools
+## Common tools
 
-- .tools:
+- `.tools`, for example:
 
   ```bash
   export PATH=$PATH:$(pwd)/.tools
-  do-pr-review.sh 62
+  do-pr-review.sh 62 # do a review with Claude Code
   ```
 
 - license finder (https://github.com/pivotal/LicenseFinder/blob/master/dlf):
@@ -33,6 +33,7 @@ see [app/]
 
 ## Product/Project Managment
 
+- [Working Agreement](working-agreement.md)
 - Weekly updates: [z_projectmanagement](z_projectmanagement/)
 - Tools:
   - claude command for weekly updates: .claude/commands/week-summary.md
