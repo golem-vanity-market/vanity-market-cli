@@ -5,7 +5,7 @@ import { createClient } from "@libsql/client";
 function getDbConnection() {
   if (process.env.NODE_ENV === "test") {
     // use an in-memory sqlite instance in test
-    const client = createClient({ url: ":memory:" });
+    const client = createClient({ url: "file::memory:?cache=shared" });
     return drizzle(client);
   }
   return drizzle(config.DB_FILE_NAME);

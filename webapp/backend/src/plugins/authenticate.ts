@@ -121,18 +121,22 @@ export default fp(async (fastify) => {
     // This function is called for every JWT verification
     // For refresh tokens, it checks if the token is valid and not expired
     trusted: async (request, decodedToken) => {
-      const token = decodedToken.token;
-      if (!token) return false;
-      const tokenRecord = await db
-        .select()
-        .from(refreshTokensTable)
-        .where(
-          and(
-            eq(refreshTokensTable.token, token),
-            gte(refreshTokensTable.expiresAt, new Date())
-          )
-        );
-      return tokenRecord.length > 0;
+      try {
+        const token = decodedToken.token;
+        if (!token) return false;
+        const tokenRecord = await db
+          .select()
+          .from(refreshTokensTable)
+          .where(
+            and(
+              eq(refreshTokensTable.token, token),
+              gte(refreshTokensTable.expiresAt, new Date())
+            )
+          );
+        return tokenRecord.length > 0;
+      } catch (e) {
+        return false;
+      }
     },
   });
 

@@ -19,6 +19,7 @@ import config from "../../config.ts";
 import { randomUUID } from "node:crypto";
 import {
   applySchemaToTestDb,
+  getAuthenticatedClient,
   getRandomPublicKey,
   getTestApiClient,
   type TestApiClient,
@@ -283,6 +284,49 @@ describe("Jobs API", () => {
       resNumWorkers.status,
       400,
       "Invalid number of workers should result in a 400"
+    );
+  });
+  it("should not allow GPU work to anonymous users", async () => {
+    const jobInput: JobInput = {
+      publicKey: getRandomPublicKey(),
+      vanityAddressPrefix: "0xabc123",
+      budgetGlm: 1,
+      processingUnit: "gpu",
+      numResults: 1,
+      numWorkers: 2,
+    };
+
+    const { status } = await client.jobs.createJob({
+      body: jobInput,
+    });
+    assert.strictEqual(
+      status,
+      400,
+      "Anonymous users should not be allowed GPU work"
+    );
+  });
+  it("should allow GPU work to signed-in users", async () => {
+    const jobInput: JobInput = {
+      publicKey: getRandomPublicKey(),
+      vanityAddressPrefix: "0xabc123",
+      budgetGlm: 1,
+      processingUnit: "gpu",
+      numResults: 1,
+      numWorkers: 2,
+    };
+
+    const authenticatedClient = await getAuthenticatedClient(
+      app.listeningOrigin,
+      client
+    );
+
+    const { status } = await authenticatedClient.jobs.createJob({
+      body: jobInput,
+    });
+    assert.strictEqual(
+      status,
+      202,
+      "Signed-in users should be allowed GPU work"
     );
   });
 });
