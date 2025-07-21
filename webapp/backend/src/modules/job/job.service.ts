@@ -24,6 +24,8 @@ import {
 import { fastifyLogger } from "../../lib/logger.ts";
 import { db } from "../../lib/db/index.ts";
 import type { Identity } from "../../plugins/authenticate.ts";
+import { ValidationError } from "../../errors/index.ts";
+import { isNativeError } from "node:util/types";
 
 // context of an active job stored in memory
 interface ActiveJobContext {
@@ -212,8 +214,14 @@ async function createJob(
   input: JobInput,
   jobOwner: Identity
 ): Promise<JobDetails> {
-  // Validate inputs before even creating the DB record
-  validateAndTransformInputs(input);
+  try {
+    // Validate inputs before even creating the DB record
+    validateAndTransformInputs(input);
+  } catch (error) {
+    throw new ValidationError(
+      isNativeError(error) ? error.message : "Invalid input"
+    );
+  }
 
   const jobId = crypto.randomUUID();
   const [job] = await db

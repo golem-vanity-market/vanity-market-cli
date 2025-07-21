@@ -6,6 +6,7 @@ import authenticatePlugin from "./plugins/authenticate.ts";
 import { contract } from "../../shared/contracts/index.ts";
 import corsPlugin from "@fastify/cors";
 import cookiePlugin from "@fastify/cookie";
+import errorPlugin from "./plugins/error.ts";
 import config from "./config.ts";
 export async function buildApp() {
   const app = Fastify({
@@ -23,18 +24,13 @@ export async function buildApp() {
     ],
   });
   app.register(cookiePlugin);
-
   app.register(authenticatePlugin);
-
+  app.register(errorPlugin);
   const s = initServer();
-
-  // Combine all your modular routers into one
   const router = s.router(contract, {
     auth: authRouter,
     jobs: jobRouter,
   });
-
   app.register(s.plugin(router));
-
   return app;
 }

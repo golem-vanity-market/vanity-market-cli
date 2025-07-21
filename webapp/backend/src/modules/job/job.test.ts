@@ -1,11 +1,11 @@
 import {
-  test,
   describe,
   before,
   after,
   beforeEach,
   mock,
   type Mock,
+  it,
 } from "node:test";
 import assert from "node:assert";
 import type { FastifyInstance } from "fastify";
@@ -93,7 +93,7 @@ describe("Jobs API", () => {
     mockJobs.clear();
   });
 
-  test("should create a job, process it, and allow fetching results", async () => {
+  it("should create a job, process it, and allow fetching results", async () => {
     const jobInput: JobInput = {
       publicKey: getRandomPublicKey(),
       vanityAddressPrefix: "0xabc123",
@@ -181,5 +181,108 @@ describe("Jobs API", () => {
     assert.strictEqual(resultStatus, 200);
     assert.strictEqual(jobResult.length, 1, "There should be one result");
     assert.deepStrictEqual(jobResult[0]?.addr, mockResult.addr);
+  });
+  it("should validate inputs", async () => {
+    const wrongPubKey: JobInput = {
+      publicKey: "not-a-valid-public-key",
+      vanityAddressPrefix: "0xabc123",
+      budgetGlm: 1,
+      processingUnit: "cpu",
+      numResults: 1,
+      numWorkers: 2,
+    };
+    const resPubKey = await client.jobs.createJob({
+      body: wrongPubKey,
+    });
+    assert.strictEqual(
+      resPubKey.status,
+      400,
+      "Invalid public key should result in a 400"
+    );
+
+    const wrongPrefix: JobInput = {
+      publicKey: getRandomPublicKey(),
+      vanityAddressPrefix: "not-a-valid-prefix",
+      budgetGlm: 1,
+      processingUnit: "cpu",
+      numResults: 1,
+      numWorkers: 2,
+    };
+    const resPrefix = await client.jobs.createJob({
+      body: wrongPrefix,
+    });
+    assert.strictEqual(
+      resPrefix.status,
+      400,
+      "Invalid vanity address prefix should result in a 400"
+    );
+
+    const wrongBudget: JobInput = {
+      publicKey: getRandomPublicKey(),
+      vanityAddressPrefix: "0xabc123",
+      budgetGlm: -1,
+      processingUnit: "cpu",
+      numResults: 1,
+      numWorkers: 2,
+    };
+    const resBudget = await client.jobs.createJob({
+      body: wrongBudget,
+    });
+    assert.strictEqual(
+      resBudget.status,
+      400,
+      "Invalid budget should result in a 400"
+    );
+
+    const wrongProcessingUnit: JobInput = {
+      publicKey: getRandomPublicKey(),
+      vanityAddressPrefix: "0xabc123",
+      budgetGlm: 1,
+      processingUnit: "not-a-valid-unit" as "cpu" | "gpu",
+      numResults: 1,
+      numWorkers: 2,
+    };
+    const resProcessingUnit = await client.jobs.createJob({
+      body: wrongProcessingUnit,
+    });
+    assert.strictEqual(
+      resProcessingUnit.status,
+      400,
+      "Invalid processing unit should result in a 400"
+    );
+
+    const wrongNumResults: JobInput = {
+      publicKey: getRandomPublicKey(),
+      vanityAddressPrefix: "0xabc123",
+      budgetGlm: 1,
+      processingUnit: "cpu",
+      numResults: -1,
+      numWorkers: 2,
+    };
+    const resNumResults = await client.jobs.createJob({
+      body: wrongNumResults,
+    });
+    assert.strictEqual(
+      resNumResults.status,
+      400,
+      "Invalid number of results should result in a 400"
+    );
+
+    const wrongNumWorkers: JobInput = {
+      publicKey: getRandomPublicKey(),
+      vanityAddressPrefix: "0xabc123",
+      budgetGlm: 1,
+      processingUnit: "cpu",
+      numResults: 1,
+      numWorkers: -1,
+    };
+    const resNumWorkers = await client.jobs.createJob({
+      body: wrongNumWorkers,
+    });
+    assert.strictEqual(
+      resNumWorkers.status,
+      400,
+      "Invalid number of workers should result in a 400"
+    );
   });
 });
