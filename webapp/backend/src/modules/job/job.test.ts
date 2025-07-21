@@ -4,7 +4,7 @@ import type { FastifyInstance } from "fastify";
 import {
   GolemService,
   type Callbacks as GolemCallbacks,
-} from "./golem.service.ts"; // We need the real service for its types
+} from "./golem.service.ts";
 import { db } from "../../lib/db/index.ts";
 import { jobsTable, jobResultsTable } from "../../lib/db/schema.ts";
 import { type JobInput } from "../../../../shared/contracts/job.contract.ts";
@@ -77,14 +77,8 @@ describe("Jobs API", () => {
       body: jobInput,
     });
 
-    // ASSERT 1: The initial API call returns 201 Created and 'pending' status
-    assert.strictEqual(
-      status,
-      202,
-      `Status should be 201 Created, instead got an error: ${JSON.stringify(
-        createdJob
-      )}`
-    );
+    // ASSERT 1: The initial API call returns 202 Created and 'pending' status
+    assert.strictEqual(status, 202, "API call should return 202 Created");
     assert.strictEqual(createdJob.status, "pending");
     assert.ok(createdJob.id, "Job should have an ID");
     const jobId = createdJob.id;
