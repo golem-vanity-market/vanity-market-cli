@@ -1,5 +1,5 @@
 import { initServer } from "@ts-rest/fastify";
-import * as AuthService from "./auth.service.ts";
+import { AuthService } from "./auth.service.ts";
 import { contract } from "../../../../shared/contracts/index.ts";
 import config from "../../config.ts";
 
