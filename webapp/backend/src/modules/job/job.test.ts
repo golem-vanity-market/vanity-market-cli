@@ -13,6 +13,7 @@ import { randomUUID } from "node:crypto";
 import {
   applySchemaToTestDb,
   getAuthenticatedClient,
+  getDefaultServices,
   getRandomPublicKey,
   getTestApiClient,
   type TestApiClient,
@@ -42,14 +43,7 @@ describe("Jobs API", () => {
 
     await applySchemaToTestDb();
 
-    const jobService = newJobService(golemService);
-    const authService = newAuthService();
-
-    app = await buildApp({
-      jobService,
-      golemService,
-      authService,
-    });
+    app = await buildApp(getDefaultServices({ golemService }));
     await app.ready();
 
     const serverUrl = await app.listen({ port: 0 });
