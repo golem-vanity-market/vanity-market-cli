@@ -9,8 +9,8 @@ import {
   type JobResult,
 } from "../../../../shared/contracts/job.contract.ts";
 import {
-  GolemService,
   type Callbacks as GolemCallbacks,
+  type GolemService,
 } from "./golem.service.ts";
 import type { Identity } from "../../plugins/authenticate.ts";
 import { ValidationError } from "../../errors/index.ts";
@@ -43,9 +43,9 @@ function jobToJobDetails(job: typeof jobsTable.$inferSelect): JobDetails {
 }
 
 class JobServiceImpl {
-  private golemService: typeof GolemService;
+  private golemService: GolemService;
 
-  constructor(golemService: typeof GolemService) {
+  constructor(golemService: GolemService) {
     this.golemService = golemService;
   }
 
@@ -207,4 +207,6 @@ class JobServiceImpl {
   }
 }
 
-export const JobService = new JobServiceImpl(GolemService);
+export function newJobService(gs: GolemService): JobServiceImpl {
+  return new JobServiceImpl(gs);
+}

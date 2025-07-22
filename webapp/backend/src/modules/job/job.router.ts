@@ -1,11 +1,21 @@
 import { initServer } from "@ts-rest/fastify";
 import { contract } from "../../../../shared/contracts/index.ts";
-import { JobService } from "./job.service.ts";
+import { newJobService } from "./job.service.ts";
 import { UnconnectedJobInputSchema } from "../../../../shared/contracts/job.contract.ts";
+import { newGolemService } from "./golem.service.ts";
+import fastify from "fastify";
+import { fastifyLogger } from "../../lib/logger.ts";
 
 const s = initServer();
 
-export const jobRouter = s.router(contract.jobs, {
+
+
+export const createJobRouter = () => 
+  {
+    const golemService = newGolemService(fastifyLogger)
+    const jobService = newJobService(golemService);
+
+   return s.router(contract.jobs, {
   createJob: {
     handler: async ({ body, request }) => {
       const jobOwner = request.userIdentity!;
@@ -17,7 +27,7 @@ export const jobRouter = s.router(contract.jobs, {
         }
         body = parseResults.data;
       }
-      const job = await JobService.createJob(body, jobOwner);
+      const job = await jobService.createJob(body, jobOwner);
 
       return { status: 202, body: job };
     },
@@ -28,7 +38,7 @@ export const jobRouter = s.router(contract.jobs, {
   listJobs: {
     handler: async ({ request }) => {
       const jobOwner = request.userIdentity!;
-      const jobs = await JobService.findJobsByOwner(jobOwner);
+      const jobs = await jobService.findJobsByOwner(jobOwner);
       return { status: 200, body: jobs };
     },
     hooks: {
@@ -38,7 +48,7 @@ export const jobRouter = s.router(contract.jobs, {
   getJobDetails: {
     handler: async ({ params, request }) => {
       const jobOwner = request.userIdentity!;
-      const job = await JobService.findJobById(params.id, jobOwner);
+      const job = await jobService.findJobById(params.id, jobOwner);
       if (!job) {
         return { status: 404, body: { message: "Job not found" } };
       }
@@ -51,7 +61,7 @@ export const jobRouter = s.router(contract.jobs, {
   getJobResult: {
     handler: async ({ params, request }) => {
       const jobOwner = request.userIdentity!;
-      const result = await JobService.getJobResult(params.id, jobOwner);
+      const result = await jobService.getJobResult(params.id, jobOwner);
       if (!result) {
         return { status: 404, body: { message: "Result not found" } };
       }
@@ -62,3 +72,4 @@ export const jobRouter = s.router(contract.jobs, {
     },
   },
 });
+  }

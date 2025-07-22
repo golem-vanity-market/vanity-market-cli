@@ -13,7 +13,6 @@ import {
   validateProcessingUnit,
 } from "@unoperate/golem-vaddr-cli/lib";
 import type { JobInput } from "../../../../shared/contracts/job.contract.ts";
-import { fastifyLogger } from "../../lib/logger.ts";
 
 export interface Result {
   addr: string;
@@ -40,7 +39,17 @@ interface ActiveJobContext {
 
 const activeJobs: Record<string, ActiveJobContext> = {};
 
-class GolemServiceImpl {
+export interface GolemService {
+  startJob(jobId: string, input: JobInput, callbacks: Callbacks): void;
+  cancelJob(jobId: string): Promise<boolean>;
+  validateAndTransformInputs(input: JobInput): {
+    publicKey: PublicKey;
+    vanityAddressPrefix: GenerationPrefix;
+    processingUnitType: string;
+  };
+}
+
+class GolemServiceImpl implements GolemService {
   private readonly rootLogger: Logger;
 
   constructor(rootLogger: Logger) {
@@ -187,4 +196,6 @@ class GolemServiceImpl {
   }
 }
 
-export const GolemService = new GolemServiceImpl(fastifyLogger);
+export function newGolemService(l: Logger): GolemService {
+  return new GolemServiceImpl(l);
+}
