@@ -15,7 +15,7 @@ import {
 import type { Identity } from "../../plugins/authenticate.ts";
 import { ValidationError } from "../../errors/index.ts";
 import { isNativeError } from "node:util/types";
-import { validateProcessingUnit } from "@unoperate/golem-vaddr-cli/lib";
+import type { JobService } from "../../types.ts";
 
 function getOwnerWhereClause(jobOwner: Identity) {
   switch (jobOwner.type) {

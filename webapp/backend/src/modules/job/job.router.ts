@@ -1,9 +1,6 @@
 import { initServer } from "@ts-rest/fastify";
 import { contract } from "../../../../shared/contracts/index.ts";
-import { newJobService } from "./job.service.ts";
 import { UnconnectedJobInputSchema } from "../../../../shared/contracts/job.contract.ts";
-import { newGolemService } from "./golem.service.ts";
-import { fastifyLogger } from "../../lib/logger.ts";
 import type { JobService } from "../../types.ts";
 
 export const createJobRouter = (s: ReturnType<typeof initServer>, jobService: JobService) => {
