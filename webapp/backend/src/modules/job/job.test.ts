@@ -3,7 +3,6 @@ import assert from "node:assert";
 import type { FastifyInstance } from "fastify";
 import { newGolemService } from "./golem.service.ts";
 import { type Callbacks as GolemCallbacks } from "./types.ts";
-import { newJobService } from "./job.service.ts";
 import { db } from "../../lib/db/index.ts";
 import { jobsTable, jobResultsTable } from "../../lib/db/schema.ts";
 import { type JobInput } from "../../../../shared/contracts/job.contract.ts";
@@ -19,7 +18,6 @@ import {
   type TestApiClient,
 } from "../../test/helpers.ts";
 import { fastifyLogger } from "../../lib/logger.ts";
-import { newAuthService } from "../auth/auth.service.ts";
 
 const golemService = newGolemService(fastifyLogger);
 const startJobMock = mock.method(golemService, "startJob");
