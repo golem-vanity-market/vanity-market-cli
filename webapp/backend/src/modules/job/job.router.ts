@@ -6,7 +6,7 @@ import { newGolemService } from "./golem.service.ts";
 import { fastifyLogger } from "../../lib/logger.ts";
 
 export const createJobRouter = (s: ReturnType<typeof initServer>) => {
-  const golemService = newGolemService(fastifyLogger);
+  const golemService = newGolemService(fastifyLogger); // we could consider to create these two in app.ts and pass them as parameters
   const jobService = newJobService(golemService);
 
   return s.router(contract.jobs, {
