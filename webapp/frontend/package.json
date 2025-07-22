@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"next dev --turbopack\" \"node build-keystore.mjs && serve keystore_dist -l 3002\"",
-    "build": "next build --turbo && node build-keystore.mjs",
+    "build": "next build && node build-keystore.mjs",
     "start": "next start",
     "lint": "next lint"
   },
