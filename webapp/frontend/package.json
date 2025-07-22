@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "concurrently \"next dev --turbopack\" \"serve keystore -l 3002\"",
-    "build": "next build --turbo",
+    "dev": "concurrently \"next dev --turbopack\" \"node build-keystore.mjs && serve keystore_dist -l 3002\"",
+    "build": "next build && node build-keystore.mjs",
     "start": "next start",
     "lint": "next lint"
   },
@@ -40,6 +40,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "concurrently": "^9.2.0",
+    "dotenv": "^17.2.0",
     "eslint": "^9",
     "eslint-config-next": "15.3.5",
     "serve": "^14.2.4",
