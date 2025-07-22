@@ -13,24 +13,9 @@ import {
   validateProcessingUnit,
 } from "@unoperate/golem-vaddr-cli/lib";
 import type { JobInput } from "../../../../shared/contracts/job.contract.ts";
+import type { GolemService, Callbacks } from "./types.ts";
 
-export interface Result {
-  addr: string;
-  salt: string;
-  pubKey: string;
-  provider: {
-    id: string;
-    name: string;
-    walletAddress: string;
-  };
-}
 
-export interface Callbacks {
-  onProcessing: (jobId: string) => Promise<void>;
-  onResults: (jobId: string, results: Result[]) => Promise<void>;
-  onCompleted: (jobId: string) => Promise<void>;
-  onFailed: (jobId: string, error: Error) => Promise<void>;
-}
 
 interface ActiveJobContext {
   golemSessionManager: GolemSessionManager;
@@ -38,16 +23,6 @@ interface ActiveJobContext {
 }
 
 const activeJobs: Record<string, ActiveJobContext> = {};
-
-export interface GolemService {
-  startJob(jobId: string, input: JobInput, callbacks: Callbacks): void;
-  cancelJob(jobId: string): Promise<boolean>;
-  validateAndTransformInputs(input: JobInput): {
-    publicKey: PublicKey;
-    vanityAddressPrefix: GenerationPrefix;
-    processingUnitType: string;
-  };
-}
 
 class GolemServiceImpl implements GolemService {
   private readonly rootLogger: Logger;

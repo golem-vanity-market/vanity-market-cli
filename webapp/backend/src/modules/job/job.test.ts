@@ -3,8 +3,8 @@ import assert from "node:assert";
 import type { FastifyInstance } from "fastify";
 import {
   newGolemService,
-  type Callbacks as GolemCallbacks,
 } from "./golem.service.ts";
+import { type Callbacks as GolemCallbacks} from "./types.ts";
 import { newJobService } from "./job.service.ts";
 import { db } from "../../lib/db/index.ts";
 import { jobsTable, jobResultsTable } from "../../lib/db/schema.ts";

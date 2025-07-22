@@ -11,7 +11,7 @@ import {
 import {
   type Callbacks as GolemCallbacks,
   type GolemService,
-} from "./golem.service.ts";
+} from "./types.ts";
 import type { Identity } from "../../plugins/authenticate.ts";
 import { ValidationError } from "../../errors/index.ts";
 import { isNativeError } from "node:util/types";
