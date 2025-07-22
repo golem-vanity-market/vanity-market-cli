@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import { initServer } from "@ts-rest/fastify";
 import { authRouter } from "./modules/auth/auth.router.ts";
-import { jobRouter } from "./modules/job/job.router.ts";
+import { createJobRouter } from "./modules/job/job.router.ts";
 import authenticatePlugin from "./plugins/authenticate.ts";
 import { contract } from "../../shared/contracts/index.ts";
 import corsPlugin from "@fastify/cors";
@@ -27,6 +27,7 @@ export async function buildApp() {
   app.register(authenticatePlugin);
   app.register(errorPlugin);
   const s = initServer();
+  const jobRouter = createJobRouter(s);
   const router = s.router(contract, {
     auth: authRouter,
     jobs: jobRouter,

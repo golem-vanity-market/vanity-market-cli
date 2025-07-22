@@ -3,73 +3,74 @@ import { contract } from "../../../../shared/contracts/index.ts";
 import { newJobService } from "./job.service.ts";
 import { UnconnectedJobInputSchema } from "../../../../shared/contracts/job.contract.ts";
 import { newGolemService } from "./golem.service.ts";
-import fastify from "fastify";
 import { fastifyLogger } from "../../lib/logger.ts";
 
-const s = initServer();
+export const createJobRouter = (s: ReturnType<typeof initServer>) => {
+  const golemService = newGolemService(fastifyLogger);
+  const jobService = newJobService(golemService);
 
-
-
-export const createJobRouter = () => 
-  {
-    const golemService = newGolemService(fastifyLogger)
-    const jobService = newJobService(golemService);
-
-   return s.router(contract.jobs, {
-  createJob: {
-    handler: async ({ body, request }) => {
-      const jobOwner = request.userIdentity!;
-      // extra strict validation for anonymous accounts
-      if (jobOwner.type === "anonymous") {
-        const parseResults = UnconnectedJobInputSchema.safeParse(body);
-        if (!parseResults.success) {
-          return { status: 400, body: { message: parseResults.error.message } };
+  return s.router(contract.jobs, {
+    createJob: {
+      handler: async ({ body, request }) => {
+        const jobOwner = request.userIdentity!;
+        // extra strict validation for anonymous accounts
+        if (jobOwner.type === "anonymous") {
+          const parseResults = UnconnectedJobInputSchema.safeParse(body);
+          if (!parseResults.success) {
+            return {
+              status: 400,
+              body: { message: parseResults.error.message },
+            };
+          }
+          body = parseResults.data;
         }
-        body = parseResults.data;
-      }
-      const job = await jobService.createJob(body, jobOwner);
+        const job = await jobService.createJob(body, jobOwner);
 
-      return { status: 202, body: job };
+        return { status: 202, body: job };
+      },
+      hooks: {
+        onRequest: (req, ...rest) =>
+          req.server.requireAnyIdentity(req, ...rest),
+      },
     },
-    hooks: {
-      onRequest: (req, ...rest) => req.server.requireAnyIdentity(req, ...rest),
+    listJobs: {
+      handler: async ({ request }) => {
+        const jobOwner = request.userIdentity!;
+        const jobs = await jobService.findJobsByOwner(jobOwner);
+        return { status: 200, body: jobs };
+      },
+      hooks: {
+        onRequest: (req, ...rest) =>
+          req.server.requireAnyIdentity(req, ...rest),
+      },
     },
-  },
-  listJobs: {
-    handler: async ({ request }) => {
-      const jobOwner = request.userIdentity!;
-      const jobs = await jobService.findJobsByOwner(jobOwner);
-      return { status: 200, body: jobs };
+    getJobDetails: {
+      handler: async ({ params, request }) => {
+        const jobOwner = request.userIdentity!;
+        const job = await jobService.findJobById(params.id, jobOwner);
+        if (!job) {
+          return { status: 404, body: { message: "Job not found" } };
+        }
+        return { status: 200, body: job };
+      },
+      hooks: {
+        onRequest: (req, ...rest) =>
+          req.server.requireAnyIdentity(req, ...rest),
+      },
     },
-    hooks: {
-      onRequest: (req, ...rest) => req.server.requireAnyIdentity(req, ...rest),
+    getJobResult: {
+      handler: async ({ params, request }) => {
+        const jobOwner = request.userIdentity!;
+        const result = await jobService.getJobResult(params.id, jobOwner);
+        if (!result) {
+          return { status: 404, body: { message: "Result not found" } };
+        }
+        return { status: 200, body: result };
+      },
+      hooks: {
+        onRequest: (req, ...rest) =>
+          req.server.requireAnyIdentity(req, ...rest),
+      },
     },
-  },
-  getJobDetails: {
-    handler: async ({ params, request }) => {
-      const jobOwner = request.userIdentity!;
-      const job = await jobService.findJobById(params.id, jobOwner);
-      if (!job) {
-        return { status: 404, body: { message: "Job not found" } };
-      }
-      return { status: 200, body: job };
-    },
-    hooks: {
-      onRequest: (req, ...rest) => req.server.requireAnyIdentity(req, ...rest),
-    },
-  },
-  getJobResult: {
-    handler: async ({ params, request }) => {
-      const jobOwner = request.userIdentity!;
-      const result = await jobService.getJobResult(params.id, jobOwner);
-      if (!result) {
-        return { status: 404, body: { message: "Result not found" } };
-      }
-      return { status: 200, body: result };
-    },
-    hooks: {
-      onRequest: (req, ...rest) => req.server.requireAnyIdentity(req, ...rest),
-    },
-  },
-});
-  }
+  });
+};
