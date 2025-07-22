@@ -3,11 +3,19 @@ import config from "./config.ts";
 import { newJobService } from "./modules/job/job.service.ts";
 import { newGolemService } from "./modules/job/golem.service.ts";
 import { fastifyLogger } from "./lib/logger.ts";
+import { newAuthService } from "./modules/auth/auth.service.ts";
 
 const start = async () => {
-  const jobSrv = newJobService(newGolemService(fastifyLogger));
+  const golemService = newGolemService(fastifyLogger);
+  const jobService = newJobService(golemService);
+  const authService = newAuthService();
 
-  const app = await buildApp(jobSrv);
+  const app = await buildApp({
+    jobService,
+    golemService,
+    authService,
+  });
+
   try {
     await app.listen({ port: config.BIND_PORT, host: config.BIND_ADDRESS });
   } catch (err) {

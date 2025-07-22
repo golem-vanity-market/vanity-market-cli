@@ -11,11 +11,11 @@ import {
 import {
   type Callbacks as GolemCallbacks,
   type GolemService,
+  type JobService,
 } from "./types.ts";
 import type { Identity } from "../../plugins/authenticate.ts";
 import { ValidationError } from "../../errors/index.ts";
 import { isNativeError } from "node:util/types";
-import type { JobService } from "../../types.ts";
 
 function getOwnerWhereClause(jobOwner: Identity) {
   switch (jobOwner.type) {
@@ -41,7 +41,6 @@ function jobToJobDetails(job: typeof jobsTable.$inferSelect): JobDetails {
     updatedAt: job.updatedAt,
   });
 }
-
 
 class JobServiceImpl implements JobService {
   private golemService: GolemService;

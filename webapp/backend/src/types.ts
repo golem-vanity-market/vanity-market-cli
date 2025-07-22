@@ -1,10 +1,8 @@
-import type { JobInput, JobDetails, JobResult } from "../../shared/contracts/job.contract";
-import type { Identity } from "./plugins/authenticate";
+import type { AuthService } from "./modules/auth/types";
+import type { GolemService, JobService } from "./modules/job/types";
 
-export interface JobService {
-  createJob(input: JobInput, jobOwner: Identity): Promise<JobDetails>;
-  cancelJob(jobId: string, jobOwner: Identity): Promise<JobDetails | null>;
-  findJobById(jobId: string, jobOwner: Identity): Promise<JobDetails | null>;
-  findJobsByOwner(jobOwner: Identity): Promise<JobDetails[]>;
-  getJobResult(jobId: string, jobOwner: Identity): Promise<JobResult>;
+export interface ServiceContainer {
+  jobService: JobService;
+  golemService: GolemService;
+  authService: AuthService;
 }
