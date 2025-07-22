@@ -4,11 +4,9 @@ import { newJobService } from "./job.service.ts";
 import { UnconnectedJobInputSchema } from "../../../../shared/contracts/job.contract.ts";
 import { newGolemService } from "./golem.service.ts";
 import { fastifyLogger } from "../../lib/logger.ts";
+import type { JobService } from "../../types.ts";
 
-export const createJobRouter = (s: ReturnType<typeof initServer>) => {
-  const golemService = newGolemService(fastifyLogger); // we could consider to create these two in app.ts and pass them as parameters
-  const jobService = newJobService(golemService);
-
+export const createJobRouter = (s: ReturnType<typeof initServer>, jobService: JobService) => {
   return s.router(contract.jobs, {
     createJob: {
       handler: async ({ body, request }) => {

@@ -8,7 +8,9 @@ import corsPlugin from "@fastify/cors";
 import cookiePlugin from "@fastify/cookie";
 import errorPlugin from "./plugins/error.ts";
 import config from "./config.ts";
-export async function buildApp() {
+import type { JobService } from "./types.ts";
+
+export async function buildApp(jobServ: JobService) {
   const app = Fastify({
     logger: true, // TODO: use golem-compatible logger
   });
@@ -27,7 +29,7 @@ export async function buildApp() {
   app.register(authenticatePlugin);
   app.register(errorPlugin);
   const s = initServer();
-  const jobRouter = createJobRouter(s);
+  const jobRouter = createJobRouter(s, jobServ);
   const router = s.router(contract, {
     auth: authRouter,
     jobs: jobRouter,

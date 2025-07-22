@@ -5,6 +5,7 @@ import {
   newGolemService,
   type Callbacks as GolemCallbacks,
 } from "./golem.service.ts";
+import { newJobService } from "./job.service.ts";
 import { db } from "../../lib/db/index.ts";
 import { jobsTable, jobResultsTable } from "../../lib/db/schema.ts";
 import { type JobInput } from "../../../../shared/contracts/job.contract.ts";
@@ -41,7 +42,8 @@ describe("Jobs API", () => {
     });
 
     await applySchemaToTestDb();
-    app = await buildApp();
+    const js = newJobService(gs);
+    app = await buildApp(js);
     await app.ready();
 
     const serverUrl = await app.listen({ port: 0 });

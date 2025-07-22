@@ -42,7 +42,8 @@ function jobToJobDetails(job: typeof jobsTable.$inferSelect): JobDetails {
   });
 }
 
-class JobServiceImpl {
+
+class JobServiceImpl implements JobService {
   private golemService: GolemService;
 
   constructor(golemService: GolemService) {
