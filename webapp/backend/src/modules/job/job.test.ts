@@ -2,7 +2,7 @@ import { describe, before, after, beforeEach, mock, it } from "node:test";
 import assert from "node:assert";
 import type { FastifyInstance } from "fastify";
 import {
-  GolemService,
+  newGolemService,
   type Callbacks as GolemCallbacks,
 } from "./golem.service.ts";
 import { db } from "../../lib/db/index.ts";
@@ -18,9 +18,11 @@ import {
   getTestApiClient,
   type TestApiClient,
 } from "../../test/helpers.ts";
+import { fastifyLogger } from "../../lib/logger.ts";
 
-const startJobMock = mock.method(GolemService, "startJob");
-const cancelJobMock = mock.method(GolemService, "cancelJob");
+const gs = newGolemService(fastifyLogger);
+const startJobMock = mock.method(gs, "startJob");
+const cancelJobMock = mock.method(gs, "cancelJob");
 
 describe("Jobs API", () => {
   let app: FastifyInstance;
