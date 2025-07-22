@@ -69,7 +69,7 @@ export function JobsList() {
             <TableRow key={job.id}>
               <TableCell className="font-medium">
                 <Link
-                  href={`/jobs/${job.id}`}
+                  href={`/jobs?id=${job.id}`}
                   className="text-primary hover:underline"
                 >
                   {job.id}
