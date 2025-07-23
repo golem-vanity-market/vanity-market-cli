@@ -11,11 +11,12 @@ import {
 import {
   type Callbacks as GolemCallbacks,
   type GolemService,
-  type JobService,
 } from "./types.ts";
 import type { Identity } from "../../plugins/authenticate.ts";
 import { ValidationError } from "../../errors/index.ts";
 import { isNativeError } from "node:util/types";
+import type { JobService } from "../../types.ts";
+import { randomUUID } from "node:crypto";
 
 function getOwnerWhereClause(jobOwner: Identity) {
   switch (jobOwner.type) {
@@ -102,7 +103,7 @@ class JobServiceImpl implements JobService {
       );
     }
 
-    const jobId = crypto.randomUUID();
+    const jobId = randomUUID();
     const [job] = await db
       .insert(jobsTable)
       .values({

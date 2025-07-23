@@ -14,8 +14,7 @@ import {
 } from "@unoperate/golem-vaddr-cli/lib";
 import type { JobInput } from "../../../../shared/contracts/job.contract.ts";
 import type { GolemService, Callbacks } from "./types.ts";
-
-
+import { isNativeError } from "node:util/types";
 
 interface ActiveJobContext {
   golemSessionManager: GolemSessionManager;
@@ -38,7 +37,10 @@ class GolemServiceImpl implements GolemService {
         `Unhandled exception in Golem process for job ${jobId}:`,
         error
       );
-      callbacks.onFailed(jobId, error);
+      callbacks.onFailed(
+        jobId,
+        isNativeError(error) ? error : new Error(String(error))
+      );
     });
   }
 

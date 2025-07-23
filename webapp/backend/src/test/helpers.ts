@@ -15,6 +15,7 @@ import { newAuthService } from "../modules/auth/auth.service.ts";
 // Workaround for dynamic require error in drizzle: https://github.com/drizzle-team/drizzle-orm/issues/2853#issuecomment-2668459509
 const require = createRequire(import.meta.url);
 const { pushSQLiteSchema } =
+  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   require("drizzle-kit/api") as typeof import("drizzle-kit/api");
 
 export async function applySchemaToTestDb() {
@@ -72,7 +73,7 @@ export async function getAuthenticatedClient(
   const signInResponse = await anonymousClient.auth.signIn({
     body: {
       message,
-      signature: signature as `0x${string}`,
+      signature,
     },
   });
   if (signInResponse.status !== 200) {
@@ -87,12 +88,10 @@ export async function getAuthenticatedClient(
 export function getDefaultServices(
   customServices?: Partial<ServiceContainer>
 ): ServiceContainer {
-  const golemService =
-    customServices?.golemService || newGolemService(fastifyLogger);
-  const jobService = customServices?.jobService || newJobService(golemService);
+  const jobService =
+    customServices?.jobService || newJobService(newGolemService(fastifyLogger));
   const authService = customServices?.authService || newAuthService();
   return {
-    golemService,
     jobService,
     authService,
   };
