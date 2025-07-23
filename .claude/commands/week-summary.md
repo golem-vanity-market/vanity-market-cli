@@ -90,6 +90,8 @@ I'll create a markdown summary following the following format:
     - Use ../.claude/scripts/calculate_pr_metrics.py
     - Avg time between opening and merging PR to main of all PR fetched in the step 3
     - Avg time waiting for the first reviwew for all PRs fetched in the step 3
+    - Number of PRs merged with review
+    - Number of PRs merged without review
   - Tasks:
     - 3 oldest ticket in progress: - `[{Ticket Number}: {Ticket Name}]({LINK TO TICKET}): age in hours` 
     - 3 oldest tickets in TODO - `[{Ticket Number}: {Ticket Name}]({LINK TO TICKET}): age in hours`
