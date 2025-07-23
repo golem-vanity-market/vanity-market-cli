@@ -10,8 +10,9 @@ import { eq, and, gte } from "drizzle-orm";
 import { verifyMessage } from "viem";
 import { generateSiweNonce, parseSiweMessage } from "viem/siwe";
 import { randomUUID } from "node:crypto";
+import type { AuthService } from "./types.ts";
 
-class AuthServiceImpl {
+class AuthServiceImpl implements AuthService {
   public async generateNonce() {
     const nonce = generateSiweNonce();
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes expiration
@@ -186,4 +187,6 @@ class AuthServiceImpl {
   }
 }
 
-export const AuthService = new AuthServiceImpl();
+export function newAuthService(): AuthService {
+  return new AuthServiceImpl();
+}

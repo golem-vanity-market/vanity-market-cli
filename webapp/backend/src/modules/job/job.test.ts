@@ -1,10 +1,8 @@
 import { describe, before, after, beforeEach, mock, it } from "node:test";
 import assert from "node:assert";
 import type { FastifyInstance } from "fastify";
-import {
-  GolemService,
-  type Callbacks as GolemCallbacks,
-} from "./golem.service.ts";
+import { newGolemService } from "./golem.service.ts";
+import { type Callbacks as GolemCallbacks } from "./types.ts";
 import { db } from "../../lib/db/index.ts";
 import { jobsTable, jobResultsTable } from "../../lib/db/schema.ts";
 import { type JobInput } from "../../../../shared/contracts/job.contract.ts";
@@ -14,13 +12,16 @@ import { randomUUID } from "node:crypto";
 import {
   applySchemaToTestDb,
   getAuthenticatedClient,
+  getDefaultServices,
   getRandomPublicKey,
   getTestApiClient,
   type TestApiClient,
 } from "../../test/helpers.ts";
+import { fastifyLogger } from "../../lib/logger.ts";
 
-const startJobMock = mock.method(GolemService, "startJob");
-const cancelJobMock = mock.method(GolemService, "cancelJob");
+const golemService = newGolemService(fastifyLogger);
+const startJobMock = mock.method(golemService, "startJob");
+const cancelJobMock = mock.method(golemService, "cancelJob");
 
 describe("Jobs API", () => {
   let app: FastifyInstance;
@@ -39,7 +40,8 @@ describe("Jobs API", () => {
     });
 
     await applySchemaToTestDb();
-    app = await buildApp();
+
+    app = await buildApp(getDefaultServices({ golemService }));
     await app.ready();
 
     const serverUrl = await app.listen({ port: 0 });
