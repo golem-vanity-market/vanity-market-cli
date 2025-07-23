@@ -14,12 +14,12 @@ import { newAuthService } from "../modules/auth/auth.service.ts";
 
 // Workaround for dynamic require error in drizzle: https://github.com/drizzle-team/drizzle-orm/issues/2853#issuecomment-2668459509
 const require = createRequire(import.meta.url);
-const { pushSQLiteSchema } =
+const { pushSchema } =
   // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   require("drizzle-kit/api") as typeof import("drizzle-kit/api");
 
 export async function applySchemaToTestDb() {
-  const { apply } = await pushSQLiteSchema(schema, db);
+  const { apply } = await pushSchema(schema, db);
   await apply();
 }
 
