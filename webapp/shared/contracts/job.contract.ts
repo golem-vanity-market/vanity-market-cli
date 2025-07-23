@@ -67,6 +67,7 @@ export const jobsContract = c.router({
     body: JobInputSchema,
     responses: {
       202: JobSchema,
+      400: z.object({ message: z.string() }),
     },
     summary: "Create a new long-running job",
   },

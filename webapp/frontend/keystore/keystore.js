@@ -1,13 +1,5 @@
-const ALLOWED_PARENT_ORIGINS = [
-  "https://vanity.market"
-];
+const ALLOWED_PARENT_ORIGINS = ["__KEYSTORE_PARENT_ORIGIN__"];
 const LOCAL_STORAGE_KEY = "vanity_market_master_keystore_json";
-
-// For local development, when this iframe is served from localhost,
-// allow the parent frame to be on localhost as well.
-if (window.location.hostname === 'localhost') {
-  ALLOWED_PARENT_ORIGINS.push("http://localhost:3000");
-}
 
 window.addEventListener("message", async (event) => {
   if (!ALLOWED_PARENT_ORIGINS.includes(event.origin)) {

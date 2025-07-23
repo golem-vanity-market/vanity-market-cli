@@ -56,8 +56,13 @@ def prepare_env_file():
     content += "YAGNA_AUTOCONF_ID_SECRET=%%YAGNA_AUTOCONF_ID_SECRET%%\n"
     content += "\n"
 
+    # content += "# Testnet for glm-base\n"
+    # content += "YA_NET_RELAY_HOST=ya-golembase.dev.golem.network:7477\n"
+    # content += "\n"
+
     content += "# Testnet for glm-base\n"
-    content += "YA_NET_RELAY_HOST=ya-golembase.dev.golem.network:7477\n"
+    content += "YA_NET_TYPE=central\n"
+    content += "CENTRAL_NET_HOST=polygongas.org:7999\n"
     content += "\n"
 
     env_file_path = "./base/.env"
@@ -81,7 +86,7 @@ def prepare_client_env_file():
 if __name__ == "__main__":
     system = platform.system()
 
-    yagna_version = "pre-rel-v0.17.1-preview.golembase.22"
+    yagna_version = "pre-rel-v0.17.1-allocationbase"
     unpack_location = "base"
 
     if os.path.exists(unpack_location):

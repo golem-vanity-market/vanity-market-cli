@@ -35,3 +35,6 @@ Thumbs.db
 
 # Monitoring and config backups
 otel-config*.yaml.bak
+
+#
+temp/

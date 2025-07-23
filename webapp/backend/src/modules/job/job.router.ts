@@ -1,14 +1,13 @@
 import { initServer } from "@ts-rest/fastify";
 import { contract } from "../../../../shared/contracts/index.ts";
-import * as JobService from "./job.service.ts";
 import { UnconnectedJobInputSchema } from "../../../../shared/contracts/job.contract.ts";
 
 const s = initServer();
 
 export const jobRouter = s.router(contract.jobs, {
   createJob: {
-    handler: async ({ body, request }) => {
-      const jobOwner = request.userIdentity!;
+    handler: async ({ body, request: { userIdentity, jobService } }) => {
+      const jobOwner = userIdentity!;
       // extra strict validation for anonymous accounts
       if (jobOwner.type === "anonymous") {
         const parseResults = UnconnectedJobInputSchema.safeParse(body);
@@ -17,7 +16,7 @@ export const jobRouter = s.router(contract.jobs, {
         }
         body = parseResults.data;
       }
-      const job = await JobService.createJob(body, jobOwner);
+      const job = await jobService.createJob(body, jobOwner);
 
       return { status: 202, body: job };
     },
@@ -26,9 +25,9 @@ export const jobRouter = s.router(contract.jobs, {
     },
   },
   listJobs: {
-    handler: async ({ request }) => {
-      const jobOwner = request.userIdentity!;
-      const jobs = await JobService.findJobsByOwner(jobOwner);
+    handler: async ({ request: { jobService, userIdentity } }) => {
+      const jobOwner = userIdentity!;
+      const jobs = await jobService.findJobsByOwner(jobOwner);
       return { status: 200, body: jobs };
     },
     hooks: {
@@ -36,9 +35,9 @@ export const jobRouter = s.router(contract.jobs, {
     },
   },
   getJobDetails: {
-    handler: async ({ params, request }) => {
-      const jobOwner = request.userIdentity!;
-      const job = await JobService.findJobById(params.id, jobOwner);
+    handler: async ({ params, request: { jobService, userIdentity } }) => {
+      const jobOwner = userIdentity!;
+      const job = await jobService.findJobById(params.id, jobOwner);
       if (!job) {
         return { status: 404, body: { message: "Job not found" } };
       }
@@ -49,9 +48,9 @@ export const jobRouter = s.router(contract.jobs, {
     },
   },
   getJobResult: {
-    handler: async ({ params, request }) => {
-      const jobOwner = request.userIdentity!;
-      const result = await JobService.getJobResult(params.id, jobOwner);
+    handler: async ({ params, request: { jobService, userIdentity } }) => {
+      const jobOwner = userIdentity!;
+      const result = await jobService.getJobResult(params.id, jobOwner);
       if (!result) {
         return { status: 404, body: { message: "Result not found" } };
       }

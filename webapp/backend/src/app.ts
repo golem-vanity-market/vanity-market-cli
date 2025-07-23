@@ -6,8 +6,12 @@ import authenticatePlugin from "./plugins/authenticate.ts";
 import { contract } from "../../shared/contracts/index.ts";
 import corsPlugin from "@fastify/cors";
 import cookiePlugin from "@fastify/cookie";
+import errorPlugin from "./plugins/error.ts";
 import config from "./config.ts";
-export async function buildApp() {
+import type { ServiceContainer } from "./types.ts";
+import servicesPlugin from "./plugins/services.ts";
+
+export async function buildApp(serviceContainer: ServiceContainer) {
   const app = Fastify({
     logger: true, // TODO: use golem-compatible logger
   });
@@ -23,18 +27,16 @@ export async function buildApp() {
     ],
   });
   app.register(cookiePlugin);
-
   app.register(authenticatePlugin);
+  app.register(errorPlugin);
+
+  app.register(servicesPlugin(serviceContainer));
 
   const s = initServer();
-
-  // Combine all your modular routers into one
   const router = s.router(contract, {
     auth: authRouter,
     jobs: jobRouter,
   });
-
   app.register(s.plugin(router));
-
   return app;
 }

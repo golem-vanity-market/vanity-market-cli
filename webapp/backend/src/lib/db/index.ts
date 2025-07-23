@@ -1,4 +1,14 @@
 import { drizzle } from "drizzle-orm/libsql";
 import config from "../../config.ts";
+import { createClient } from "@libsql/client";
 
-export const db = drizzle(config.DB_FILE_NAME);
+function getDbConnection() {
+  if (process.env.NODE_ENV === "test") {
+    // use an in-memory sqlite instance in test
+    const client = createClient({ url: "file::memory:?cache=shared" });
+    return drizzle(client);
+  }
+  return drizzle(config.DB_FILE_NAME);
+}
+
+export const db = getDbConnection();

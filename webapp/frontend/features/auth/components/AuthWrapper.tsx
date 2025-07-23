@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useCallback } from "react";
 import { useAuth } from "../hooks/useAuth";
 import {
   createAuthenticationAdapter,
@@ -8,6 +8,7 @@ import { apiClient, setAccessToken } from "@/lib/api";
 import { createSiweMessage } from "viem/siwe";
 import { useRouter } from "next/router";
 import { useQueryClient } from "@tanstack/react-query";
+import { useAccount } from "wagmi";
 
 export default function AuthWrapper({
   children,
@@ -17,6 +18,41 @@ export default function AuthWrapper({
   const { data: user, isLoading, refetch } = useAuth();
   const queryClient = useQueryClient();
   const router = useRouter();
+  const { address: connectedWalletAddress, isDisconnected } = useAccount();
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      await apiClient.auth.logout({ body: {} });
+    } catch (error) {
+      console.error("Backend logout failed", error);
+    } finally {
+      setAccessToken("");
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      router.push("/");
+    }
+  }, [queryClient, router]);
+
+  // Synchronize wallet connect state with auth state
+  useEffect(() => {
+    if (user) {
+      // We are logged in but no wallet connection
+      if (isDisconnected) {
+        console.log("Wallet disconnected, forcing application logout.");
+        handleSignOut();
+        return; // Exit early
+      }
+      // We are logged in but connected with a different wallet
+      if (
+        user.address &&
+        connectedWalletAddress &&
+        user.address.toLowerCase() !== connectedWalletAddress.toLowerCase()
+      ) {
+        console.log("Wallet account changed, forcing application logout.");
+        handleSignOut();
+      }
+    }
+  }, [user, connectedWalletAddress, isDisconnected, handleSignOut]);
 
   const authAdapter = useMemo(() => {
     return createAuthenticationAdapter({
@@ -63,22 +99,10 @@ export default function AuthWrapper({
       },
 
       signOut: async () => {
-        try {
-          await apiClient.auth.logout({ body: {} });
-        } catch (error) {
-          console.error("Logout failed", error);
-        } finally {
-          setAccessToken("");
-          // remove ALL cached data to avoid showing data from previous session
-          await queryClient.cancelQueries();
-          queryClient.clear();
-
-          // redirect back to home page
-          router.push("/");
-        }
+        await handleSignOut();
       },
     });
-  }, [refetch, queryClient, router]);
+  }, [refetch, handleSignOut]);
 
   const authState = !!user
     ? "authenticated"
