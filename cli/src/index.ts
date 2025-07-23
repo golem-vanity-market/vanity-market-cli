@@ -203,7 +203,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       resultService,
     });
     const sessionManagerParams: SessionManagerParams = {
-      rentalDurationSeconds: 15 / 60, // for all cost calculations assume we're renting a provider for 15 minutes at a time
+      rentalDurationSeconds: 15 * 60, // for all cost calculations assume we're renting a provider for 15 minutes at a time
       budgetInitial: generationParams.budgetInitial,
       processingUnitType: validatedOptions.processingUnitType,
       estimatorService,

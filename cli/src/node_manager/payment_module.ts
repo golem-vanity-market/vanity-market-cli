@@ -27,59 +27,76 @@ export class VanityPaymentModule extends PaymentModuleImpl {
     allocation: Allocation,
     amount: string,
   ): Promise<DebitNote> {
-    console.log("Accepting debit note:", debitNote.id);
+    try {
+      VanityPaymentModule.ctx.consoleInfo(
+        "Accepting debit note:",
+        debitNote.id,
+      );
 
-    const amountF = parseFloat(debitNote.totalAmountDue);
+      const amountF = parseFloat(debitNote.totalAmountDue);
 
-    if (isNaN(amountF) || amountF < 0) {
-      VanityPaymentModule.ctx
-        .L()
-        .error(`Invalid amount in debit note: ${debitNote.id}`);
-      throw new Error(`Invalid amount in debit note: ${debitNote.id}`);
-    }
-    const resp = VanityPaymentModule.estimatorService.reportCosts(
-      debitNote.agreementId,
-      amountF,
-    );
+      if (isNaN(amountF) || amountF < 0) {
+        VanityPaymentModule.ctx
+          .L()
+          .error(`Invalid amount in debit note: ${debitNote.id}`);
+        throw new Error(`Invalid amount in debit note: ${debitNote.id}`);
+      }
+      const resp = VanityPaymentModule.estimatorService.reportCosts(
+        debitNote.agreementId,
+        amountF,
+      );
 
-    if (!resp.accepted) {
-      VanityPaymentModule.ctx
-        .L()
-        .error(
+      if (!resp.accepted) {
+        VanityPaymentModule.ctx
+          .L()
+          .error(
+            `Failed to report costs for debit note ${debitNote.id}: ${resp.reason}`,
+          );
+        throw new Error(
           `Failed to report costs for debit note ${debitNote.id}: ${resp.reason}`,
         );
-      return debitNote;
-      //throw new Error(`Failed to report costs for debit note: ${resp.reason}`);
+      }
+      return await super.acceptDebitNote(debitNote, allocation, amount);
+    } catch (error) {
+      VanityPaymentModule.ctx
+        .L()
+        .error(`Failed to accept debit note ${debitNote.id}: ${error}`);
+      throw error;
     }
-    return super.acceptDebitNote(debitNote, allocation, amount);
   }
   async acceptInvoice(
     invoice: Invoice,
     allocation: Allocation,
     amount: string,
   ) {
-    const amountF = parseFloat(invoice.amount);
+    try {
+      const amountF = parseFloat(invoice.amount);
 
-    if (isNaN(amountF) || amountF < 0) {
+      if (isNaN(amountF) || amountF < 0) {
+        VanityPaymentModule.ctx
+          .L()
+          .error(`Invalid amount in invoice: ${invoice.id}`);
+        throw new Error(`Invalid amount in invoice: ${invoice.id}`);
+      }
+      const resp = VanityPaymentModule.estimatorService.reportCosts(
+        invoice.agreementId,
+        amountF,
+      );
+      if (!resp.accepted) {
+        VanityPaymentModule.ctx
+          .L()
+          .error(
+            `Failed to report costs for invoice ${invoice.id}: ${resp.reason}`,
+          );
+        return invoice;
+      }
+      return await super.acceptInvoice(invoice, allocation, amount);
+    } catch (err) {
       VanityPaymentModule.ctx
         .L()
-        .error(`Invalid amount in debit note: ${invoice.id}`);
-      throw new Error(`Invalid amount in debit note: ${invoice.id}`);
+        .error(`Failed to accept invoice ${invoice.id}: ${err}`);
+      throw err;
     }
-    const resp = VanityPaymentModule.estimatorService.reportCosts(
-      invoice.agreementId,
-      amountF,
-    );
-    if (!resp.accepted) {
-      VanityPaymentModule.ctx
-        .L()
-        .error(
-          `Failed to report costs for invoice ${invoice.id}: ${resp.reason}`,
-        );
-      return invoice;
-      //throw new Error(`Failed to report costs for debit note: ${resp.reason}`);
-    }
-    return super.acceptInvoice(invoice, allocation, amount);
   }
 
   // golem-js doesn't implement amending allocations
