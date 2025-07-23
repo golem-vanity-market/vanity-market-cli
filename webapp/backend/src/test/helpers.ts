@@ -6,6 +6,11 @@ import { contract } from "../../../shared/contracts/index.ts";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { createSiweMessage } from "viem/siwe";
 import { polygon } from "viem/chains";
+import type { ServiceContainer } from "../types.ts";
+import { newGolemService } from "../modules/job/golem.service.ts";
+import { fastifyLogger } from "../lib/logger.ts";
+import { newJobService } from "../modules/job/job.service.ts";
+import { newAuthService } from "../modules/auth/auth.service.ts";
 
 // Workaround for dynamic require error in drizzle: https://github.com/drizzle-team/drizzle-orm/issues/2853#issuecomment-2668459509
 const require = createRequire(import.meta.url);
@@ -77,4 +82,18 @@ export async function getAuthenticatedClient(
     ...extraHeaders,
     authorization: `Bearer ${signInResponse.body.accessToken}`,
   });
+}
+
+export function getDefaultServices(
+  customServices?: Partial<ServiceContainer>
+): ServiceContainer {
+  const golemService =
+    customServices?.golemService || newGolemService(fastifyLogger);
+  const jobService = customServices?.jobService || newJobService(golemService);
+  const authService = customServices?.authService || newAuthService();
+  return {
+    golemService,
+    jobService,
+    authService,
+  };
 }
