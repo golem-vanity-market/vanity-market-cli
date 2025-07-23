@@ -122,7 +122,7 @@ export default fp(async (fastify) => {
     // For refresh tokens, it checks if the token is valid and not expired
     trusted: async (request, decodedToken) => {
       try {
-        const token = decodedToken.token;
+        const token = String(decodedToken.token);
         if (!token) return false;
         const tokenRecord = await db
           .select()

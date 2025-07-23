@@ -1,24 +1,21 @@
-import js from "@eslint/js";
-import typescript from "@typescript-eslint/eslint-plugin";
-import typescriptParser from "@typescript-eslint/parser";
+import tseslint from "typescript-eslint";
 
-export default [
-  js.configs.recommended,
+export default tseslint.config(
   {
-    files: ["**/*.ts", "**/*.js"],
+    ignores: ["dist/", "node_modules/", ".env"],
+  },
+  {
+    files: ["**/*.ts"],
+    extends: [
+      ...tseslint.configs.recommendedTypeChecked,
+    ],
     languageOptions: {
-      ecmaVersion: "latest",
-      sourceType: "module",
-      parser: typescriptParser,
       parserOptions: {
-        project: "./tsconfig.json",
+        project: true,
+        tsconfigRootDir: import.meta.dirname,
       },
     },
-    plugins: {
-      "@typescript-eslint": typescript,
-    },
     rules: {
-      ...typescript.configs.recommended.rules,
       "no-unused-vars": "off",
       "@typescript-eslint/no-unused-vars": [
         "warn",
@@ -32,12 +29,17 @@ export default [
       "@typescript-eslint/consistent-type-imports": "error",
       "prefer-const": "error",
       "no-var": "error",
+      "@typescript-eslint/require-await": "off",
+      "@typescript-eslint/no-misused-promises": "off",
+      "@typescript-eslint/no-floating-promises": "off"
     },
   },
+
+  // Specific override for test files
   {
     files: ["**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
-];
+);
