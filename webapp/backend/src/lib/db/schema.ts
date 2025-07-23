@@ -31,7 +31,8 @@ export const usersTable = pgTable("user", {
     .defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
     .notNull()
-    .defaultNow(),
+    .defaultNow()
+    .$onUpdate(() => new Date()),
 });
 
 export const noncesTable = pgTable("nonce", {
@@ -69,7 +70,8 @@ export const jobsTable = pgTable(
       .defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
-      .defaultNow(),
+      .defaultNow()
+      .$onUpdate(() => new Date()),
   },
   (table) => [
     // Either session id or user address have to be defined
