@@ -87,12 +87,10 @@ export async function getAuthenticatedClient(
 export function getDefaultServices(
   customServices?: Partial<ServiceContainer>
 ): ServiceContainer {
-  const golemService =
-    customServices?.golemService || newGolemService(fastifyLogger);
-  const jobService = customServices?.jobService || newJobService(golemService);
+  const jobService =
+    customServices?.jobService || newJobService(newGolemService(fastifyLogger));
   const authService = customServices?.authService || newAuthService();
   return {
-    golemService,
     jobService,
     authService,
   };
