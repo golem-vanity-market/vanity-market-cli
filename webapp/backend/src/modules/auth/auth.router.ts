@@ -1,14 +1,13 @@
 import { initServer } from "@ts-rest/fastify";
-import * as AuthService from "./auth.service.ts";
 import { contract } from "../../../../shared/contracts/index.ts";
 import config from "../../config.ts";
 
 const s = initServer();
 
 export const authRouter = s.router(contract.auth, {
-  getNonce: async () => {
+  getNonce: async ({ request: { authService } }) => {
     try {
-      const { nonce, expiresAt } = await AuthService.generateNonce();
+      const { nonce, expiresAt } = await authService.generateNonce();
       return {
         status: 200,
         body: {
@@ -20,7 +19,11 @@ export const authRouter = s.router(contract.auth, {
       return { status: 500, body: { message: String(error) } };
     }
   },
-  signIn: async ({ body, request, reply }) => {
+  signIn: async ({
+    body,
+    request: { headers, server, authService },
+    reply,
+  }) => {
     try {
       const { message, signature } = body;
       if (!message || !signature) {
@@ -29,11 +32,10 @@ export const authRouter = s.router(contract.auth, {
           body: { message: "Message and signature are required" },
         };
       }
-      const sessionIdHeader =
-        request.headers[config.ANONYMOUS_SESSION_ID_HEADER_NAME];
+      const sessionIdHeader = headers[config.ANONYMOUS_SESSION_ID_HEADER_NAME];
       const { accessToken, refreshToken } =
-        await AuthService.verifySignatureAndLogin(
-          request.server,
+        await authService.verifySignatureAndLogin(
+          server,
           message,
           signature,
           reply,
@@ -58,7 +60,7 @@ export const authRouter = s.router(contract.auth, {
   me: {
     handler: async ({ request }) => {
       try {
-        const user = await AuthService.getCurrentUser(request);
+        const user = await request.authService.getCurrentUser(request);
         return { status: 200, body: user };
       } catch (error) {
         return { status: 401, body: { message: String(error) } };
@@ -71,7 +73,7 @@ export const authRouter = s.router(contract.auth, {
   refresh: async ({ request, reply }) => {
     try {
       const { accessToken, refreshToken } =
-        await AuthService.refreshAccessToken(request, reply);
+        await request.authService.refreshAccessToken(request, reply);
       reply.setCookie(config.COOKIE_NAME, refreshToken, {
         httpOnly: true,
         secure: config.IS_PRODUCTION,
@@ -89,7 +91,7 @@ export const authRouter = s.router(contract.auth, {
   logout: {
     handler: async ({ request, reply }) => {
       try {
-        await AuthService.logout(request);
+        await request.authService.logout(request);
         reply.clearCookie(config.COOKIE_NAME);
         return { status: 200, body: { message: "Logged out successfully" } };
       } catch (error) {
