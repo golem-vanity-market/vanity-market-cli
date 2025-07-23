@@ -52,14 +52,15 @@ npm run dev -- generate \
 
 - Git branch name conventions:
 
-  - prefix: 'feature/' 'bugfix/'
-  - followed by descriptive name
+  - prefix: 'feature/' 'bugfix/' 'chore/', 'refactor/', 'experiment/', 'docs/'
+  - followed by descriptive name, words connected with dashes
 
 - Git commit messages:
   - Use imperative mood (e.g., "Add feature" not "Added feature")
   - Keep subject line concise (50 chars or less)
   - Start with capital letter and don't end with period
   - Separate subject from body with a blank line for detailed explanations
+  - For security updates, prefix with "Security:" or document vulnerability fixes
   - NEVER ever mention a co-authored-by or similar aspects. In particular, never mention the tool used to create the commit message or PR.
 
 ## Pull Requests
@@ -99,6 +100,7 @@ npm run dev -- generate \
 - Implement proper input validation and sanitization
 - Follow cryptographic best practices
 - Avoid hardcoded secrets
+- Regularly update dependencies to address security vulnerabilities
 
 ### Performance Optimization
 
