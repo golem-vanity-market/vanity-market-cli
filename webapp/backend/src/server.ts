@@ -12,7 +12,6 @@ const start = async () => {
 
   const app = await buildApp({
     jobService,
-    golemService,
     authService,
   });
 
