@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "test": "cross-env NODE_ENV=test node --test src/modules/**/*.test.ts",
-    "dev": "node --watch src/server.ts"
+    "dev": "node --watch src/server.ts",
+    "lint": "eslint ."
   },
   "author": "",
   "license": "ISC",
@@ -29,9 +30,13 @@
     "zod": "^3.25.73"
   },
   "devDependencies": {
+    "@eslint/js": "^9.15.0",
     "@types/node": "^24.0.10",
+    "@typescript-eslint/eslint-plugin": "^8.15.0",
+    "@typescript-eslint/parser": "^8.15.0",
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.4",
+    "eslint": "^9.15.0",
     "prettier": "^3.6.2",
     "tsx": "^4.20.3"
   }
