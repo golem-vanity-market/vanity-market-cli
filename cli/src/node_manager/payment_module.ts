@@ -52,15 +52,16 @@ export class VanityPaymentModule extends PaymentModuleImpl {
           .error(
             `Failed to report costs for debit note ${debitNote.id}: ${resp.reason}`,
           );
-        return debitNote;
+        throw new Error(
+          `Failed to report costs for debit note ${debitNote.id}: ${resp.reason}`,
+        );
       }
       return await super.acceptDebitNote(debitNote, allocation, amount);
     } catch (error) {
       VanityPaymentModule.ctx
         .L()
         .error(`Failed to accept debit note ${debitNote.id}: ${error}`);
-      // Throwing here would cause the entire node.js process to crash (bug in golem-js)
-      return debitNote;
+      throw error;
     }
   }
   async acceptInvoice(
@@ -74,8 +75,8 @@ export class VanityPaymentModule extends PaymentModuleImpl {
       if (isNaN(amountF) || amountF < 0) {
         VanityPaymentModule.ctx
           .L()
-          .error(`Invalid amount in debit note: ${invoice.id}`);
-        throw new Error(`Invalid amount in debit note: ${invoice.id}`);
+          .error(`Invalid amount in invoice: ${invoice.id}`);
+        throw new Error(`Invalid amount in invoice: ${invoice.id}`);
       }
       const resp = VanityPaymentModule.estimatorService.reportCosts(
         invoice.agreementId,
@@ -94,8 +95,7 @@ export class VanityPaymentModule extends PaymentModuleImpl {
       VanityPaymentModule.ctx
         .L()
         .error(`Failed to accept invoice ${invoice.id}: ${err}`);
-      // Throwing here would cause the entire node.js process to crash (bug in golem-js)
-      return invoice;
+      throw err;
     }
   }
 
