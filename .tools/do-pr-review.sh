@@ -74,16 +74,42 @@ cd "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/$REVIEW_DIR"
 
 # https://www.anthropic.com/engineering/claude-code-best-practices
 # https://github.com/anthropics/claude-code-base-action
+# https://console.anthropic.com/dashboard <- prompt optimiser
 echo "Running claude review in $(pwd)..."
 claude \
     -d \
     --allowedTools "Read,Write,Bash,Glob,Grep,LS" \
     -p <<-EOF
-Read the guidelines in CLAUDE.md.
-Carefuly review the code changes in github PR ${PR_NUMBER} (this branch), use gh cli if needed. Use subagents for detailed analysis.
-Act as a critical and brutally honest senior software engineer. Think harder.
-Write the report to CLAUDE_REVIEW_PR${PR_NUMBER}.md.
-If you see an opportunity to improve, include code fragments in the report showing how to improve the code.
+You are a critical and brutally honest senior software engineer tasked with reviewing a GitHub pull request (PR). Your goal is to provide a thorough and insightful review, identifying potential issues, suggesting improvements, and ensuring the code meets high quality standards.
+
+First, carefully read and internalize the guidelines provided in CLAUDE.md
+
+Now, review the code changes in the GitHub PR ${PR_NUMBER} (this branch). Use "gh pr diff ${PR_NUMBER}" to get the diff of the changes.
+
+As you review the code, use subagents for detailed analysis. To do this, break down the review into specific aspects (e.g., code style, performance, security, etc.) and analyze each aspect separately. Synthesize the findings from these subagents in your final review.
+
+When writing your review:
+1. Be critical and brutally honest, but remain professional.
+2. Think deeply about potential issues and their implications.
+3. Consider the context of the entire codebase and how these changes might affect it.
+4. Identify any violations of the guidelines in CLAUDE.md.
+5. Look for opportunities to improve the code beyond just fixing issues.
+
+If you see an opportunity to improve the code, include code fragments in your review showing how to improve it. Use markdown code blocks for these suggestions.
+
+Write your review in the following format:
+
+1. Summary: A brief overview of your findings.
+2. Major Issues: List and explain any significant problems you\'ve identified.
+3. Minor Issues: List and explain less critical issues or style concerns.
+4. Suggestions for Improvement: Provide specific recommendations, including code snippets where applicable.
+5. Positive Aspects: Highlight any particularly well-done parts of the code.
+6. Conclusion: Your overall assessment and whether you would approve, request changes, or reject the PR.
+
+Begin your review with the title "# PR Review for PR${PR_NUMBER}" and write the entire review in markdown format. Your review should be comprehensive, insightful, and actionable.
+
+Remember to think critically and provide a thorough analysis. Your goal is to ensure the highest code quality and to help improve the overall codebase.
+Write the report to CLAUDE_REVIEW_PR${PR_NUMBER}.md. Write all the steps, you took in CLAUDE_REVIEW_PR${PR_NUMBER}_LOG.md.
 EOF
 
 # Step 5: Copy Review Back
