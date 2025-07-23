@@ -18,6 +18,7 @@ import {
   type TestApiClient,
 } from "../../test/helpers.ts";
 import { fastifyLogger } from "../../lib/logger.ts";
+import { newJobService } from "./job.service.ts";
 
 const golemService = newGolemService(fastifyLogger);
 const startJobMock = mock.method(golemService, "startJob");
@@ -41,7 +42,8 @@ describe("Jobs API", () => {
 
     await applySchemaToTestDb();
 
-    app = await buildApp(getDefaultServices({ golemService }));
+    const jobService = newJobService(golemService);
+    app = await buildApp(getDefaultServices({ jobService }));
     await app.ready();
 
     const serverUrl = await app.listen({ port: 0 });
