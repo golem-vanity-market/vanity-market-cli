@@ -4,7 +4,7 @@ import * as z from "zod/v4";
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 
 const envSchema = z.object({
-  DB_URL: z.string().default("db.sqlite"),
+  DB_URL: z.string(),
   YAGNA_APPKEY: z.string(),
   JWT_SECRET: z.string(),
   PORT: z.coerce.number().default(3001),
