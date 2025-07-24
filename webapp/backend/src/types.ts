@@ -1,7 +1,10 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
-import type { JobInput, JobDetails, JobResult } from "../../shared/contracts/job.contract";
+import type {
+  JobInput,
+  JobDetails,
+  JobResult,
+} from "../../shared/contracts/job.contract";
 import type { Identity } from "./plugins/authenticate";
-
 
 export interface ServiceContainer {
   jobService: JobService;
@@ -36,4 +39,3 @@ export interface AuthService {
   ): Promise<{ accessToken: string; refreshToken: string }>;
   logout(request: FastifyRequest): Promise<void>;
 }
-

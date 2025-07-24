@@ -38,8 +38,8 @@ function jobToJobDetails(job: typeof jobsTable.$inferSelect): JobDetails {
     numWorkers: job.numWorkers,
     budgetGlm: job.budgetGlm,
     processingUnit: job.processingUnit,
-    createdAt: job.createdAt,
-    updatedAt: job.updatedAt,
+    createdAt: job.createdAt.toISOString(),
+    updatedAt: job.updatedAt.toISOString(),
   });
 }
 

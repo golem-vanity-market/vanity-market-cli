@@ -22,14 +22,32 @@ Copy the `.env.template` file to `.env` and fill in the required values.
 
 ## Database
 
-Database is saved to a file `db.sqlite` in the root of the project. You can use `drizzle-kit` to push the schema to the database:
+The application uses postgres to persist data. You can configure the connection string with the `DB_URL` env variable.
+
+For convenience you may use the attached `docker-compose` file to start a local postgres instance:
+
+```bash
+docker compose up -d --build
+```
+
+To push the project's schema to a newly created database you can run: 
 
 ```bash
 npx drizzle-kit push
 ```
 
-It also includes a database viewer:
+`drizzle-kit` also includes a database viewer:
 
 ```bash
 npx drizzle-kit studio
 ```
+
+## Testing
+
+To run integration tests use the following command:
+
+```bash
+npm test
+```
+
+The test environment uses an in-memory implementation of postgres, so there is no need to set up a "real" database.

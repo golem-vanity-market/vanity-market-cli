@@ -1,14 +1,14 @@
-import { drizzle } from "drizzle-orm/libsql";
+import { drizzle } from "drizzle-orm/node-postgres";
 import config from "../../config.ts";
-import { createClient } from "@libsql/client";
 
-function getDbConnection() {
+async function getDbConnection() {
   if (process.env.NODE_ENV === "test") {
-    // use an in-memory sqlite instance in test
-    const client = createClient({ url: "file::memory:?cache=shared" });
-    return drizzle(client);
+    // use an in-memory postgres instance in test
+    const { drizzle: pgLiteDrizzleClient } = await import("drizzle-orm/pglite");
+    return pgLiteDrizzleClient("memory://");
   }
-  return drizzle(config.DB_FILE_NAME);
+  // in dev and production connect to a "real" postgres server
+  return drizzle(config.DB_URL);
 }
 
-export const db = getDbConnection();
+export const db = await getDbConnection();

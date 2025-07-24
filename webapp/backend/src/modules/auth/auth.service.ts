@@ -10,7 +10,7 @@ import { eq, and, gte } from "drizzle-orm";
 import { verifyMessage } from "viem";
 import { generateSiweNonce, parseSiweMessage } from "viem/siwe";
 import { randomUUID } from "node:crypto";
-import type { AuthService } from "./types.ts";
+import type { AuthService } from "../../types.ts";
 
 class AuthServiceImpl implements AuthService {
   public async generateNonce() {
@@ -112,7 +112,6 @@ class AuthServiceImpl implements AuthService {
         };
       } catch (error) {
         fastify.log.error(error);
-        tx.rollback();
         throw new Error("Authentication failed");
       }
     });
@@ -132,7 +131,11 @@ class AuthServiceImpl implements AuthService {
     if (!user) {
       throw new Error("User not found");
     }
-    return user;
+    return {
+      address: user.address,
+      createdAt: user.createdAt.toISOString(),
+      updatedAt: user.updatedAt.toISOString(),
+    };
   }
 
   public async refreshAccessToken(
