@@ -112,7 +112,6 @@ class AuthServiceImpl implements AuthService {
         };
       } catch (error) {
         fastify.log.error(error);
-        tx.rollback();
         throw new Error("Authentication failed");
       }
     });
