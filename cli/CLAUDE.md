@@ -1,15 +1,37 @@
 # Claude Code Configuration
 
-This is a TypeScript CLI application for generating vanity cryptocurrency addresses with OpenTelemetry observability support.
+This is an enterprise-grade distributed vanity cryptocurrency address generation platform built in TypeScript. The system orchestrates parallel computation across the Golem Network using sophisticated provider selection, real-time budget management, and statistical estimation algorithms. The CLI operates exclusively on public keys with elliptic curve point addition for cryptographically secure vanity address generation, while your private key never leaves your local machine.
 
 ## Project Structure
 
-- `src/index.ts` - Main CLI entry point with Commander.js and OpenTelemetry integration
-- `src/__tests__/` - Jest test files
-- `dist/` - Built JavaScript output
-- `package.json` - NPM dependencies and scripts
-- `monitoring/` - scripts for setting up the local monitoring stack
-- `.claude/scripts/` - Claude Code hook scripts (bash) for automation
+```
+cli/
+├── src/
+│   ├── index.ts                    # Main CLI entry point with Commander.js
+│   ├── instrumentation.ts          # OpenTelemetry setup and configuration
+│   ├── scheduler.ts               # Orchestrates distributed generation tasks
+│   ├── app_context.ts             # Application context and logging
+│   ├── metrics_collector.ts       # Performance metrics collection
+│   ├── app/
+│   │   └── optionsValidator.ts    # CLI parameter validation
+│   ├── node_manager/
+│   │   ├── golem_session.ts       # Golem network connection management
+│   │   ├── selector.ts            # Provider selection logic
+│   │   └── payment_module.ts      # GLM payment handling
+│   ├── estimator/
+│   │   ├── estimator.ts           # Generation time estimation
+│   │   └── proof.ts               # Cryptographic proof validation
+│   ├── ui/
+│   │   └── displaySummary.ts      # Progress display and reporting
+│   └── __tests__/                 # Jest test suite
+├── monitoring/                    # Local observability stack
+│   ├── docker-compose.yml         # Grafana, Prometheus, Tempo setup
+│   └── grafana/                   # Dashboard configurations
+├── results/                       # Generated vanity address outputs
+├── dist/                          # Compiled JavaScript output
+├── package.json                   # NPM dependencies and scripts
+└── tools/                         # Development utilities
+```
 
 ## Development Commands
 
@@ -17,43 +39,75 @@ This is a TypeScript CLI application for generating vanity cryptocurrency addres
 # Install dependencies
 npm install
 
-# Run in development mode
-npm run dev
-
-# Build for production
+# Build for production (updates version automatically)
 npm run build
 
-# Run tests
-npm test
+# Run the built CLI
+npm start
 
-# Watch mode for testing
-npm run test:watch
+# Development mode (runs generate command directly)
+npm run dev -- --public-key sample-key.pub --vanity-address-prefix 0xtest
+
+# Testing
+npm test                    # Run full test suite
+npm run test:watch          # Watch mode for testing
+
+# Code quality
+npm run lint               # Check code style and errors
+npm run lint:fix           # Auto-fix linting issues
+npm run format             # Check code formatting
+npm run format:fix         # Auto-fix formatting
+
+# Golem network exploration
+npm run list-cpu-offers    # List available CPU providers
+npm run list-gpu-offers    # List available GPU providers
+
+# Monitoring stack (requires Docker)
+cd monitoring && docker-compose up -d
 ```
+
+## Architecture Overview
+
+**⚠️ Complex Distributed System**: This is not a typical CLI tool. It's a sophisticated distributed platform with 20+ TypeScript modules across 7 directories, requiring Docker for the monitoring stack and advanced understanding of distributed computing concepts.
+
+## Technology Stack
+
+- **Core Framework**: TypeScript, Node.js, Commander.js for CLI interface
+- **Distributed Computing**: Golem SDK for network orchestration
+- **Reactive Programming**: RxJS for event streams and asynchronous data flow
+- **Logging**: Pino for structured, high-performance logging with OpenTelemetry integration
+- **Cryptography**: Elliptic for secp256k1 operations, Ethers.js for Ethereum functionality
+- **Observability**: OpenTelemetry SDK with Grafana, Prometheus, Tempo, Loki, Alloy
+- **Testing**: Jest with TypeScript support
 
 ## Key Features
 
-- **Golem**: golem SDK
-- **CLI Framework**: Commander.js for argument parsing
-- **Observability**: OpenTelemetry for tracing and telemetry
-- **Testing**: Jest with TypeScript support
-- **Build**: TypeScript compilation to `dist/`
+- **Distributed Computing**: Multi-provider parallel execution with intelligent task scheduling
+- **Advanced Budget Management**: Real-time GLM monitoring, automatic allocation amendments, exhaustion detection
+- **Provider Intelligence**: Sophisticated selection algorithms with reputation tracking and offer evaluation
+- **Statistical Analysis**: Monte Carlo estimation, difficulty calculation, and performance prediction algorithms
+- **Enterprise Observability**: Production-grade OTLP stack (Grafana, Prometheus, Tempo, Loki, Alloy)
+- **Cryptographic Validation**: Multi-layered verification with elliptic curve point addition
+- **Reactive Architecture**: RxJS-based event streams for real-time progress tracking and error handling
 
 ## Main Command
 
 ```bash
 # Generate vanity address
-npm run dev -- generate \
-  --public-key my-public-key.txt \
-  --vanity-address-prefix vanity \
-  --budget-glm 1000
+ npm run dev -- generate --public-key sample-key.pub \
+  --vanity-address-prefix 0xcafe77 \
+  --budget-limit 4 \
+  --processing-unit gpu \
+  --results-file results/result_cafe77_gpu.json \
+  --num-workers 2
 ```
 
 ## Working with Git
 
 - Git branch name conventions:
 
-  - prefix: 'feature/' 'bugfix/' 'chore/', 'refactor/', 'experiment/', 'docs/'
-  - followed by descriptive name, words connected with dashes
+- prefix: 'feature/' 'bugfix/' 'chore/', 'refactor/', 'experiment/', 'docs/'
+- followed by descriptive name, words connected with dashes
 
 - Git commit messages:
   - Use imperative mood (e.g., "Add feature" not "Added feature")
