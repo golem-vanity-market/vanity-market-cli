@@ -21,7 +21,7 @@ python prepare-pre-release.py
 or for production (it relies on the binaries from the sandbox):
 
 ```bash
-python prepare_prod.py
+python prepare-prod.py
 # do not forget about setting up YAGNA_AUTOCONF_ID_SECRET
 ```
 
