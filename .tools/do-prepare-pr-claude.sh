@@ -17,6 +17,9 @@ PR_INFO=$(gh pr view "$PR_NUMBER" --json headRefName,title,files)
 BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName')
 BRANCH_DIR_POSTFIX=$(echo "$PR_INFO" | jq -r '.headRefName' | tr '/' '-')
 
+GIT_TOP_DIR=$(git rev-parse --show-toplevel)
+WORKTREE_DIR="$GIT_TOP_DIR/temp/golem-vanity.market-$BRANCH_DIR_POSTFIX"
+
 echo "Copy .claude config (main and cli) files to worktree..."
-cp .claude/settings.local.json temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/.claude/settings.local.json
-cp cli/.claude/settings.local.json temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/cli/.claude/settings.local.json
+cp "$GIT_TOP_DIR/.claude/settings.local.json" "$WORKTREE_DIR/.claude/settings.local.json"
+cp "$GIT_TOP_DIR/cli/.claude/settings.local.json" "$WORKTREE_DIR/cli/.claude/settings.local.json"
