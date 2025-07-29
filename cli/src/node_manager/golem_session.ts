@@ -535,6 +535,7 @@ export class GolemSessionManager {
     await this.estimatorService.initJobIfNotInitialized(
       rental.agreement.id,
       rental.agreement.provider.name,
+      rental.agreement.provider.id,
       computePrefixDifficulty(
         generationParams.vanityAddressPrefix.fullPrefix(),
       ),
