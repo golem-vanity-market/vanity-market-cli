@@ -67,3 +67,7 @@ cli/src/version.ts
 
 # tools
 dlf
+
+#drizzle local migrations
+cli/drizzle/*
+

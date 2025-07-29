@@ -3,24 +3,46 @@ import {
   GolemSessionManager,
   OnErrorHandler,
 } from "./node_manager/golem_session";
-import { AppContext } from "./app_context";
+import { AppContext, setJobId } from "./app_context";
 import { GenerationParams } from "./params";
 import { EstimatorService } from "./estimator_service";
 import { getProviderEstimatorSummaryMessage } from "./ui/displaySummary";
+import { Problem } from "./lib/db/schema";
+import { SchedulerRecorder } from "./scheduler/types";
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * The purpose of the Scheduler is to continuously generate tasks until either enough addresses are found or the budget is exhausted.
  */
 export class Scheduler {
+  schedulerRecorder: SchedulerRecorder;
   constructor(
     private readonly sessionManager: GolemSessionManager,
     private readonly estimator: EstimatorService,
-  ) {}
+    recorder: SchedulerRecorder,
+  ) {
+    this.schedulerRecorder = recorder;
+  }
 
   public async runGenerationProcess(
     ctx: AppContext,
     params: GenerationParams,
   ): Promise<void> {
+    const jobId = uuidv4();
+
+    const problem: Problem = {
+      type: "prefix",
+      specifier: params.vanityAddressPrefix.fullPrefix(),
+    };
+
+    this.schedulerRecorder.startGenerationJob(
+      ctx,
+      jobId,
+      problem,
+      params,
+      this.sessionManager.getProcessingUnitType(),
+    );
+
     const onError: OnErrorHandler = async ({ error, provider }) => {
       ctx
         .L()
@@ -64,9 +86,10 @@ export class Scheduler {
       `🔨 Starting work with ${params.numberOfWorkers} concurrent providers...`,
     );
 
+    const newCtx = setJobId(ctx, jobId);
     // Create and start multiple providers in parallel
     const workerPromises = Array.from({ length: params.numberOfWorkers }, () =>
-      this.workInLoop(ctx, params, onError),
+      this.workInLoop(newCtx, params, onError),
     );
 
     await Promise.allSettled(workerPromises);

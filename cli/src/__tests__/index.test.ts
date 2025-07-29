@@ -200,6 +200,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: 5,
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(validOptions)).not.toThrow();
@@ -216,6 +217,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: 5,
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -235,6 +237,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: 5,
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -254,6 +257,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: 5,
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -274,6 +278,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: 5,
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -294,6 +299,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: 5,
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -314,6 +320,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: 5,
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -334,6 +341,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 1001,
         minOffers: 5,
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -353,6 +361,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: -1, // Invalid
         minOffersTimeoutSec: 30,
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(
@@ -372,6 +381,7 @@ describe("Unit Tests for Generate Command Functions", () => {
         budgetLimit: 100,
         minOffers: 5,
         minOffersTimeoutSec: -10, // Invalid
+        dbPath: "./db.sqlite",
       };
 
       expect(() => validateGenerateOptions(invalidOptions)).toThrow(

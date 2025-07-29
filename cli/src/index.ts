@@ -25,6 +25,10 @@ import "dotenv/config";
 import { EstimatorService } from "./estimator_service";
 import { ResultsService } from "./results_service";
 import { APP_NAME, APP_VERSION } from "./version";
+import { drizzle } from "drizzle-orm/libsql";
+import { GollemSessionRecorderImpl } from "./db/golem_session_recorder";
+import { SchedulerRecorderImpl } from "./db/scheduler_recorder";
+import { SchedulerRecorder } from "./scheduler/types";
 
 /**
  * Handles the generate command execution with proper validation and error handling
@@ -40,11 +44,13 @@ async function handleGenerateCommand(options: any): Promise<void> {
   const tracer = trace.getTracer(APP_NAME, APP_VERSION);
   const meter = metrics.getMeter(APP_NAME, APP_VERSION);
   const mCollector = MetricsCollector.newCollector(meter);
+  const db = drizzle(`file:${options.db}`);
 
   const appCtx = new AppContext(ROOT_CONTEXT)
     .WithLogger(logger)
     .WithTracer(tracer)
-    .WithCollector(mCollector);
+    .WithCollector(mCollector)
+    .WithDatabase(db);
 
   let golemSessionManager: GolemSessionManager | null = null;
   let isShuttingDown = false;
@@ -126,6 +132,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       nonInteractive: options.nonInteractive,
       minOffers: parseInt(options.minOffers),
       minOffersTimeoutSec: parseInt(options.minOffersTimeoutSec),
+      dbPath: options.db,
     };
 
     const validatedOptions = validateGenerateOptions(generateOptions);
@@ -210,7 +217,12 @@ async function handleGenerateCommand(options: any): Promise<void> {
       resultService,
     };
 
-    golemSessionManager = new GolemSessionManager(sessionManagerParams);
+    const dbRecorder: GollemSessionRecorderImpl =
+      new GollemSessionRecorderImpl();
+    golemSessionManager = new GolemSessionManager(
+      sessionManagerParams,
+      dbRecorder,
+    );
 
     await golemSessionManager.connectToGolemNetwork(appCtx);
     appCtx.consoleInfo("✅ Connected to Golem network successfully");
@@ -229,7 +241,12 @@ async function handleGenerateCommand(options: any): Promise<void> {
       generateOptions.minOffersTimeoutSec,
     );
 
-    const scheduler = new Scheduler(golemSessionManager, estimatorService);
+    const schedulerRecorder: SchedulerRecorder = new SchedulerRecorderImpl();
+    const scheduler = new Scheduler(
+      golemSessionManager,
+      estimatorService,
+      schedulerRecorder,
+    );
     await scheduler.runGenerationProcess(appCtx, generationParams);
 
     // Normal completion, initiate shutdown.
@@ -320,6 +337,7 @@ function main(): void {
       "--budget-limit <budgetLimit>",
       "The total budget cap in GLM for the entire generation process. Work stops when this limit is reached.",
     )
+    .option("--db <dbPath>", "File to store data", "./db.sqlite")
     .action(handleGenerateCommand);
 
   // Parse command line arguments and execute appropriate command

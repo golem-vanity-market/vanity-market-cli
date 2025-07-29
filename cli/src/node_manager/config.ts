@@ -4,7 +4,7 @@
 
 import { GenerationParams, ProcessingUnitType } from "../params";
 import { ExeUnit, Allocation, MarketOrderSpec } from "@golem-sdk/golem-js";
-import { selectCheapestProvider } from "./selector";
+import { selectBestProvider } from "./selector";
 
 /**
  * Configuration for a specific processing unit type
@@ -105,7 +105,7 @@ export abstract class BaseRentalConfig {
           maxCpuPerHourPrice: this._config.maxCpuPerHourPrice ?? 0.0,
           maxEnvPerHourPrice: this._config.maxEnvPricePerHour,
         },
-        offerProposalSelector: selectCheapestProvider(rentalDurationHours),
+        offerProposalSelector: selectBestProvider(rentalDurationHours),
       },
       payment: {
         allocation,

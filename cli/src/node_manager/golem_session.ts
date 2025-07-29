@@ -10,7 +10,7 @@ import {
 import { isNativeError } from "util/types";
 
 // Internal imports
-import { AppContext } from "../app_context";
+import { AppContext, getJobId } from "../app_context";
 import { GenerationParams, ProcessingUnitType } from "../params";
 import { BaseRentalConfig, CPURentalConfig, GPURentalConfig } from "./config";
 import { computePrefixDifficulty } from "../difficulty";
@@ -27,7 +27,16 @@ import {
 } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
-import { validateVanityResult } from "../validator";
+import {
+  validateAddressMatchPattern,
+  validateVanityResult,
+} from "../validator";
+
+import {
+  getJobProviderID,
+  GolemSessionRecorder,
+  withJobProviderID,
+} from "./types";
 
 /**
  * Parameters for the GolemSessionManager constructor
@@ -69,13 +78,15 @@ export class GolemSessionManager {
   private estimatorService: EstimatorService;
   private resultService: ResultsService;
   private stopWorkAC: AbortController = new AbortController();
+  private dbRecorder: GolemSessionRecorder;
 
-  constructor(params: SessionManagerParams) {
+  constructor(params: SessionManagerParams, recorder: GolemSessionRecorder) {
     this.rentalDurationSeconds = params.rentalDurationSeconds;
     this.budgetInitial = params.budgetInitial;
     this.processingUnitType = params.processingUnitType;
     this.estimatorService = params.estimatorService;
     this.resultService = params.resultService;
+    this.dbRecorder = recorder;
   }
 
   public saveResultsToFile(filePath: string): void {
@@ -135,6 +146,10 @@ export class GolemSessionManager {
 
   public isWorkStopped(): boolean {
     return this.stopWorkAC.signal.aborted;
+  }
+
+  public getProcessingUnitType(): ProcessingUnitType {
+    return this.processingUnitType;
   }
 
   public getConfigBasedOnProcessingUnitType(
@@ -299,6 +314,11 @@ export class GolemSessionManager {
       const command = config.generateCommand(generationParams);
       ctx.L().info(`Executing command: ${command}`);
 
+      //TODO Reputation
+      //is that the best place?
+
+      this.dbRecorder.jobStarted(ctx, getJobProviderID(ctx));
+
       const res = await exe.run(command, {
         signalOrTimeout: this.stopWorkAC.signal,
       });
@@ -323,6 +343,12 @@ export class GolemSessionManager {
       }
 
        */
+
+      //TODO reputation
+      //push all proofs to db
+      //process results and set hashrate/offences/glmspent
+      this.dbRecorder.jobCompleted(ctx, getJobProviderID(ctx));
+
       const stdout = res.stdout ? String(res.stdout) : "";
 
       const parsedResults: ParsedResults = parseVanityResults(
@@ -343,6 +369,11 @@ export class GolemSessionManager {
       };
 
       if (cmdResult.failedLines.length > 0) {
+        //TODO reputation
+        // push proofs to table
+        // if some failed to parse, set offense to nonsense
+        this.dbRecorder.resultFailedParsing(ctx, getJobProviderID(ctx));
+
         ctx.L().error("failed to parse lines:", cmdResult.failedLines);
         throw new Error("Failed to parse result lines");
       }
@@ -362,6 +393,7 @@ export class GolemSessionManager {
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
         ctx.L().info("Work was stopped by user");
+        this.dbRecorder.jobStopped(ctx, getJobProviderID(ctx));
         return {
           agreementId,
           provider: rental.agreement.provider,
@@ -372,7 +404,10 @@ export class GolemSessionManager {
           providerType: this.processingUnitType,
         };
       }
+      // TODO: inform estimator and reputation model
       ctx.L().error(`Error during profanity_cuda execution: ${error}`);
+      this.dbRecorder.jobFailed(ctx, getJobProviderID(ctx), String(error));
+
       throw new Error("Profanity execution failed");
     }
   }
@@ -415,6 +450,15 @@ export class GolemSessionManager {
 
     let shouldKeepRental: boolean;
     let r: CommandResult | null = null;
+
+    // TODO Reputation select additional problems for hashrateverification
+    const provJobId = await this.dbRecorder.agreementAcquired(
+      ctx,
+      getJobId(ctx),
+      rental.agreement,
+    );
+    ctx = withJobProviderID(ctx, provJobId);
+
     try {
       await this.initEstimatorForRental(rental, generationParams);
       /*console.log(
@@ -502,7 +546,11 @@ export class GolemSessionManager {
     cmd: CommandResult,
     generationParams: GenerationParams,
   ): void {
-    // TODO: inform estimator and reputation model that there were no results
+    // TODO: inform estimator that there were no results
+    if (cmd.results.length === 0) {
+      ctx.L().info("No results found in the command output");
+      return;
+    }
 
     for (const r in cmd.results) {
       // TODO: validation
@@ -517,23 +565,32 @@ export class GolemSessionManager {
         cpu: cmd.providerType,
       };
 
+      const isValid = validateVanityResult(ctx, cmd.results[r]);
+
+      if (!isValid.isValid) {
+        this.dbRecorder.resultInvalidVanityKey(ctx, getJobProviderID(ctx));
+        ctx
+          .L()
+          .error(
+            `Validation failed for result (provider ${cmd.provider.id}) ${cmd.results[r]}: ${isValid.msg}`,
+          );
+        throw new Error(
+          `Validation failed for result (provider ${cmd.provider.id}) ${cmd.results[r]}: ${isValid.msg}`,
+        );
+      }
+
+      //TODO reputation - recognize which patterns a given result matches (1)
+      const matched = validateAddressMatchPattern(
+        cmd.results[r].address,
+        generationParams.vanityAddressPrefix.fullPrefix(),
+      );
+
+      // (1) if we have info about the pattern for the result
+      // we can use it to write the right proof
+      this.dbRecorder.proofsStore(ctx, getJobProviderID(ctx), [cmd.results[r]]);
       this.estimatorService.pushProofToQueue(entry);
 
-      if (this.isRequestedPattern(cmd.results[r], generationParams)) {
-        const isValid = validateVanityResult(ctx, cmd.results[r]);
-        if (isValid.isValid === false) {
-          ctx
-            .L()
-            .error(
-              `Validation failed for result ${cmd.results[r]}: ${isValid.msg}`,
-            );
-          throw new Error(
-            `Validation failed for result (provider ${cmd.provider.name}) ${cmd.results[r]}: ${isValid.msg}`,
-          );
-        }
-
-        // TODO: filter out proofs
-        // and take only those that match the user's pattern
+      if (matched) {
         this.resultService.processValidatedEntry(
           entry,
           (jobId: string, address: string, addrDifficulty: number) => {

@@ -35,6 +35,7 @@ interface GenerateCmdOptions {
   budgetInitial: number;
   budgetTopUp: number;
   budgetLimit: number;
+  dbPath: string; //Location of the database
 }
 
 /**

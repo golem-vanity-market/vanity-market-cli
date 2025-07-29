@@ -22,17 +22,6 @@ function validateVanityResult(
     return isValidFormat;
   }
 
-  const matchesPattern = validateAddressMatchPattern(
-    result.address,
-    result.pattern,
-  );
-  if (matchesPattern === false) {
-    return {
-      isValid: false,
-      msg: `Address ${result.address} does not match pattern ${result.pattern}`,
-    };
-  }
-
   try {
     const pubKeyRightFormat =
       UNCOMPRESSED_PUBLIC_KEY_PREFIX + result.pubKey.slice(2);
@@ -102,4 +91,5 @@ function validateInputFormat(
   }
   return { isValid: true };
 }
-export { validateVanityResult, ValidationResult };
+
+export { validateVanityResult, ValidationResult, validateAddressMatchPattern };

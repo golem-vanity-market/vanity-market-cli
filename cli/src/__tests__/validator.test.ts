@@ -1,4 +1,7 @@
-import { validateVanityResult } from "../validator";
+import {
+  validateAddressMatchPattern,
+  validateVanityResult,
+} from "../validator";
 import { VanityResult } from "../node_manager/result";
 import { AppContext } from "../app_context";
 import { getCtxForTests } from "./utils";
@@ -86,8 +89,13 @@ describe("VanityResult Validator", () => {
           estimatedComplexity: 1000000,
         };
         console.log(`Testing: ${testName}`);
-        const validationResult = await validateVanityResult(ctx, result);
-        expect(validationResult.isValid).toBe(false);
+        const validationResult = validateVanityResult(ctx, result);
+        const matchedPattern = validateAddressMatchPattern(
+          testCase.addr,
+          testCase.pattern,
+        );
+
+        expect(validationResult.isValid && matchedPattern).toBe(false);
       }
     });
   });
