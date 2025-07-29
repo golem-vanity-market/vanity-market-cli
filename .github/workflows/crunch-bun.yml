@@ -101,6 +101,7 @@ jobs:
       - name: Run crunch on Golem
         working-directory: cli
         run: |
+          npm run db:setup
           bun src/index.ts generate \
             --public-key generated.pub \
             --vanity-address-prefix ${{ github.event.inputs.argument-prefix }} \
