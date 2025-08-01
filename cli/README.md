@@ -31,15 +31,15 @@ Once authentication is configured, you can run the CLI directly:
 
 ```bash
 # Display help
-npx @unoperate/golem-vaddr-cli@1.0.1 --help
+npx @unoperate/golem-vaddr-cli@0.1.5 --help
 
-export YAGNA_APP_KEY=
+export YAGNA_APPKEY=your-generated-app-key
 
 # optional
 export OTEL_CONFIG_FILE=
 
 # Generate vanity address
-npx @unoperate/golem-vaddr-cli@1.0.1 generate \
+npx @unoperate/golem-vaddr-cli@0.1.5 generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x6666 \
   --budget-limit 6 \
@@ -54,7 +54,7 @@ You can also authenticate for a single command:
 
 ```bash
 # Set token and run in one command
-NPM_TOKEN=YOUR_GITHUB_TOKEN npx @unoperate/golem-vaddr-cli@1.0.1 generate \
+NPM_TOKEN=YOUR_GITHUB_TOKEN npx @unoperate/golem-vaddr-cli@0.1.5 generate \
   --public-key my-public-key.txt \
   --vanity-address-prefix 0xvanity \
   --budget-limit 1000 \
@@ -67,6 +67,9 @@ NPM_TOKEN=YOUR_GITHUB_TOKEN npx @unoperate/golem-vaddr-cli@1.0.1 generate \
 ```bash
 npm install
 npm run build
+
+# Initialize the database (first time setup)
+npm run db:setup
 ```
 
 ## Usage
@@ -128,11 +131,15 @@ node dist/index.js generate \
 
 ## Arguments
 
-| Argument                  | Type      | Description                                                     | Example      |
-| ------------------------- | --------- | --------------------------------------------------------------- | ------------ |
-| `--public-key`            | file path | Path to file containing the public key (Ethereum format: 0x...) | `my-key.txt` |
-| `--vanity-address-prefix` | string    | Desired vanity prefix for the generated address (max 20 chars)  | `vanity`     |
-| `--budget-limit`          | number    | Budget in GLM tokens for the generation process (1-1,000,000)   | `1000`       |
+| Argument                  | Type      | Description                                                        | Example          |
+| ------------------------- | --------- | ------------------------------------------------------------------ | ---------------- |
+| `--public-key`            | file path | Path to file containing the public key (Ethereum format: 0x...)    | `my-key.txt`     |
+| `--vanity-address-prefix` | string    | Desired vanity prefix for the generated address (1-10 chars)       | `0x1337`         |
+| `--budget-limit`          | number    | Budget in GLM tokens for the generation process (required)         | `10`             |
+| `--processing-unit`       | string    | Processing unit type: 'cpu' or 'gpu' (default: gpu)                | `cpu`            |
+| `--results-file`          | file path | Path to save the generation results (optional)                     | `results.json`   |
+| `--num-workers`           | number    | Number of parallel workers to use (default: 1)                     | `2`              |
+| `--db`                    | file path | Database file path for storing session data (default: ./db.sqlite) | `./my-db.sqlite` |
 
 ## Public Key File Format
 
@@ -160,11 +167,25 @@ npm run dev
 # Build for production
 npm run build
 
+# Initialize database (first time setup)
+npm run db:setup
+
+# Reset database (drops and recreates tables)
+npm run db:clear
+
 # Run tests
 npm test
 
 # Watch mode for testing
-npm test:watch
+npm run test:watch
+
+# Code quality
+npm run lint
+npm run format:fix
+
+# Golem network exploration
+npm run list-cpu-offers
+npm run list-gpu-offers
 ```
 
 ## Example Output
@@ -224,7 +245,33 @@ When OpenTelemetry is enabled, telemetry data is exported to:
 
 ### Monitoring Stack
 
-A complete monitoring stack is available in the `monitoring/` directory. See `monitoring/README.md` for setup instructions.
+A complete monitoring stack is available in the `monitoring/` directory. The CLI provides comprehensive OpenTelemetry observability support.
+
+### Database Management
+
+The CLI uses a local SQLite database to track provider performance and job history:
+
+```bash
+# Initialize the database (run before first use)
+npm run db:setup
+
+# Reset the database (drops and recreates tables)
+npm run db:clear
+```
+
+The default database file is `./db.sqlite`, but you can specify a custom path using the `--db <path>` option.
+
+### Golem Network Exploration
+
+Explore available providers on the Golem Network:
+
+```bash
+# List available CPU providers
+npm run list-cpu-offers
+
+# List available GPU providers
+npm run list-gpu-offers
+```
 
 ## Sample commands
 
