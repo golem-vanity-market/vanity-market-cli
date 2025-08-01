@@ -11,10 +11,13 @@ import {
   type GenerationParams,
   type SessionManagerParams,
   validateProcessingUnit,
+  type GolemSessionRecorder,
+  type SchedulerRecorder,
 } from "@unoperate/golem-vaddr-cli/lib";
 import type { JobInput } from "../../../../shared/contracts/job.contract.ts";
 import type { GolemService, Callbacks } from "./types.ts";
 import { isNativeError } from "node:util/types";
+import { randomUUID } from "node:crypto";
 
 interface ActiveJobContext {
   golemSessionManager: GolemSessionManager;
@@ -113,9 +116,30 @@ class GolemServiceImpl implements GolemService {
         estimatorService,
         resultService,
       };
-      golemSessionManager = new GolemSessionManager(sessionParams);
 
-      const scheduler = new Scheduler(golemSessionManager, estimatorService);
+      // TODO:
+      const NOOP = async () => {};
+      const dbRecorder: GolemSessionRecorder = {
+        agreementAcquired: async () => randomUUID(),
+        jobStarted: NOOP,
+        jobCompleted: NOOP,
+        jobStopped: NOOP,
+        jobFailed: NOOP,
+        resultFailedParsing: NOOP,
+        resultInvalidVanityKey: NOOP,
+        proofsStore: NOOP,
+      };
+      const schedulerRecorder: SchedulerRecorder = {
+        startGenerationJob: NOOP,
+      };
+
+      golemSessionManager = new GolemSessionManager(sessionParams, dbRecorder);
+
+      const scheduler = new Scheduler(
+        golemSessionManager,
+        estimatorService,
+        schedulerRecorder
+      );
       activeJobs[jobId] = { golemSessionManager, scheduler };
 
       // Setup results collector to periodically check for and report new results
@@ -142,7 +166,7 @@ class GolemServiceImpl implements GolemService {
       const generationParams: GenerationParams = {
         publicKey: validated.publicKey.toTruncatedHex(),
         vanityAddressPrefix: validated.vanityAddressPrefix,
-        budgetInitial: 1,
+        budgetInitial: 0.5,
         budgetLimit: input.budgetGlm,
         budgetTopUp: 0.5,
         numberOfWorkers: input.numWorkers,
