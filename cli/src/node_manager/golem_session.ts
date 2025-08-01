@@ -1,6 +1,7 @@
 // External imports
 import {
   Allocation,
+  anyAbortSignal,
   DraftOfferProposalPool,
   GolemNetwork,
   ProviderInfo,
@@ -105,6 +106,9 @@ export class GolemSessionManager {
       override: {
         payment: VanityPaymentModule,
       },
+      market: {
+        demandRefreshIntervalSec: 60 * 5, // refresh demand every 5 minutes to get fresh offers
+      },
     });
     try {
       await this.golemNetwork.connect();
@@ -186,6 +190,40 @@ export class GolemSessionManager {
         );
       },
     );
+
+    // Periodically remove stale offers from the proposal pool
+    this.golemNetwork.market.events.on("demandSubscriptionRefreshed", () => {
+      ctx
+        .L()
+        .info(
+          "Demand subscription refreshed, removing stale offers from pool...",
+        );
+      const proposalPool = this.rentalPool?.getProposalPool();
+      if (!proposalPool) {
+        ctx
+          .L()
+          .warn("Tried removing stale offers but proposal pool was not found");
+        return;
+      }
+      proposalPool.getAvailable().forEach((offer) => {
+        const timestamp10MinsAgo = new Date(
+          Date.now() - 10 * 60 * 1000,
+        ).toISOString();
+        if (offer.timestamp.toISOString() < timestamp10MinsAgo) {
+          proposalPool.remove(offer);
+          ctx
+            .L()
+            .debug(
+              `Proposal ${offer.id} removed from pool, reason: stale (over 10 minutes old)`,
+            );
+        }
+      });
+      ctx
+        .L()
+        .info(
+          `Successfully removed stale proposals from the pool, remaining size: ${proposalPool.availableCount()}`,
+        );
+    });
 
     const glm = this.golemNetwork;
     const rentalDurationWithPaymentsSeconds = this.rentalDurationSeconds + 360;
@@ -320,7 +358,10 @@ export class GolemSessionManager {
       this.dbRecorder.jobStarted(ctx, getJobProviderID(ctx));
 
       const res = await exe.run(command, {
-        signalOrTimeout: this.stopWorkAC.signal,
+        signalOrTimeout: anyAbortSignal(
+          this.stopWorkAC.signal,
+          AbortSignal.timeout(60_000),
+        ).signal,
       });
 
       /* Uncomment this code to parse reported compute stats
@@ -471,7 +512,7 @@ export class GolemSessionManager {
 
       if (this.isWorkStopped()) {
         ctx.L().info("Work was stopped by user");
-        await this.rentalPool.release(rental);
+        await this.rentalPool.release(rental, AbortSignal.timeout(30_000));
         return r;
       }
 
@@ -499,7 +540,7 @@ export class GolemSessionManager {
         /*console.log(
           `💡 Provider ${providerName} ran the command successfully, returning them to the pool of available workers`,
         );*/
-        await this.rentalPool.release(rental);
+        await this.rentalPool.release(rental, AbortSignal.timeout(30_000));
       } else {
         ctx
           .L()
@@ -509,7 +550,7 @@ export class GolemSessionManager {
         ctx.consoleInfo(
           `💔 Provider ${providerName} did not run the command successfully, destroying the rental`,
         );
-        await this.rentalPool.destroy(rental);
+        await this.rentalPool.destroy(rental, AbortSignal.timeout(30_000));
       }
     } catch (error) {
       ctx

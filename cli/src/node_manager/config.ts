@@ -98,7 +98,7 @@ export abstract class BaseRentalConfig {
         },
       },
       market: {
-        rentHours: rentalDurationHours,
+        rentHours: 24 * 365,
         pricing: {
           model: "linear",
           maxStartPrice: 0.0,
