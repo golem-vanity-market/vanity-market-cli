@@ -29,7 +29,8 @@
     "list-cpu-offers": "node forward.js golem-sdk market scan",
     "list-gpu-offers": "node forward.js golem-sdk market scan --engine vm-nvidia",
     "db:setup": "npx drizzle-kit generate && npx drizzle-kit migrate",
-    "db:clear": "rm -r drizzle/* db.sqlite "
+    "db:clear": "rm -r drizzle/* db.sqlite",
+    "db:studio": "npx drizzle-kit studio"
   },
   "keywords": [
     "vanity",
