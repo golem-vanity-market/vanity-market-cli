@@ -108,6 +108,17 @@ jobs:
 
             Published `@${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }}` to GitHub Packages.
 
+            ### Prerequisites
+
+            1. **GitHub Personal Access Token**: You need a GitHub token with `read:packages` permission to access the private npm package ([GitHub Settings > Developer settings > Personal access tokens](https://github.com/settings/tokens)).
+
+            2. **Yagna Setup**: You need to run a local yagna instance and grab a YAGNA_APP_KEY:
+
+            ```bash
+            yagna app-key create golem-vaddr
+            yagna app-key list
+            ```
+
             ### Authentication Setup
 
             First, configure npm to authenticate with GitHub Packages:
@@ -125,13 +136,31 @@ jobs:
             # Display help
             npx @${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }} --help
 
+            # Set your Yagna app key
+            export YAGNA_APPKEY=your-generated-app-key
+
             # Generate vanity address
             npx @${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }} generate \
-              --public-key my-public-key.txt \
-              --vanity-address-prefix 0xcafe \
-              --budget-limit 10 \
-              --processing-unit gpu \
-              --results-file results.json
+              --public-key sample-key.pub \
+              --vanity-address-prefix 0x6666 \
+              --budget-limit 6 \
+              --processing-unit cpu \
+              --results-file results.json \
+              --num-workers 2
+            ```
+
+            ### Alternative: One-time authentication
+
+            You can also authenticate for a single command:
+
+            ```bash
+            NPM_TOKEN=YOUR_GITHUB_TOKEN npx @${{ github.repository_owner }}/golem-vaddr-cli@${{ github.ref_name }} generate \
+              --public-key sample-key.pub \
+              --vanity-address-prefix 0x6666 \
+              --budget-limit 6 \
+              --processing-unit cpu \
+              --results-file results.json \
+              --num-workers 2
             ```
           draft: false
           prerelease: false

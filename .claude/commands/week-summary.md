@@ -103,3 +103,7 @@ I'll create a markdown summary following the following format:
   - Follow the same template for each issue as in Section 3
 
 The output will be saved to: {{output_file}} or z_projectmanagement/{{end_date | replace: "-", ""}}\_week_summary.md
+
+---
+
+**Note**: This summary covers the exact time range from {{start_date}} to {{end_date}}{% if github_from or github_to %}, with GitHub changes between {% if github_from %}{{github_from}}{% else %}start{% endif %}...{% if github_to %}{{github_to}}{% else %}HEAD{% endif %}{% endif %}.
