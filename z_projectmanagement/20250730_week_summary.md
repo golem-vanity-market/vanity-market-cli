@@ -18,7 +18,8 @@ Highlights:
 Lowlights:
 
 - 🚨 YAGNA has issues with handling more than 10 agreements
-- more bugs in golem-js (last week, we released [v3.5.1](https://github.com/golemfactory/golem-js/releases/tag/v3.5.1)) - ongoing fixes - [beta release](https://github.com/golemfactory/golem-js/releases/tag/v3.5.0-beta.4)
+
+- more bugs in golem-js (last week, we released [v3.5.1](https://github.com/golemfactory/golem-js/releases/tag/v3.5.1)) - ongoing fixes - [v3.5.0-beta.4](https://github.com/golemfactory/golem-js/releases/tag/v3.5.0-beta.4) and [v3.5.0-beta.5](https://github.com/golemfactory/golem-js/releases/tag/v3.5.0-beta.5)
 
 - 500s from YAGNA
 
