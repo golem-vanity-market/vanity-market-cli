@@ -1,0 +1,20 @@
+{
+  "enabledMcpjsonServers": [
+    "context7",
+    "sequentialthinking",
+    "sequential-thinking"
+  ],
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/git-hook-checker.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
