@@ -26,20 +26,24 @@ BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName')
 BRANCH_DIR_POSTFIX=$(echo "$PR_INFO" | jq -r '.headRefName' | tr '/' '-')
 PR_TITLE=$(echo "$PR_INFO" | jq -r '.title')
 
+GIT_TOP_DIR=$(git rev-parse --show-toplevel)
+TEMP_DIR_FOR_WS="${GIT_TOP_DIR}/temp"
+WORKTREE_DIR="${TEMP_DIR_FOR_WS}/golem-vanity.market-$BRANCH_DIR_POSTFIX"
+
 echo "PR Title: $PR_TITLE"
 echo "Branch: $BRANCH_NAME"
 
 # Step 2: Create Worktree
 echo "Step 2: Creating worktree..."
-mkdir -p temp
+mkdir -p "${TEMP_DIR_FOR_WS}"
 
 # Remove existing worktree if it exists
-if [ -d "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" ]; then
+if [ -d "$WORKTREE_DIR" ]; then
     echo "Removing existing worktree..."
-    git worktree remove "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" --force
+    git worktree remove "$WORKTREE_DIR" --force
 fi
 
-git worktree add "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" "$BRANCH_NAME"
+git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
 
 # Step 3: Analyze Changes and Determine Review Directory
 echo "Step 3: Analyzing changes..."
@@ -65,11 +69,11 @@ echo "Infrastructure changes: $INFRA_CHANGES"
 
 # Determine review directory - prioritize infra if most changes are there
 if [ "$INFRA_CHANGES" -gt "$CLI_CHANGES" ] && [ "$INFRA_CHANGES" -gt "$WEBAPP_CHANGES" ]; then
-    REVIEW_DIR="."
-    echo "Most changes in Infrastructure directory - reviewing from root"
+    REVIEW_DIR="infra"
+    echo "Most changes in Infrastructure directory - reviewing from infra"
 elif [ "$CLI_CHANGES" -gt "$WEBAPP_CHANGES" ]; then
     REVIEW_DIR="cli"
-    echo "Most changes in CLI directory"
+    echo "Most changes in CLI directory - reviewing from cli"
 else
     REVIEW_DIR="webapp"
     echo "Most changes in Webapp directory"
@@ -77,7 +81,7 @@ fi
 
 # Step 4: Execute Review in Separate Claude Process
 echo "Step 4: Executing review in separate claude process..."
-cd "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX/$REVIEW_DIR"
+cd "$WORKTREE_DIR/$REVIEW_DIR"
 
 # https://www.anthropic.com/engineering/claude-code-best-practices
 # https://github.com/anthropics/claude-code-base-action
@@ -122,7 +126,7 @@ EOF
 # Step 5: Copy Review Back
 echo "Step 5: Copying review back to original repository..."
 if [ -f "CLAUDE_REVIEW_PR$PR_NUMBER.md" ]; then
-    mv "CLAUDE_REVIEW_PR$PR_NUMBER.md" "../../../CLAUDE_REVIEW_PR$PR_NUMBER.md"
+    mv "CLAUDE_REVIEW_PR$PR_NUMBER.md" "${GIT_TOP_DIR}/CLAUDE_REVIEW_PR$PR_NUMBER.md"
     echo "Review completed and saved to CLAUDE_REVIEW_PR$PR_NUMBER.md"
 else
     echo "Warning: Review file not found"
