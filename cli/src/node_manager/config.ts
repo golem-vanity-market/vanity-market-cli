@@ -98,7 +98,8 @@ export abstract class BaseRentalConfig {
         },
       },
       market: {
-        rentHours: rentalDurationHours,
+        // 1 year is a safe default, expiration time is mandatory but we don't want the rental to expire on it's own
+        rentHours: 24 * 365,
         pricing: {
           model: "linear",
           maxStartPrice: 0.0,
