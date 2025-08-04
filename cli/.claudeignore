@@ -36,4 +36,6 @@ Thumbs.db
 # Monitoring and config backups
 otel-config*.yaml.bak
 
+# Repo
 README_public.md
+results/

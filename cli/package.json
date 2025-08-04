@@ -1,6 +1,6 @@
 {
   "name": "@unoperate/golem-vaddr-cli",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Vanity address generator CLI",
   "bin": {
     "golem-addr": "dist/index.js"
@@ -29,7 +29,8 @@
     "list-cpu-offers": "node forward.js golem-sdk market scan",
     "list-gpu-offers": "node forward.js golem-sdk market scan --engine vm-nvidia",
     "db:setup": "npx drizzle-kit generate && npx drizzle-kit migrate",
-    "db:clear": "rm -r drizzle/* db.sqlite "
+    "db:clear": "rm -r drizzle/* db.sqlite",
+    "db:studio": "npx drizzle-kit studio"
   },
   "keywords": [
     "vanity",

@@ -3,8 +3,8 @@ set -o nounset
 set -o errexit
 set -o pipefail
 
-TARGET_DIR=/home/eb/workspace/golem-vanity-market-cli
-SRC_GIT_TAG=v0.1.4
+TARGET_DIR=/home/eb/workspace-golem/golem-vanity-market-cli
+SRC_GIT_TAG=v0.1.6
 SRC_DIR="temp/golem-vanity.market-$SRC_GIT_TAG"
 SRC_DIR_CLI="$SRC_DIR/cli"
 
@@ -36,6 +36,7 @@ cp package-lock.json $TARGET_DIR
 cp forward.js $TARGET_DIR
 cp tsconfig.json $TARGET_DIR
 cp eslint.config.mjs $TARGET_DIR
+cp drizzle.config.ts $TARGET_DIR
 popd
 
 echo "3. Copying github actions"

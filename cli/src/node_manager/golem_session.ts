@@ -355,7 +355,7 @@ export class GolemSessionManager {
       //TODO Reputation
       //is that the best place?
 
-      this.dbRecorder.jobStarted(ctx, getJobProviderID(ctx));
+      await this.dbRecorder.jobStarted(ctx, getJobProviderID(ctx));
 
       const res = await exe.run(command, {
         signalOrTimeout: anyAbortSignal(
@@ -388,7 +388,7 @@ export class GolemSessionManager {
       //TODO reputation
       //push all proofs to db
       //process results and set hashrate/offences/glmspent
-      this.dbRecorder.jobCompleted(ctx, getJobProviderID(ctx));
+      await this.dbRecorder.jobCompleted(ctx, getJobProviderID(ctx));
 
       const stdout = res.stdout ? String(res.stdout) : "";
 
@@ -413,7 +413,7 @@ export class GolemSessionManager {
         //TODO reputation
         // push proofs to table
         // if some failed to parse, set offense to nonsense
-        this.dbRecorder.resultFailedParsing(ctx, getJobProviderID(ctx));
+        await this.dbRecorder.resultFailedParsing(ctx, getJobProviderID(ctx));
 
         ctx.L().error("failed to parse lines:", cmdResult.failedLines);
         throw new Error("Failed to parse result lines");
@@ -434,7 +434,7 @@ export class GolemSessionManager {
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
         ctx.L().info("Work was stopped by user");
-        this.dbRecorder.jobStopped(ctx, getJobProviderID(ctx));
+        await this.dbRecorder.jobStopped(ctx, getJobProviderID(ctx));
         return {
           agreementId,
           provider: rental.agreement.provider,
@@ -447,7 +447,11 @@ export class GolemSessionManager {
       }
       // TODO: inform estimator and reputation model
       ctx.L().error(`Error during profanity_cuda execution: ${error}`);
-      this.dbRecorder.jobFailed(ctx, getJobProviderID(ctx), String(error));
+      await this.dbRecorder.jobFailed(
+        ctx,
+        getJobProviderID(ctx),
+        String(error),
+      );
 
       throw new Error("Profanity execution failed");
     }
@@ -508,7 +512,7 @@ export class GolemSessionManager {
       r = await this.runCommand(ctx, rental, generationParams);
 
       // TODO: should throw an error if the resuts failed verficication
-      this.processCommandResult(ctx, r, generationParams);
+      await this.processCommandResult(ctx, r, generationParams);
 
       if (this.isWorkStopped()) {
         ctx.L().info("Work was stopped by user");
@@ -583,11 +587,11 @@ export class GolemSessionManager {
     );
   }
 
-  private processCommandResult(
+  private async processCommandResult(
     ctx: AppContext,
     cmd: CommandResult,
     generationParams: GenerationParams,
-  ): void {
+  ): Promise<void> {
     // TODO: inform estimator that there were no results
     if (cmd.results.length === 0) {
       ctx.L().info("No results found in the command output");
@@ -610,7 +614,10 @@ export class GolemSessionManager {
       const isValid = validateVanityResult(ctx, cmd.results[r]);
 
       if (!isValid.isValid) {
-        this.dbRecorder.resultInvalidVanityKey(ctx, getJobProviderID(ctx));
+        await this.dbRecorder.resultInvalidVanityKey(
+          ctx,
+          getJobProviderID(ctx),
+        );
         ctx
           .L()
           .error(
@@ -629,7 +636,9 @@ export class GolemSessionManager {
 
       // (1) if we have info about the pattern for the result
       // we can use it to write the right proof
-      this.dbRecorder.proofsStore(ctx, getJobProviderID(ctx), [cmd.results[r]]);
+      await this.dbRecorder.proofsStore(ctx, getJobProviderID(ctx), [
+        cmd.results[r],
+      ]);
       this.estimatorService.pushProofToQueue(entry);
 
       if (matched) {
