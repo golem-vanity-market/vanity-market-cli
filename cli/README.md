@@ -114,7 +114,7 @@ npm run dev -- generate \
   --results-file results.json
 ```
 
-#### Using the built version:
+#### Using the built version
 
 ```bash
 # Build first
@@ -140,6 +140,24 @@ node dist/index.js generate \
 | `--results-file`          | file path | Path to save the generation results (optional)                     | `results.json`   |
 | `--num-workers`           | number    | Number of parallel workers to use (default: 1)                     | `2`              |
 | `--db`                    | file path | Database file path for storing session data (default: ./db.sqlite) | `./my-db.sqlite` |
+
+## Environment variables
+
+Internal functionality of the CLI can be configured using environment variables:
+
+| Variable                           | Description                                                                    | Default Value                 |
+| ---------------------------------- | ------------------------------------------------------------------------------ | ----------------------------- |
+| `YAGNA_APPKEY`                     | Yagna application key for authentication                                       | (required)                    |
+| `OTEL_CONFIG_FILE`                 | Path to OpenTelemetry configuration file for observability support             | `monitoring/otel-config.yaml` |
+| `MAX_CPU_ENV_PER_HOUR`             | Maximum price per hour for CPU environment (in GLM tokens)                     | `0.1`                         |
+| `MAX_CPU_CPU_PER_HOUR`             | Maximum price per hour for CPU compute (in GLM tokens)                         | `0.1`                         |
+| `MAX_GPU_ENV_PER_HOUR`             | Maximum price per hour for GPU environment (in GLM tokens)                     | `2.0`                         |
+| `RESULT_CSV_FILE`                  | Path to save results in CSV format                                             | `results-{current-date}.csv`  |
+| `MESSAGE_LOOP_SEC_INTERVAL`        | Interval in seconds for printing status to the console                         | `30`                          |
+| `PROCESS_LOOP_SEC_INTERVAL`        | Interval in seconds for processing results                                     | `1`                           |
+| `COMMAND_EXECUTION_TIMEOUT_BUFFER` | Extra time (ms) added to `singlePassSec` before aborting unresponsive commands | `30000` (30s)                 |
+| `RENTAL_RELEASE_TIMEOUT`           | Timeout (ms) for releasing a rental                                            | `30000` (30s)                 |
+| `RENTAL_DESTROY_TIMEOUT`           | Timeout (ms) for destroying a rental                                           | `30000` (30s)                 |
 
 ## Public Key File Format
 
