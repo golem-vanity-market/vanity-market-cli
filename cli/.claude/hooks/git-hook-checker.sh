@@ -14,7 +14,7 @@ if [[ "$command" == git* ]]; then
   # Parse git command
   if [[ "$command" == *"git add"* ]]; then
     echo "🔍 Git add detected - running format and lint checks..."
-    ./.claude/scripts/pre-commit-checks.sh --format-only
+    ./.claude/hooks/pre-commit-checks.sh --format-only
     exit_code=$?
     if [ $exit_code -ne 0 ]; then
       echo "❌ Pre-commit checks failed for git add"
@@ -23,7 +23,7 @@ if [[ "$command" == git* ]]; then
     echo "✅ Format and lint checks passed for git add"
   elif [[ "$command" == *"git push"* ]]; then
     echo "🚀 Git push detected - running full checks (format, lint, tests)..."
-    ./.claude/scripts/pre-commit-checks.sh
+    ./.claude/hooks/pre-commit-checks.sh
     exit_code=$?
     if [ $exit_code -ne 0 ]; then
       echo "❌ Pre-commit checks failed for git push"
