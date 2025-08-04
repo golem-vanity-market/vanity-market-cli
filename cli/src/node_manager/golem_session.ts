@@ -357,10 +357,13 @@ export class GolemSessionManager {
 
       await this.dbRecorder.jobStarted(ctx, getJobProviderID(ctx));
 
+      const commandExecutionSec = generationParams.singlePassSeconds;
+      const timeoutBufferSec =
+        Number(process.env.COMMAND_EXECUTION_TIMEOUT_BUFFER) || 30_000; // buffer for command execution timeout
       const res = await exe.run(command, {
         signalOrTimeout: anyAbortSignal(
           this.stopWorkAC.signal,
-          AbortSignal.timeout(60_000),
+          AbortSignal.timeout(commandExecutionSec * 1000 + timeoutBufferSec), // timeout = expected time to execute command + buffer
         ).signal,
       });
 
@@ -516,7 +519,12 @@ export class GolemSessionManager {
 
       if (this.isWorkStopped()) {
         ctx.L().info("Work was stopped by user");
-        await this.rentalPool.release(rental, AbortSignal.timeout(30_000));
+        await this.rentalPool.release(
+          rental,
+          AbortSignal.timeout(
+            Number(process.env.RENTAL_RELEASE_TIMEOUT) || 30_000,
+          ),
+        );
         return r;
       }
 
@@ -544,7 +552,12 @@ export class GolemSessionManager {
         /*console.log(
           `💡 Provider ${providerName} ran the command successfully, returning them to the pool of available workers`,
         );*/
-        await this.rentalPool.release(rental, AbortSignal.timeout(30_000));
+        await this.rentalPool.release(
+          rental,
+          AbortSignal.timeout(
+            Number(process.env.RENTAL_RELEASE_TIMEOUT) || 30_000,
+          ),
+        );
       } else {
         ctx
           .L()
@@ -554,7 +567,12 @@ export class GolemSessionManager {
         ctx.consoleInfo(
           `💔 Provider ${providerName} did not run the command successfully, destroying the rental`,
         );
-        await this.rentalPool.destroy(rental, AbortSignal.timeout(30_000));
+        await this.rentalPool.destroy(
+          rental,
+          AbortSignal.timeout(
+            Number(process.env.RENTAL_DESTROY_TIMEOUT) || 30_000,
+          ),
+        );
       }
     } catch (error) {
       ctx
