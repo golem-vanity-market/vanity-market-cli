@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run .claude/hooks/text_to_speech.py 'Claude waits for your input'"
+            "command": "python3 .claude/hooks/text_to_speech_piper.py 'Claude waits for your input'"
           },
           {
             "type": "command",
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "uv run .claude/hooks/text_to_speech.py 'Claude finished its work'"
+            "command": "python3 .claude/hooks/text_to_speech_piper.py 'Claude finished its work'"
           },
           {
             "type": "command",
