@@ -33,8 +33,9 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
     return id;
   }
 
-  async jobStarted(ctx: AppContext, jobProviderId: string): Promise<void> {
-    await ctx
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  async jobStarted(ctx: AppContext, jobProviderId: string): Promise<any> {
+    return ctx
       .getDB()
       .update(providerJobsTable)
       .set({
@@ -43,8 +44,9 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
       .where(eq(providerJobsTable.id, jobProviderId));
   }
 
-  async jobCompleted(ctx: AppContext, jobProviderId: string): Promise<void> {
-    await ctx
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  async jobCompleted(ctx: AppContext, jobProviderId: string): Promise<any> {
+    return ctx
       .getDB()
       .update(providerJobsTable)
       .set({
@@ -54,23 +56,25 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
       .where(eq(providerJobsTable.id, jobProviderId));
   }
 
-  async jobStopped(ctx: AppContext, jobProviderId: string): Promise<void> {
-    await ctx
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  async jobStopped(ctx: AppContext, jobProviderId: string): Promise<any> {
+    return ctx
       .getDB()
       .update(providerJobsTable)
       .set({
-        status: "completed",
+        status: "stopped",
         endTime: new Date().toISOString(),
       })
       .where(eq(providerJobsTable.id, jobProviderId));
   }
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   async jobFailed(
     ctx: AppContext,
     jobProviderId: string,
     _error: string,
-  ): Promise<void> {
-    await ctx
+  ): Promise<any> {
+    return ctx
       .getDB()
       .update(providerJobsTable)
       .set({
@@ -80,11 +84,12 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
       .where(eq(providerJobsTable.id, jobProviderId));
   }
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   async resultFailedParsing(
     ctx: AppContext,
     jobProviderId: string,
-  ): Promise<void> {
-    await ctx
+  ): Promise<any> {
+    return ctx
       .getDB()
       .update(providerJobsTable)
       .set({
@@ -93,11 +98,12 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
       .where(eq(providerJobsTable.id, jobProviderId));
   }
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   async resultInvalidVanityKey(
     ctx: AppContext,
     jobProviderId: string,
-  ): Promise<void> {
-    await ctx
+  ): Promise<any> {
+    return ctx
       .getDB()
       .update(providerJobsTable)
       .set({
@@ -106,11 +112,12 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
       .where(eq(providerJobsTable.id, jobProviderId));
   }
 
+  /* eslint-disable @typescript-eslint/no-explicit-any */
   async proofsStore(
     ctx: AppContext,
     jobProviderId: string,
     results: VanityResult[],
-  ): Promise<void> {
+  ): Promise<any> {
     const newProofs: NewProofModel[] = results.map((res) => {
       return {
         providerJobId: jobProviderId,
@@ -123,6 +130,6 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
         },
       };
     });
-    await ctx.getDB().insert(proofsTable).values(newProofs);
+    return ctx.getDB().insert(proofsTable).values(newProofs);
   }
 }
