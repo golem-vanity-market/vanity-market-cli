@@ -47,20 +47,27 @@ FILES=$(echo "$PR_INFO" | jq -r '.files[].path')
 
 CLI_CHANGES=0
 WEBAPP_CHANGES=0
+INFRA_CHANGES=0
 
 while IFS= read -r file; do
     if [[ "$file" == cli/* ]]; then
         CLI_CHANGES=$((CLI_CHANGES + 1))
     elif [[ "$file" == webapp/* ]]; then
         WEBAPP_CHANGES=$((WEBAPP_CHANGES + 1))
+    elif [[ "$file" == infra/* ]]; then
+        INFRA_CHANGES=$((INFRA_CHANGES + 1))
     fi
 done <<< "$FILES"
 
 echo "CLI changes: $CLI_CHANGES"
 echo "Webapp changes: $WEBAPP_CHANGES"
+echo "Infrastructure changes: $INFRA_CHANGES"
 
-# Determine review directory
-if [ "$CLI_CHANGES" -gt "$WEBAPP_CHANGES" ]; then
+# Determine review directory - prioritize infra if most changes are there
+if [ "$INFRA_CHANGES" -gt "$CLI_CHANGES" ] && [ "$INFRA_CHANGES" -gt "$WEBAPP_CHANGES" ]; then
+    REVIEW_DIR="."
+    echo "Most changes in Infrastructure directory - reviewing from root"
+elif [ "$CLI_CHANGES" -gt "$WEBAPP_CHANGES" ]; then
     REVIEW_DIR="cli"
     echo "Most changes in CLI directory"
 else
