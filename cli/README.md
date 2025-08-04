@@ -145,19 +145,20 @@ node dist/index.js generate \
 
 Internal functionality of the CLI can be configured using environment variables:
 
-| Variable                           | Description                                                                    | Default Value                 |
-| ---------------------------------- | ------------------------------------------------------------------------------ | ----------------------------- |
-| `YAGNA_APPKEY`                     | Yagna application key for authentication                                       | (required)                    |
-| `OTEL_CONFIG_FILE`                 | Path to OpenTelemetry configuration file for observability support             | `monitoring/otel-config.yaml` |
-| `MAX_CPU_ENV_PER_HOUR`             | Maximum price per hour for CPU environment (in GLM tokens)                     | `0.1`                         |
-| `MAX_CPU_CPU_PER_HOUR`             | Maximum price per hour for CPU compute (in GLM tokens)                         | `0.1`                         |
-| `MAX_GPU_ENV_PER_HOUR`             | Maximum price per hour for GPU environment (in GLM tokens)                     | `2.0`                         |
-| `RESULT_CSV_FILE`                  | Path to save results in CSV format                                             | `results-{current-date}.csv`  |
-| `MESSAGE_LOOP_SEC_INTERVAL`        | Interval in seconds for printing status to the console                         | `30`                          |
-| `PROCESS_LOOP_SEC_INTERVAL`        | Interval in seconds for processing results                                     | `1`                           |
-| `COMMAND_EXECUTION_TIMEOUT_BUFFER` | Extra time (ms) added to `singlePassSec` before aborting unresponsive commands | `30000` (30s)                 |
-| `RENTAL_RELEASE_TIMEOUT`           | Timeout (ms) for releasing a rental                                            | `30000` (30s)                 |
-| `RENTAL_DESTROY_TIMEOUT`           | Timeout (ms) for destroying a rental                                           | `30000` (30s)                 |
+| Variable                            | Description                                                                    | Default Value                 |
+| ----------------------------------- | ------------------------------------------------------------------------------ | ----------------------------- |
+| `YAGNA_APPKEY`                      | Yagna application key for authentication                                       | (required)                    |
+| `OTEL_CONFIG_FILE`                  | Path to OpenTelemetry configuration file for observability support             | `monitoring/otel-config.yaml` |
+| `MAX_CPU_ENV_PER_HOUR`              | Maximum price per hour for CPU environment (in GLM tokens)                     | `0.1`                         |
+| `MAX_CPU_CPU_PER_HOUR`              | Maximum price per hour for CPU compute (in GLM tokens)                         | `0.1`                         |
+| `MAX_GPU_ENV_PER_HOUR`              | Maximum price per hour for GPU environment (in GLM tokens)                     | `2.0`                         |
+| `RESULT_CSV_FILE`                   | Path to save results in CSV format                                             | `results-{current-date}.csv`  |
+| `MESSAGE_LOOP_SEC_INTERVAL`         | Interval in seconds for printing status to the console                         | `30`                          |
+| `PROCESS_LOOP_SEC_INTERVAL`         | Interval in seconds for processing results                                     | `1`                           |
+| `COMMAND_EXECUTION_TIMEOUT_BUFFER`  | Extra time (ms) added to `singlePassSec` before aborting unresponsive commands | `30000` (30s)                 |
+| `RENTAL_RELEASE_TIMEOUT`            | Timeout (ms) for releasing a rental                                            | `30000` (30s)                 |
+| `RENTAL_DESTROY_TIMEOUT`            | Timeout (ms) for destroying a rental                                           | `30000` (30s)                 |
+| `MAX_CONSECUTIVE_ALLOCATION_ERRORS` | Maximum number of consecutive allocation errors before giving up               | `10`                          |
 
 ## Public Key File Format
 
