@@ -37,7 +37,9 @@ import {
   getJobProviderID,
   GolemSessionRecorder,
   withJobProviderID,
+  Reputation,
 } from "./types";
+import { ReputationImpl } from "../reputation/reputation";
 
 /**
  * Parameters for the GolemSessionManager constructor
@@ -77,6 +79,7 @@ export class GolemSessionManager {
   private allocation?: Allocation;
   private rentalPool?: ResourceRentalPool;
   private estimatorService: EstimatorService;
+  private reputation: Reputation;
   private resultService: ResultsService;
   private stopWorkAC: AbortController = new AbortController();
   private dbRecorder: GolemSessionRecorder;
@@ -86,6 +89,7 @@ export class GolemSessionManager {
     this.budgetInitial = params.budgetInitial;
     this.processingUnitType = params.processingUnitType;
     this.estimatorService = params.estimatorService;
+    this.reputation = new ReputationImpl();
     this.resultService = params.resultService;
     this.dbRecorder = recorder;
   }
@@ -241,8 +245,10 @@ export class GolemSessionManager {
           max: 100,
         }, //unused in our case, we are managing pool size manually
         order: this.getConfigBasedOnProcessingUnitType().getOrder(
+          ctx,
           this.rentalDurationSeconds,
           this.allocation,
+          this.reputation,
         ),
       });
     } catch (error) {

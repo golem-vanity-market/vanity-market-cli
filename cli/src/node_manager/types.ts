@@ -1,6 +1,12 @@
-import { AppContext } from "../app_context";
-import { Agreement } from "@golem-sdk/golem-js";
-import { VanityResult } from "./result";
+import type { AppContext } from "../app_context";
+import type { Agreement } from "@golem-sdk/golem-js";
+import type { VanityResult } from "./result";
+
+export interface Reputation {
+  isProviderBanned(providerId: string): boolean;
+  addBannedProvider(ctx: AppContext, providerId: string): boolean;
+  markForTermination(providerId: string): boolean;
+}
 
 export interface GolemSessionRecorder {
   // return providerJobID

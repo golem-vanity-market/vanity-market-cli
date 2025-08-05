@@ -143,6 +143,10 @@ export class EstimatorService {
     }
   }
 
+  public didProviderDoneWork(_agreementId: string, _amountF: number) {
+    return true; // TODO: Placeholder for termination logic
+  }
+
   private get messageLoopSecs(): number {
     return this.options.messageLoopSecs || 30.0;
   }

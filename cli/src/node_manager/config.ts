@@ -4,7 +4,9 @@
 
 import { GenerationParams, ProcessingUnitType } from "../params";
 import { ExeUnit, Allocation, MarketOrderSpec } from "@golem-sdk/golem-js";
-import { selectBestProvider } from "./selector";
+import { filterProposal, selectBestProvider } from "./selector";
+import { Reputation } from "./types";
+import { AppContext } from "../app_context";
 
 /**
  * Configuration for a specific processing unit type
@@ -84,8 +86,10 @@ export abstract class BaseRentalConfig {
    * Get the Golem order configuration for this processing unit type
    */
   public getOrder(
+    ctx: AppContext,
     rentalDurationSeconds: number,
     allocation: Allocation,
+    reputation: Reputation,
   ): MarketOrderSpec {
     const rentalDurationHours = Math.ceil(rentalDurationSeconds / 3600);
 
@@ -106,7 +110,8 @@ export abstract class BaseRentalConfig {
           maxCpuPerHourPrice: this._config.maxCpuPerHourPrice ?? 0.0,
           maxEnvPerHourPrice: this._config.maxEnvPricePerHour,
         },
-        offerProposalSelector: selectBestProvider(rentalDurationHours),
+        offerProposalFilter: filterProposal(ctx, reputation),
+        offerProposalSelector: selectBestProvider(ctx, rentalDurationHours),
       },
       payment: {
         allocation,
