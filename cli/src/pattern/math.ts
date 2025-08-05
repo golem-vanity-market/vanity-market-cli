@@ -1,5 +1,5 @@
 /* Calculates n choose k (binomial coefficient). */
-function binomialCoefficient(n: number, k: number) {
+export function binomialCoefficient(n: number, k: number) {
   if (k < 0 || k > n) return 0;
   if (k === 0 || k === n) return 1;
   let res = 1;
@@ -36,13 +36,13 @@ export function exactlyLettersCombinationsDifficulty(
 ): number {
   if (letters < 30) return 1.0; // Below this threshold, it's not considered difficult.
 
-  let combinationsTotal = 0.0;
+  let qualifyingCombinations = 0.0;
   for (let i = letters; i <= total; i++) {
-    combinationsTotal += exactlyLettersCombinations(i, total);
+    qualifyingCombinations += exactlyLettersCombinations(i, total);
   }
 
-  if (combinationsTotal === 0) return totalCombinations(total);
-  return totalCombinations(total) / combinationsTotal;
+  if (qualifyingCombinations === 0) return totalCombinations(total);
+  return totalCombinations(total) / qualifyingCombinations;
 }
 /** Calculates combinations for a "snake" (number of adjacent identical characters). */
 function snakeCombinations(pairs: number, total: number): number {
