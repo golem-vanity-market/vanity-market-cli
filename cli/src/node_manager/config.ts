@@ -185,7 +185,7 @@ export class CPURentalConfig extends BaseRentalConfig {
     const prefix = params.vanityAddressPrefix.toArg();
 
     // Create multiple prefix instances for parallel processing
-    const prefixes = ` "no_default=1;prefix=${prefix}"`.repeat(cpuCount);
+    const prefixes = ` "prefix=${prefix}"`.repeat(cpuCount);
 
     const commandParts = [
       "parallel",
@@ -249,7 +249,7 @@ export class GPURentalConfig extends BaseRentalConfig {
       "-r",
       this.config.roundCount.toString(),
       "-p",
-      `"no_default=1;prefix=${prefix}"`,
+      `"prefix=${prefix}"`,
       "-b",
       params.singlePassSeconds.toString(),
       "-z",
