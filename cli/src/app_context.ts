@@ -1,8 +1,8 @@
 import * as otl from "@opentelemetry/api";
-import { Logger } from "@golem-sdk/golem-js";
+import { type Logger } from "@golem-sdk/golem-js";
 import { pinoLogger } from "@golem-sdk/pino-logger";
-import { MetricsCollector } from "./metrics_collector";
-import { LibSQLDatabase } from "drizzle-orm/libsql";
+import { type MetricsCollector } from "./metrics_collector";
+import { type LibSQLDatabase } from "drizzle-orm/libsql";
 
 export class AppContext {
   private _activeContext: otl.Context;
@@ -80,6 +80,27 @@ export class AppContext {
   public getValue<T>(key: string): T | undefined {
     const otl_key = otl.createContextKey(key);
     return this._activeContext.getValue(otl_key) as T | undefined;
+  }
+
+  public info(message: string): void {
+    if (!this.logger) {
+      throw new Error("Logger is not set in the AppContext");
+    }
+    this.logger.info(message);
+  }
+
+  public warn(message: string): void {
+    if (!this.logger) {
+      throw new Error("Logger is not set in the AppContext");
+    }
+    this.logger.warn(message);
+  }
+
+  public error(message: string): void {
+    if (!this.logger) {
+      throw new Error("Logger is not set in the AppContext");
+    }
+    this.logger.error(message);
   }
 
   public consoleInfo(message?: unknown, ...optionalParams: unknown[]): void {
