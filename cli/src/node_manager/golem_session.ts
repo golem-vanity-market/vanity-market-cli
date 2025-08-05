@@ -1,30 +1,31 @@
 // External imports
 import {
-  Allocation,
+  type Allocation,
   anyAbortSignal,
-  DraftOfferProposalPool,
+  type DraftOfferProposalPool,
   GolemNetwork,
-  ProviderInfo,
-  ResourceRental,
-  ResourceRentalPool,
+  type ResourceRental,
+  type ResourceRentalPool,
 } from "@golem-sdk/golem-js";
-import { isNativeError } from "util/types";
 
 // Internal imports
-import { AppContext, getJobId } from "../app_context";
-import { GenerationParams, ProcessingUnitType } from "../params";
-import { BaseRentalConfig, CPURentalConfig, GPURentalConfig } from "./config";
+import { type AppContext, getJobId } from "../app_context";
+import { type GenerationParams, ProcessingUnitType } from "../params";
+import {
+  type BaseRentalConfig,
+  CPURentalConfig,
+  GPURentalConfig,
+} from "./config";
 import { computePrefixDifficulty } from "../difficulty";
-import { withTimeout } from "../utils/timeout";
-import { EstimatorService } from "../estimator_service";
-import { ResultsService } from "../results_service";
+import type { EstimatorService } from "../estimator_service";
+import type { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
 import {
   parseVanityResults,
-  IterationInfo,
-  ParsedResults,
-  CommandResult,
-  VanityResult,
+  type IterationInfo,
+  type ParsedResults,
+  type CommandResult,
+  type VanityResult,
 } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
@@ -35,9 +36,9 @@ import {
 
 import {
   getJobProviderID,
-  GolemSessionRecorder,
+  type GolemSessionRecorder,
+  type Reputation,
   withJobProviderID,
-  Reputation,
 } from "./types";
 import { ReputationImpl } from "../reputation/reputation";
 
@@ -58,12 +59,6 @@ export interface SessionManagerParams {
 
   resultService: ResultsService;
 }
-
-// Callbacks for `runSingleIteration` method
-export type OnErrorHandler = (payload: {
-  error: Error;
-  provider: ProviderInfo;
-}) => Promise<boolean>;
 
 /**
  * The purpose of the GolemSessionManager is to abstract the complexity of managing
@@ -116,9 +111,9 @@ export class GolemSessionManager {
     });
     try {
       await this.golemNetwork.connect();
-      ctx.L().info("Connected to Golem Network successfully");
+      ctx.info("Connected to Golem Network successfully");
     } catch (error) {
-      ctx.L().error("Failed to connect to Golem Network:", error);
+      ctx.error(`Failed to connect to Golem Network: ${error}`);
       throw new Error("Connection to Golem Network failed");
     }
     this.golemNetwork.market.events.on("agreementApproved", ({ agreement }) => {
@@ -177,11 +172,9 @@ export class GolemSessionManager {
 
   public async initializeRentalPool(ctx: AppContext): Promise<void> {
     if (!this.golemNetwork) {
-      ctx
-        .L()
-        .error(
-          "Golem Network is not initialized. Call connectToGolemNetwork first.",
-        );
+      ctx.error(
+        "Golem Network is not initialized. Call connectToGolemNetwork first.",
+      );
       throw new Error("Golem Network is not initialized");
     }
 
@@ -197,16 +190,12 @@ export class GolemSessionManager {
 
     // Periodically remove stale offers from the proposal pool
     this.golemNetwork.market.events.on("demandSubscriptionRefreshed", () => {
-      ctx
-        .L()
-        .info(
-          "Demand subscription refreshed, removing stale offers from pool...",
-        );
+      ctx.info(
+        "Demand subscription refreshed, removing stale offers from pool...",
+      );
       const proposalPool = this.rentalPool?.getProposalPool();
       if (!proposalPool) {
-        ctx
-          .L()
-          .warn("Tried removing stale offers but proposal pool was not found");
+        ctx.warn("Tried removing stale offers but proposal pool was not found");
         return;
       }
       proposalPool.getAvailable().forEach((offer) => {
@@ -215,18 +204,14 @@ export class GolemSessionManager {
         ).toISOString();
         if (offer.timestamp.toISOString() < timestamp10MinsAgo) {
           proposalPool.remove(offer);
-          ctx
-            .L()
-            .debug(
-              `Proposal ${offer.id} removed from pool, reason: stale (over 10 minutes old)`,
-            );
+          ctx.debug(
+            `Proposal ${offer.id} removed from pool, reason: stale (over 10 minutes old)`,
+          );
         }
       });
-      ctx
-        .L()
-        .info(
-          `Successfully removed stale proposals from the pool, remaining size: ${proposalPool.availableCount()}`,
-        );
+      ctx.info(
+        `Successfully removed stale proposals from the pool, remaining size: ${proposalPool.availableCount()}`,
+      );
     });
 
     const glm = this.golemNetwork;
@@ -252,7 +237,7 @@ export class GolemSessionManager {
         ),
       });
     } catch (error) {
-      ctx.L().error("Failed to initialize rental pool:", error);
+      ctx.error(`Failed to initialize rental pool: ${error}`);
       throw error;
     }
   }
@@ -263,11 +248,9 @@ export class GolemSessionManager {
     timeoutSec: number,
   ): Promise<void> {
     if (!this.rentalPool) {
-      ctx
-        .L()
-        .error(
-          "Rental pool is not initialized. Call initializeRentalPool first.",
-        );
+      ctx.error(
+        "Rental pool is not initialized. Call initializeRentalPool first.",
+      );
       throw new Error("Rental pool is not initialized");
     }
     const proposalPool: DraftOfferProposalPool =
@@ -275,11 +258,9 @@ export class GolemSessionManager {
     const isEnough = () => proposalPool.availableCount() >= numOffers;
 
     if (isEnough()) {
-      ctx
-        .L()
-        .info(
-          `Found enough offers immediately: ${proposalPool.availableCount()} >= ${numOffers}`,
-        );
+      ctx.info(
+        `Found enough offers immediately: ${proposalPool.availableCount()} >= ${numOffers}`,
+      );
       return;
     }
 
@@ -293,28 +274,22 @@ export class GolemSessionManager {
 
       const onProposalAdded = () => {
         if (isEnough()) {
-          ctx
-            .L()
-            .info(
-              `Found enough offers: ${proposalPool.availableCount()} >= ${numOffers}`,
-            );
+          ctx.info(
+            `Found enough offers: ${proposalPool.availableCount()} >= ${numOffers}`,
+          );
           cleanup();
           resolve();
           return;
         }
-        ctx
-          .L()
-          .info(
-            `Current offers: ${proposalPool.availableCount()}, waiting for ${numOffers} offers...`,
-          );
+        ctx.info(
+          `Current offers: ${proposalPool.availableCount()}, waiting for ${numOffers} offers...`,
+        );
       };
       const timeoutId = setTimeout(() => {
         cleanup();
-        ctx
-          .L()
-          .warn(
-            `Timeout reached: ${timeoutSec} seconds, current offers: ${proposalPool.availableCount()}`,
-          );
+        ctx.warn(
+          `Timeout reached: ${timeoutSec} seconds, current offers: ${proposalPool.availableCount()}`,
+        );
         resolve();
       }, timeoutSec * 1000);
 
@@ -337,11 +312,9 @@ export class GolemSessionManager {
 
       const provider = exe.provider;
 
-      ctx
-        .L()
-        .info(
-          `Running command on provider: ${provider.name}, type: ${this.processingUnitType}`,
-        );
+      ctx.info(
+        `Exe unit ready, running capability check: ${provider.name}, type: ${this.processingUnitType}`,
+      );
 
       // Validate capabilities (CPU or GPU specific)
       await config.checkAndSetCapabilities(exe);
@@ -355,14 +328,20 @@ export class GolemSessionManager {
         );
       }
       */
+
+      if (this.processingUnitType === ProcessingUnitType.CPU) {
+        ctx.info(`Capabilities checked, ${config["_config"].cpuCount}`);
+      }
+
       const command = config.generateCommand(generationParams);
-      ctx.L().info(`Executing command: ${command}`);
 
       //TODO Reputation
       //is that the best place?
 
       await this.dbRecorder.jobStarted(ctx, getJobProviderID(ctx));
 
+      ctx.info(`Executing command: ${command}`);
+      const startTime = Date.now();
       const commandExecutionSec = generationParams.singlePassSeconds;
       const timeoutBufferSec =
         Number(process.env.COMMAND_EXECUTION_TIMEOUT_BUFFER) || 30_000; // buffer for command execution timeout
@@ -372,12 +351,15 @@ export class GolemSessionManager {
           AbortSignal.timeout(commandExecutionSec * 1000 + timeoutBufferSec), // timeout = expected time to execute command + buffer
         ).signal,
       });
+      ctx.info(
+        `Command finished after ${((Date.now() - startTime) / 1000).toFixed(1)} s`,
+      );
 
       /* Uncomment this code to parse reported compute stats
       let biggestCompute = 0;
       const stderr = res.stderr ? String(res.stderr) : "";
       for (const line of stderr.split("\n")) {
-        //ctx.L().info(line);
+        //ctx.info(line);
         if (line.includes("Total compute")) {
           try {
             const totalCompute = line
@@ -387,7 +369,7 @@ export class GolemSessionManager {
             const totalComputeFloatGh = parseFloat(totalCompute);
             biggestCompute = totalComputeFloatGh * 1e9;
           } catch (e) {
-            ctx.L().error("Error parsing compute stats:", e);
+            ctx.error("Error parsing compute stats:", e);
           }
         }
       }
@@ -424,25 +406,23 @@ export class GolemSessionManager {
         // if some failed to parse, set offense to nonsense
         await this.dbRecorder.resultFailedParsing(ctx, getJobProviderID(ctx));
 
-        ctx.L().error("failed to parse lines:", cmdResult.failedLines);
+        ctx.error(`failed to parse lines: ${cmdResult.failedLines}`);
         throw new Error("Failed to parse result lines");
       }
 
       if (cmdResult.results.length === 0) {
         // TODO: inform estimator and reputation model
-        ctx.L().info("No results found in the output");
+        ctx.info("No results found in the output");
         cmdResult.status = "not_found";
         return cmdResult;
       }
-      ctx
-        .L()
-        .info(
-          `Found ${cmdResult.results.length} results for job ${agreementId}`,
-        );
+      ctx.info(
+        `Found ${cmdResult.results.length} results for job ${agreementId}`,
+      );
       return cmdResult;
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
-        ctx.L().info("Work was stopped by user");
+        ctx.info(`Work was stopped by user`);
         await this.dbRecorder.jobStopped(ctx, getJobProviderID(ctx));
         return {
           agreementId,
@@ -455,15 +435,53 @@ export class GolemSessionManager {
         };
       }
       // TODO: inform estimator and reputation model
-      ctx.L().error(`Error during profanity_cuda execution: ${error}`);
+      ctx.error(`Error during profanity_cuda execution: ${error}`);
       await this.dbRecorder.jobFailed(
         ctx,
         getJobProviderID(ctx),
         String(error),
       );
 
-      throw new Error("Profanity execution failed");
+      throw new Error(`Profanity execution failed`);
     }
+  }
+
+  public getProposals(): object {
+    const rentalPool = this.rentalPool;
+    if (!rentalPool) {
+      return {};
+    }
+    return rentalPool.getProposalPool().getAvailable();
+  }
+
+  public getRentalStatus(): object {
+    const rentalPool = this.rentalPool;
+    if (!rentalPool) {
+      return {};
+    }
+    const idleRentalsWithActivity: Set<ResourceRental> =
+      rentalPool["highPriority"];
+    const idleRentalsWithNoActivity: Set<ResourceRental> =
+      rentalPool["lowPriority"];
+    const activeRentals: Set<ResourceRental> = rentalPool["borrowed"];
+
+    return {
+      activeRentals: Array.from(activeRentals).map((rental) => ({
+        provider: rental.agreement.provider.name,
+        agreementId: rental.agreement.id,
+        status: "active",
+      })),
+      highPriority: Array.from(idleRentalsWithActivity).map((rental) => ({
+        provider: rental.agreement.provider.name,
+        agreementId: rental.agreement.id,
+        status: "idle_with_activity",
+      })),
+      borrowed: Array.from(idleRentalsWithNoActivity).map((rental) => ({
+        provider: rental.agreement.provider.name,
+        agreementId: rental.agreement.id,
+        status: "idle_with_no_activity",
+      })),
+    };
   }
 
   /**
@@ -480,18 +498,15 @@ export class GolemSessionManager {
   public async runSingleIteration(
     ctx: AppContext,
     generationParams: GenerationParams,
-    onError: OnErrorHandler,
   ): Promise<IterationInfo | null> {
     if (this.stopWorkAC.signal.aborted) {
-      ctx.L().info("Work was stopped by user");
+      ctx.info("Work was stopped by user");
       return null;
     }
     if (!this.golemNetwork || !this.allocation || !this.rentalPool) {
-      ctx
-        .L()
-        .error(
-          "Cannot run command without initialized Golem Network, allocation and rental pool.",
-        );
+      ctx.error(
+        "Cannot run command without initialized Golem Network, allocation and rental pool.",
+      );
       throw new Error(
         "Golem Network, allocation or rental pool is not initialized",
       );
@@ -502,10 +517,21 @@ export class GolemSessionManager {
     const rental = await this.rentalPool.acquire(this.stopWorkAC.signal); // wait as long as needed to find a provider (cancelled by stopWorkAC)
     const providerName = rental.agreement.provider.name;
 
-    let shouldKeepRental: boolean;
-    let r: CommandResult | null = null;
+    ctx.info(`Checking if terminate rental with provider: ${providerName}`);
+    if (this.estimatorService.check_if_terminate(rental.agreement.id, null)) {
+      ctx.warn(
+        `Terminating rental with provider ${providerName} due to estimator decision`,
+      );
+      //@todo add to ban
+      //bannedProviders.add(rental.agreement.provider.id);
+      await this.rentalPool.destroy(rental, 60_000);
+      return null; // No results, rental was terminated
+    }
 
-    // TODO Reputation select additional problems for hashrateverification
+    let shouldKeepRental: boolean;
+    let cmdResult: CommandResult | null = null;
+
+    // TODO Reputation select additional problems for hashrate verification
     const provJobId = await this.dbRecorder.agreementAcquired(
       ctx,
       getJobId(ctx),
@@ -515,78 +541,69 @@ export class GolemSessionManager {
 
     try {
       await this.initEstimatorForRental(rental, generationParams);
-      /*console.log(
-        `🔨 Acquired provider ${providerName} from the pool, running the generation command on them ...`,
-      );*/
-      r = await this.runCommand(ctx, rental, generationParams);
 
-      // TODO: should throw an error if the resuts failed verficication
-      await this.processCommandResult(ctx, r, generationParams);
+      ctx.info(`Running command on provider: ${providerName}`);
+      cmdResult = await this.runCommand(ctx, rental, generationParams);
+
+      ctx.info(`Command finished, processing results...`);
+
+      // TODO: should throw an error if the results failed verification
+
+      await this.processCommandResult(ctx, cmdResult, generationParams);
+      ctx.info(`Processing results completed`);
 
       if (this.isWorkStopped()) {
-        ctx.L().info("Work was stopped by user");
+        ctx.info(`Work was stopped by user, releasing rental`);
         await this.rentalPool.release(
           rental,
           AbortSignal.timeout(
             Number(process.env.RENTAL_RELEASE_TIMEOUT) || 30_000,
           ),
         );
-        return r;
+        ctx.info(`Work was stopped by user, rental released`);
+        return cmdResult;
       }
 
-      ctx.L().info("Command finished successfully");
+      ctx.info(`Command executed successfully on provider: ${providerName}`);
       shouldKeepRental = true;
     } catch (error) {
-      ctx.L().error("Error during command execution:", error);
+      ctx.error(`Error during command execution: ${error}`);
       wasSuccess = false;
-      shouldKeepRental = await onError({
-        error: isNativeError(error) ? error : new Error(String(error)),
-        provider: rental.agreement.provider,
-      }).catch((error) => {
-        ctx
-          .L()
-          .warn(
-            "Error in onError handler (defaulting to destroying rental):",
-            error,
-          );
-        return false; // Default to destroying rental on error
-      });
+      shouldKeepRental = false;
     }
     try {
       if (shouldKeepRental) {
-        ctx.L().info(`Keeping rental with provider: ${providerName}`);
-        /*console.log(
-          `💡 Provider ${providerName} ran the command successfully, returning them to the pool of available workers`,
-        );*/
+        ctx.info(`Releasing rental to the pool...`);
         await this.rentalPool.release(
           rental,
           AbortSignal.timeout(
             Number(process.env.RENTAL_RELEASE_TIMEOUT) || 30_000,
           ),
         );
+        ctx.info(`Rental released`);
       } else {
-        ctx
-          .L()
-          .info(
-            `Destroying rental with provider: ${providerName}, the provider failed to run the commmand`,
-          );
+        ctx.info(
+          `Destroying rental with provider: ${providerName}, the provider failed to run the command`,
+        );
         ctx.consoleInfo(
           `💔 Provider ${providerName} did not run the command successfully, destroying the rental`,
         );
+        //@todo: add to ban
+        //bannedProviders.add(rental.agreement.provider.id);
         await this.rentalPool.destroy(
           rental,
           AbortSignal.timeout(
             Number(process.env.RENTAL_DESTROY_TIMEOUT) || 30_000,
           ),
         );
+        ctx.info(
+          `Successfully destroyed rental with provider: ${providerName}`,
+        );
       }
     } catch (error) {
-      ctx
-        .L()
-        .error(
-          `Error during rental for ${providerName} release/destroy:`,
-          error,
-        );
+      ctx.error(
+        `Error during rental for ${providerName} release/destroy: ${error}`,
+      );
       throw new Error("Rental release/destroy failed");
     }
     if (!wasSuccess) {
@@ -594,7 +611,7 @@ export class GolemSessionManager {
         "Rental did not complete successfully, check logs for details",
       );
     }
-    return r;
+    return cmdResult;
   }
 
   private async initEstimatorForRental(
@@ -605,20 +622,22 @@ export class GolemSessionManager {
       rental.agreement.id,
       rental.agreement.provider.name,
       rental.agreement.provider.id,
+      rental.agreement.provider.walletAddress,
       computePrefixDifficulty(
         generationParams.vanityAddressPrefix.fullPrefix(),
       ),
     );
   }
 
+  //@todo get rid of async
   private async processCommandResult(
     ctx: AppContext,
     cmd: CommandResult,
     generationParams: GenerationParams,
   ): Promise<void> {
-    // TODO: inform estimator that there were no results
     if (cmd.results.length === 0) {
-      ctx.L().info("No results found in the command output");
+      ctx.info("No results found in the command output");
+      this.estimatorService.reportEmpty(getJobProviderID(ctx));
       return;
     }
 
@@ -635,18 +654,16 @@ export class GolemSessionManager {
         cpu: cmd.providerType,
       };
 
-      const isValid = validateVanityResult(ctx, cmd.results[r]);
+      const isValid = await validateVanityResult(ctx, cmd.results[r]);
 
       if (!isValid.isValid) {
         await this.dbRecorder.resultInvalidVanityKey(
           ctx,
           getJobProviderID(ctx),
         );
-        ctx
-          .L()
-          .error(
-            `Validation failed for result (provider ${cmd.provider.id}) ${cmd.results[r]}: ${isValid.msg}`,
-          );
+        ctx.error(
+          `Validation failed for result (provider ${cmd.provider.id}) ${cmd.results[r]}: ${isValid.msg}`,
+        );
         throw new Error(
           `Validation failed for result (provider ${cmd.provider.id}) ${cmd.results[r]}: ${isValid.msg}`,
         );
@@ -675,7 +692,7 @@ export class GolemSessionManager {
           },
         );
       }
-      ctx.L().debug("Found address:", addr);
+      ctx.debug(`Found address: ${addr}`);
     }
   }
 
@@ -692,45 +709,45 @@ export class GolemSessionManager {
 
   public async disconnectFromGolemNetwork(ctx: AppContext): Promise<void> {
     if (!this.golemNetwork) {
-      ctx.L().warn("Golem Network is not initialized, nothing to disconnect");
+      ctx.warn("Golem Network is not initialized, nothing to disconnect");
       return;
     }
 
     if (this.allocation) {
       try {
         await this.golemNetwork.payment.releaseAllocation(this.allocation);
-        ctx.L().info("Released allocation");
+        ctx.info("Released allocation");
         //  error here shouldn't prevent the other cleanup steps from running
       } catch (error) {
-        ctx.L().error("Failed to release allocation:", error);
+        ctx.error(`Failed to release allocation: ${error}`);
       }
     }
 
     try {
       await this.golemNetwork.disconnect();
       this.golemNetwork.market.events.removeAllListeners();
-      ctx.L().info("Disconnected from Golem Network successfully");
+      ctx.info("Disconnected from Golem Network successfully");
       this.golemNetwork = undefined;
     } catch (error) {
-      ctx.L().error("Failed to disconnect from Golem Network:", error);
+      ctx.error(`Failed to disconnect from Golem Network: ${error}`);
       throw new Error("Disconnection from Golem Network failed");
     }
   }
 
   public async drainPool(
     ctx: AppContext,
-    timeoutSeconds: number = 10,
+    timeoutSeconds: number = 30,
   ): Promise<void> {
     if (!this.rentalPool) {
-      ctx.L().warn("Rental pool is not initialized, nothing to drain");
+      ctx.warn("Rental pool is not initialized, nothing to drain");
       return;
     }
     try {
-      ctx.L().info("Draining and clearing all rentals from the pool...");
-      await withTimeout(this.rentalPool.drainAndClear(), timeoutSeconds * 1000);
-      ctx.L().info("All rentals cleared from the pool");
+      ctx.info("Draining and clearing all rentals from the pool...");
+      await this.rentalPool.drainAndClear(timeoutSeconds * 1000);
+      ctx.info("All rentals cleared from the pool");
     } catch (error) {
-      ctx.L().error("Critical error during pool cleanup:", error);
+      ctx.error(`Critical error during pool cleanup: ${error}`);
       throw new Error("Failed to drain rental pool");
     }
   }

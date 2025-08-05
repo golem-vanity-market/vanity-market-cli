@@ -42,6 +42,7 @@ export class VanityPaymentModule extends PaymentModuleImpl {
         throw new Error(`Invalid amount in debit note: ${debitNote.id}`);
       }
 
+      /*
       if (
         !VanityPaymentModule.estimatorService.didProviderDoneWork(
           debitNote.agreementId,
@@ -55,6 +56,8 @@ export class VanityPaymentModule extends PaymentModuleImpl {
           );
         return debitNote;
       }
+
+       */
 
       const resp = VanityPaymentModule.estimatorService.reportCosts(
         debitNote.agreementId,

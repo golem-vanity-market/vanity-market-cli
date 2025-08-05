@@ -82,25 +82,36 @@ export class AppContext {
     return this._activeContext.getValue(otl_key) as T | undefined;
   }
 
+  public debug(message: string): void {
+    if (!this.logger) {
+      throw new Error("Logger is not set in the AppContext");
+    }
+    const m = this.withPrefix(message);
+    this.logger.debug(m, this.getTags());
+  }
+
   public info(message: string): void {
     if (!this.logger) {
       throw new Error("Logger is not set in the AppContext");
     }
-    this.logger.info(message);
+    const m = this.withPrefix(message);
+    this.logger.info(m, this.getTags());
   }
 
   public warn(message: string): void {
     if (!this.logger) {
       throw new Error("Logger is not set in the AppContext");
     }
-    this.logger.warn(message);
+    const m = this.withPrefix(message);
+    this.logger.warn(m, this.getTags());
   }
 
   public error(message: string): void {
     if (!this.logger) {
       throw new Error("Logger is not set in the AppContext");
     }
-    this.logger.error(message);
+    const m = this.withPrefix(message);
+    this.logger.error(m, this.getTags());
   }
 
   public consoleInfo(message?: unknown, ...optionalParams: unknown[]): void {
@@ -110,9 +121,38 @@ export class AppContext {
   public consoleError(message?: unknown, ...optionalParams: unknown[]): void {
     console.error(message, ...optionalParams);
   }
+
+  private withPrefix(m: string): string {
+    const workerNo = this.getValue<number>("workerNo");
+    const iterationNo = this.getValue<number>("iterationNo");
+    let prefix = "";
+    if (workerNo !== undefined) prefix = `Worker: ${workerNo}`;
+
+    if (iterationNo !== undefined) {
+      prefix = prefix + ` Iteration: ${iterationNo}`;
+    }
+    return prefix + " " + m;
+  }
+
+  public getTags(): Record<string, string> {
+    const tags: Record<string, string> = {};
+    const jobId = this.getValue<string>("jobId");
+    if (jobId) {
+      tags.jobId = jobId;
+    }
+    const workerNo = this.getValue<number>("workerNo");
+    if (workerNo !== undefined) {
+      tags.workerNo = workerNo.toString();
+    }
+    const iterationNo = this.getValue<number>("iterationNo");
+    if (iterationNo !== undefined) {
+      tags.iterationNo = iterationNo.toString();
+    }
+    return tags;
+  }
 }
 
-export function setJobId(ctx: AppContext, jobId: string): AppContext {
+export function withJobId(ctx: AppContext, jobId: string): AppContext {
   return ctx.withValue("jobId", jobId);
 }
 
@@ -122,6 +162,33 @@ export function getJobId(ctx: AppContext): string {
     throw new Error("Job ID not found in AppContext");
   }
   return jobId;
+}
+
+export function withWorkerNo(ctx: AppContext, workerNo: number): AppContext {
+  return ctx.withValue("workerNo", workerNo);
+}
+
+export function getWorkerNo(ctx: AppContext): number {
+  const workerNo = ctx.getValue<number>("workerNo");
+  if (workerNo === undefined) {
+    throw new Error("Worker No not found in AppContext");
+  }
+  return workerNo;
+}
+
+export function setIterationNo(
+  ctx: AppContext,
+  iterationNo: number,
+): AppContext {
+  return ctx.withValue("iterationNo", iterationNo);
+}
+
+export function getIterationNo(ctx: AppContext): number {
+  const iterationNo = ctx.getValue<number>("iterationNo");
+  if (iterationNo === undefined) {
+    throw new Error("Iteration No not found in AppContext");
+  }
+  return iterationNo;
 }
 
 /**
