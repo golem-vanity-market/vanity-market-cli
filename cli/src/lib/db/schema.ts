@@ -6,6 +6,7 @@ import {
   numeric,
 } from "drizzle-orm/sqlite-core";
 import { InferInsertModel, InferSelectModel, sql } from "drizzle-orm";
+import { ProofCategory } from "../../pattern/pattern";
 
 export const processingUnitNames = ["cpu", "gpu"] as const;
 export const statusNames = [
@@ -27,10 +28,30 @@ export type JobOffence = (typeof offenceNames)[number];
 
 export type problemType = "prefix" | "suffix";
 
+/**
+ * Problem provided by the user
+ */
 export interface Problem {
   type: problemType;
   specifier: string;
 }
+
+/**
+ * Generated address category - either a user-defined pattern (according to the job's problem)
+ * or a proof
+ */
+export type GeneratedAddressCategory =
+  | {
+      type: "user-pattern";
+      category: string;
+      difficulty: number;
+    }
+  | {
+      type: "proof";
+      score: number;
+      difficulty: number;
+      category: ProofCategory;
+    };
 
 export const jobsTable = sqliteTable("job", {
   id: text("id").primaryKey(),
@@ -77,7 +98,9 @@ export const proofsTable = sqliteTable("proof", {
   addr: text("addr").notNull(),
   salt: text("salt").notNull(),
   pubKey: text("pub_key").notNull(),
-  vanityProblem: text({ mode: "json" }).notNull().$type<Problem>(),
+  vanityProblem: text({ mode: "json" })
+    .notNull()
+    .$type<GeneratedAddressCategory>(),
 });
 
 export type ProofModel = InferSelectModel<typeof proofsTable>;

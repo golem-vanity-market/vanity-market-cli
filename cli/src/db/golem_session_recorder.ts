@@ -6,6 +6,7 @@ import {
   providerJobsTable,
   NewProofModel,
   proofsTable,
+  GeneratedAddressCategory,
 } from "../lib/db/schema";
 import { GolemSessionRecorder } from "../node_manager/types";
 import { VanityResult } from "../node_manager/result";
@@ -119,15 +120,25 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
     results: VanityResult[],
   ): Promise<any> {
     const newProofs: NewProofModel[] = results.map((res) => {
+      const vanityProblem: GeneratedAddressCategory =
+        res.type === "user-pattern"
+          ? {
+              type: "user-pattern",
+              category: res.pattern,
+              difficulty: res.estimatedComplexity,
+            }
+          : {
+              type: "proof",
+              category: res.score.bestCategory.category,
+              score: res.score.bestCategory.score,
+              difficulty: res.score.bestCategory.difficulty,
+            };
       return {
         providerJobId: jobProviderId,
         addr: res.address,
         salt: res.salt,
         pubKey: res.pubKey,
-        vanityProblem: {
-          type: "prefix",
-          specifier: res.pattern,
-        },
+        vanityProblem,
       };
     });
     return ctx.getDB().insert(proofsTable).values(newProofs);

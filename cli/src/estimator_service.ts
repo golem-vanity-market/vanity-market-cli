@@ -1,7 +1,5 @@
 import { Estimator } from "./estimator/estimator";
 import { GenerationPrefix } from "./params";
-import { ProcessingUnitType } from "./params";
-import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";
 import { ResultsService } from "./results_service";
@@ -102,35 +100,18 @@ export class EstimatorService {
     }
 
     for (const entry of proofQueue) {
-      let prover: string = "N/A";
-
-      if (entry.cpu == ProcessingUnitType.GPU) {
-        prover = this.options.vanityPrefix.toHex().slice(0, 10);
-      } else if (entry.cpu == ProcessingUnitType.CPU) {
-        prover = this.options.vanityPrefix.toHex().slice(0, 8);
-      } else {
-        this.ctx.L().error(`Unsupported worker type: ${entry.cpu}`);
-      }
-
       const estimator = this.estimators.get(entry.jobId);
       if (!estimator) {
         this.ctx.L().error(`Estimator for job ${entry.jobId} not found.`);
         throw "Estimator not found for job: " + entry.jobId;
       }
-      const proverDifficulty = computePrefixDifficulty(prover);
 
-      if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
-        this.totalEstimator?.addProvedWork(proverDifficulty, true);
-        estimator.addProvedWork(proverDifficulty, true);
-      } else if (entry.addr.startsWith(prover)) {
-        /*displayUserMessage(
-            `Adding proof: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(proverDifficulty)}`,
-          );*/
-        this.totalEstimator?.addProvedWork(proverDifficulty);
-        estimator.addProvedWork(proverDifficulty);
-      } else {
-        // empty address
-      }
+      const isUserPattern = entry.addr
+        .toLowerCase()
+        .startsWith(this.options.vanityPrefix.fullPrefix().toLowerCase());
+      this.totalEstimator?.addProvedWork(entry.difficulty, isUserPattern);
+      estimator.addProvedWork(entry.difficulty, isUserPattern);
+
       if (this.savedProofs.has(entry.addr.toLowerCase())) {
         this.ctx
           .L()

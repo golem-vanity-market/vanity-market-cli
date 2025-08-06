@@ -7,7 +7,7 @@ import {
   absDiff,
 } from "./math";
 
-export type AddressPattern =
+export type ProofCategory =
   | "leading-zeroes" // The number of leading zeroes in the address.
   | "leading-any" // The number of leading characters that are the same.
   | "letters-heavy" // The number of letters in the address (ciphers can be different).
@@ -15,7 +15,7 @@ export type AddressPattern =
   | "snake-score-no-case"; // The number of repeating characters in the address. Case insensitive.
 
 export interface AddressSinglePatternScore {
-  category: AddressPattern;
+  category: ProofCategory;
   score: number;
   difficulty: number;
 }
@@ -23,9 +23,8 @@ export interface AddressSinglePatternScore {
 export interface AddressScore {
   addressLowerCase: string;
   addressMixedCase: string;
-  scores: Record<AddressPattern, AddressSinglePatternScore>;
-  totalScore: number;
-  bestCategory: AddressPattern;
+  scores: Record<ProofCategory, AddressSinglePatternScore>;
+  bestCategory: AddressSinglePatternScore;
 }
 
 const MAX_U256_HEX = "ffffffffffffffffffffffffffffffffffffffff";
@@ -120,10 +119,9 @@ export function scoreSingleAddress(address: string): AddressScore {
     calculateSnakeNoCase(addressStr),
   ];
 
-  const bestEntry = scoreEntries.reduce((a, b) =>
+  const bestCategory = scoreEntries.reduce((a, b) =>
     a.difficulty > b.difficulty ? a : b,
   );
-  const totalScore = isNaN(bestEntry.difficulty) ? 0 : bestEntry.difficulty;
 
   return {
     addressLowerCase,
@@ -133,9 +131,8 @@ export function scoreSingleAddress(address: string): AddressScore {
         acc[entry.category] = entry;
         return acc;
       },
-      {} as Record<AddressPattern, AddressSinglePatternScore>,
+      {} as Record<ProofCategory, AddressSinglePatternScore>,
     ),
-    totalScore,
-    bestCategory: bestEntry.category,
+    bestCategory,
   };
 }

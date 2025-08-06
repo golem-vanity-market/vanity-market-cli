@@ -67,6 +67,7 @@ describe("VanityResult Validator", () => {
           pubKey: entry.pubKey,
           pattern: entry.pattern,
           estimatedComplexity: 1000000, // Placeholder value
+          type: "user-pattern",
         };
 
         const validationResult = validateVanityResult(ctx, result);
@@ -87,6 +88,7 @@ describe("VanityResult Validator", () => {
           pubKey: testCase.pubKey,
           pattern: testCase.pattern,
           estimatedComplexity: 1000000,
+          type: "user-pattern",
         };
         console.log(`Testing: ${testName}`);
         const validationResult = validateVanityResult(ctx, result);

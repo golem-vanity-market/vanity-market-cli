@@ -404,8 +404,7 @@ export class GolemSessionManager {
       const parsedResults: ParsedResults = parseVanityResults(
         ctx,
         stdout.split("\n"),
-        generationParams.vanityAddressPrefix.fullPrefix(),
-        computePrefixDifficulty,
+        generationParams.vanityAddressPrefix.fullPrefix().toLowerCase(),
       );
 
       const cmdResult: CommandResult = {
@@ -622,20 +621,23 @@ export class GolemSessionManager {
       return;
     }
 
-    for (const r in cmd.results) {
+    for (const result of cmd.results) {
       // TODO: validation
-      const addr = cmd.results[r].address;
+      const addr = result.address;
 
       const entry: ProofEntryResult = {
         addr: addr,
-        salt: cmd.results[r].salt,
-        pubKey: cmd.results[r].pubKey,
+        salt: result.salt,
+        pubKey: result.pubKey,
         provider: cmd.provider,
         jobId: cmd.agreementId,
-        cpu: cmd.providerType,
+        difficulty:
+          result.type === "user-pattern"
+            ? computePrefixDifficulty(result.pattern)
+            : result.score.bestCategory.difficulty,
       };
 
-      const isValid = validateVanityResult(ctx, cmd.results[r]);
+      const isValid = validateVanityResult(ctx, result);
 
       if (!isValid.isValid) {
         await this.dbRecorder.resultInvalidVanityKey(
@@ -645,27 +647,24 @@ export class GolemSessionManager {
         ctx
           .L()
           .error(
-            `Validation failed for result (provider ${cmd.provider.id}) ${cmd.results[r]}: ${isValid.msg}`,
+            `Validation failed for result (provider ${cmd.provider.id}) ${result}: ${isValid.msg}`,
           );
         throw new Error(
-          `Validation failed for result (provider ${cmd.provider.id}) ${cmd.results[r]}: ${isValid.msg}`,
+          `Validation failed for result (provider ${cmd.provider.id}) ${result}: ${isValid.msg}`,
         );
       }
 
-      //TODO reputation - recognize which patterns a given result matches (1)
-      const matched = validateAddressMatchPattern(
-        cmd.results[r].address,
+      const isUserPrefix = validateAddressMatchPattern(
+        result.address,
         generationParams.vanityAddressPrefix.fullPrefix(),
       );
 
       // (1) if we have info about the pattern for the result
       // we can use it to write the right proof
-      await this.dbRecorder.proofsStore(ctx, getJobProviderID(ctx), [
-        cmd.results[r],
-      ]);
+      await this.dbRecorder.proofsStore(ctx, getJobProviderID(ctx), [result]);
       this.estimatorService.pushProofToQueue(entry);
 
-      if (matched) {
+      if (isUserPrefix) {
         this.resultService.processValidatedEntry(
           entry,
           (jobId: string, address: string, addrDifficulty: number) => {

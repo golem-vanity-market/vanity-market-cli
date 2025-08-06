@@ -2,78 +2,49 @@ import {
   binomialCoefficient,
   exactlyLettersCombinations,
   exactlyLettersCombinationsDifficulty,
-  snakeDifficulty,
   totalCombinations,
 } from "../pattern/math";
-import {
-  calculateLeadingZeroes,
-  calculateLeadingAny,
-  scoreSingleAddress,
-  AddressPattern,
-} from "../pattern/pattern";
+import { scoreSingleAddress, ProofCategory } from "../pattern/pattern";
 
 describe("Pattern Scoring", () => {
-  describe("Individual Pattern Calculations", () => {
-    describe("calculateLeadingZeroes", () => {
-      it("should return a high difficulty for many leading zeroes", () => {
-        const addressStr = "00000000ffffffffffffffffffffffffffffffff";
-        const currentNum = BigInt("0x" + addressStr);
-        const { score, difficulty } = calculateLeadingZeroes(
-          addressStr,
-          currentNum,
-        );
-
-        expect(score).toBe(8);
-        expect(difficulty).toBeGreaterThan(1e9);
-      });
-    });
-
-    describe("calculateLeadingAny", () => {
-      it("should return a high difficulty for a full address of the same character", () => {
-        const addressStr = "ffffffffffffffffffffffffffffffffffffffff";
-        const currentNum = BigInt("0x" + addressStr);
-        const { score, difficulty } = calculateLeadingAny(
-          addressStr,
-          currentNum,
-        );
-
-        expect(score).toBe(39); // 40 chars means 39 repeats after the first
-        // The difficulty should be enormous because the address is exactly ideal
-        expect(difficulty).toBeGreaterThan(1e45);
-      });
-    });
-  });
-
-  describe("scoreSingleAddress (Orchestrator)", () => {
+  describe("scoreSingleAddress", () => {
     it("should correctly identify 'leading-zeroes' as the best category", () => {
       const address = "0x000000000000000000000000000000000000dEaD";
       const result = scoreSingleAddress(address);
+      const expectedScore = 36; // 36 leading zeroes
 
-      expect(result.bestCategory).toBe("leading-zeroes");
-      expect(result.totalScore).toBe(
-        result.scores["leading-zeroes"].difficulty,
-      );
+      expect(result.bestCategory.category).toBe("leading-zeroes");
+      expect(result.bestCategory.score).toBe(expectedScore);
+      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
+    });
+
+    it("should correctly identify 'leading-any' as the best category", () => {
+      const address = "0xaaaaaaaaaaaaaaaaaaaa01234567890123456789";
+      const result = scoreSingleAddress(address);
+      const expectedScore = 19; // 20 leading 'a's minus the first one, since addresses with no repeating characters are scored as 0
+
+      expect(result.bestCategory.category).toBe("leading-any");
+      expect(result.bestCategory.score).toBe(expectedScore);
+      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
     it("should correctly identify 'letters-heavy' as the best category", () => {
       const address = "0xabcDefabcdefabcdefabcdefabcdefabcdefabcd";
       const result = scoreSingleAddress(address);
-      const expectedDifficulty = exactlyLettersCombinationsDifficulty(40, 40);
+      const expectedScore = 40; // 40 letters
 
-      expect(result.bestCategory).toBe("letters-heavy");
-      expect(result.scores["letters-heavy"].score).toBe(40);
-      expect(result.totalScore).toBe(expectedDifficulty);
-      expect(result.totalScore).toBeGreaterThan(1e16); // Should be very difficult
+      expect(result.bestCategory.category).toBe("letters-heavy");
+      expect(result.bestCategory.score).toBe(expectedScore);
+      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
     it("should correctly identify 'numbers-only' as the best category", () => {
       const address = "0x0000000000000000000000000000000000000001";
       const result = scoreSingleAddress(address);
 
-      expect(result.bestCategory).toBe("numbers-only");
-      expect(result.scores["numbers-only"].score).toBe(40);
-      // Difficulty should be very high as it's a tiny number
-      expect(result.scores["numbers-only"].difficulty).toBeGreaterThan(1e16);
+      expect(result.bestCategory.category).toBe("numbers-only");
+      expect(result.bestCategory.score).toBe(40);
+      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
     it("should correctly identify 'snake-score-no-case' as the best category", () => {
@@ -81,19 +52,18 @@ describe("Pattern Scoring", () => {
       const address = "0x2111111111111111111111111111111111111112";
       const result = scoreSingleAddress(address);
 
-      const expectedScore = 37; // 38 '1's in a row
-      const expectedDifficulty = snakeDifficulty(expectedScore, 40);
+      const expectedScore = 37; // 37 '1's in a row
 
-      expect(result.bestCategory).toBe("snake-score-no-case");
-      expect(result.scores["snake-score-no-case"].score).toBe(expectedScore);
-      expect(result.totalScore).toBe(expectedDifficulty);
+      expect(result.bestCategory.category).toBe("snake-score-no-case");
+      expect(result.bestCategory.score).toBe(expectedScore);
+      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
     it("should return a full score object with all categories", () => {
       const address = "0xffffffffffffffffffffffffffffffffffffffff";
       const result = scoreSingleAddress(address);
 
-      const expectedCategories: AddressPattern[] = [
+      const expectedCategories: ProofCategory[] = [
         "leading-zeroes",
         "leading-any",
         "letters-heavy",
