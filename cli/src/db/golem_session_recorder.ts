@@ -124,7 +124,7 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
         res.type === "user-pattern"
           ? {
               type: "user-pattern",
-              category: res.pattern,
+              pattern: res.pattern,
               difficulty: res.estimatedComplexity,
             }
           : {

@@ -43,7 +43,7 @@ export interface Problem {
 export type GeneratedAddressCategory =
   | {
       type: "user-pattern";
-      category: string;
+      pattern: string;
       difficulty: number;
     }
   | {
