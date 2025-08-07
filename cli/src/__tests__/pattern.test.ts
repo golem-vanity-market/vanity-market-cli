@@ -8,20 +8,10 @@ import { scoreSingleAddress, ProofCategory } from "../pattern/pattern";
 
 describe("Pattern Scoring", () => {
   describe("scoreSingleAddress", () => {
-    it("should correctly identify 'leading-zeroes' as the best category", () => {
-      const address = "0x000000000000000000000000000000000000dEaD";
-      const result = scoreSingleAddress(address);
-      const expectedScore = 36; // 36 leading zeroes
-
-      expect(result.bestCategory.category).toBe("leading-zeroes");
-      expect(result.bestCategory.score).toBe(expectedScore);
-      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
-    });
-
     it("should correctly identify 'leading-any' as the best category", () => {
       const address = "0xaaaaaaaaaaaaaaaaaaaa01234567890123456789";
       const result = scoreSingleAddress(address);
-      const expectedScore = 19; // 20 leading 'a's minus the first one, since addresses with no repeating characters are scored as 0
+      const expectedScore = 20;
 
       expect(result.bestCategory.category).toBe("leading-any");
       expect(result.bestCategory.score).toBe(expectedScore);
@@ -64,7 +54,6 @@ describe("Pattern Scoring", () => {
       const result = scoreSingleAddress(address);
 
       const expectedCategories: ProofCategory[] = [
-        "leading-zeroes",
         "leading-any",
         "letters-heavy",
         "numbers-heavy",

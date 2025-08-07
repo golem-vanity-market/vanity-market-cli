@@ -7,7 +7,6 @@ import {
 } from "./math";
 
 export type ProofCategory =
-  | "leading-zeroes" // The number of leading zeroes in the address.
   | "leading-any" // The number of leading characters that are the same.
   | "letters-heavy" // Addresses with a high number of letters (a-f).
   | "numbers-heavy" // Addresses with a high number of ciphers (0-9).
@@ -24,20 +23,6 @@ export interface AddressScore {
   addressMixedCase: string;
   scores: Record<ProofCategory, AddressSinglePatternScore>;
   bestCategory: AddressSinglePatternScore;
-}
-
-export function calculateLeadingZeroes(
-  addressStr: string,
-): AddressSinglePatternScore {
-  let score = 0;
-  for (let i = 0; i < addressStr.length; i++) {
-    if (addressStr[i] !== "0") {
-      break;
-    }
-    score++;
-  }
-  const difficulty = Math.pow(16, score);
-  return { category: "leading-zeroes", score, difficulty };
 }
 
 export function calculateLeadingAny(
@@ -84,7 +69,6 @@ export function scoreSingleAddress(address: string): AddressScore {
   const addressStr = addressLowerCase.substring(2);
 
   const scoreEntries: AddressSinglePatternScore[] = [
-    calculateLeadingZeroes(addressStr),
     calculateLeadingAny(addressStr),
     calculateLettersHeavy(addressStr),
     calculateNumbersHeavy(addressStr),
