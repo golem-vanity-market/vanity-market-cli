@@ -123,38 +123,38 @@ export class EstimatorService {
   // }
 
   public async getCurrentEstimate(
-    jobId: string,
+    agreementId: string,
   ): Promise<ProviderCurrentEstimate> {
-    await this.process(jobId); // Ensure processing is done before getting the estimator
-    const est = this.estimators.get(jobId);
+    await this.process(agreementId); // Ensure processing is done before getting the estimator
+    const est = this.estimators.get(agreementId);
     if (!est) {
-      throw new Error(`Estimator for job ${jobId} not found.`);
+      throw new Error(`Estimator for job ${agreementId} not found.`);
     }
     const info = est.currentInfo();
     const unfortunateIteration = Math.floor(
       info.attempts / est.estimateAttemptsGivenProbability(0.5),
     );
     return {
-      jobId,
+      jobId: agreementId,
       ...info,
       costPerHour: info.estimatedSpeed?.costPerHour || 0,
       unfortunateIteration,
     };
   }
 
-  public async process(jobId: string): Promise<void> {
-    const proofQueue = this.proofQueue.get(jobId);
-    this.proofQueue.set(jobId, []); // Clear the proof queue after processing
+  public async process(agreementId: string): Promise<void> {
+    const proofQueue = this.proofQueue.get(agreementId);
+    this.proofQueue.set(agreementId, []); // Clear the proof queue after processing
 
     if (!proofQueue) {
-      this.ctx.L().error(`No proof queue found for job ${jobId}.`);
-      throw new Error(`No proof queue found for job ${jobId}.`);
+      this.ctx.L().error(`No proof queue found for agreement ${agreementId}.`);
+      throw new Error(`No proof queue found for agreement ${agreementId}.`);
     }
 
-    const estimator = this.estimators.get(jobId);
+    const estimator = this.estimators.get(agreementId);
     if (!estimator) {
-      this.ctx.L().error(`Estimator for job ${jobId} not found.`);
-      throw Error("Estimator not found for job: " + jobId);
+      this.ctx.L().error(`Estimator for job ${agreementId} not found.`);
+      throw Error("Estimator not found for job: " + agreementId);
     }
 
     for (const entry of proofQueue) {

@@ -144,6 +144,17 @@ export class Estimator {
     return this._entries[this._entries.length - 1];
   }
 
+  _getOldestRecentEntryFromEnd(maxAgeSec: number): EstimatorHistoryEntry {
+    const cutoff = new Date().getTime() - maxAgeSec * 1000;
+    let result = this._entries[this._entries.length - 1];
+    let i = this._entries.length - 1;
+    while (i >= 0 && result.timePoint.getTime() >= cutoff) {
+      result = this._entries[i];
+      i--;
+    }
+    return result;
+  }
+
   _findNewestUsableEntry(): EstimatorHistoryEntry {
     return this._entries[this._entries.length - 1];
   }
@@ -219,7 +230,6 @@ export class Estimator {
   estimatedSpeed(timeFrameSecs: number): SpeedEstimation {
     const entryOld = this._getOldestRecentEntry(timeFrameSecs);
     const entryNew = this._findNewestUsableEntry();
-
     let efficiency = null;
     if (entryNew.cost - entryOld.cost > 0) {
       efficiency =
@@ -231,6 +241,28 @@ export class Estimator {
     return new SpeedEstimation(
       new Date(entryNew.timePoint),
       new Date(entryOld.timePoint),
+      entryNew.attempts,
+      entryOld.attempts,
+      entryNew.cost,
+      entryOld.cost,
+      efficiency,
+    );
+  }
+
+  estimatedSpeedSingleRun(timeFrameSecs: number): SpeedEstimation {
+    const entryOld = this._getOldestRecentEntryFromEnd(timeFrameSecs);
+    const entryNew = this._findNewestUsableEntry();
+    let efficiency = null;
+    if (entryNew.cost - entryOld.cost > 0) {
+      efficiency =
+        (entryNew.attempts - entryOld.attempts) /
+        (entryNew.cost - entryOld.cost) /
+        1e12; // Efficiency in TH/GLM
+    }
+    const oldDate = new Date(new Date().getTime() - timeFrameSecs * 1000);
+    return new SpeedEstimation(
+      new Date(entryNew.timePoint),
+      new Date(oldDate),
       entryNew.attempts,
       entryOld.attempts,
       entryNew.cost,

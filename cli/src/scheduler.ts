@@ -142,6 +142,7 @@ export class Scheduler {
           await sleep(5);
           continue;
         }
+        console.log(new Date(), "calling estimator");
         const esp = await this.estimator.getCurrentEstimate(
           iterInfo.agreementId,
         );
