@@ -21,4 +21,4 @@ jobs:
       - working-directory: cli
         run: bun run prebuild
       - working-directory: cli
-        run: bun test
+        run: bun run test
