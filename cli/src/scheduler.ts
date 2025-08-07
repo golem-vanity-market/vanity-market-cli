@@ -148,7 +148,7 @@ export class Scheduler {
         ctx
           .L()
           .info(
-            `Provider: ${iterInfo.provider.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
+            `Provider: ${iterInfo.provider.name}, estimated speed: ${esp.estimatedSpeed1h}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
           );
 
         ctx.consoleInfo(

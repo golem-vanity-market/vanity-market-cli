@@ -80,12 +80,12 @@ export class EstimatorService {
     }
     const info = est.currentInfo();
     const unfortunateIteration = Math.floor(
-      info.attempts / est.estimateAttemptsGivenProbability(0.5),
+      est.workDoneSinceLastSuccess / est.workFor50PercentChance(),
     );
     return {
       jobId,
       ...info,
-      costPerHour: info.estimatedSpeed?.costPerHour || 0,
+      costPerHour: info.estimatedSpeed1h?.costPerHour || 0,
       unfortunateIteration,
     };
   }
@@ -140,7 +140,7 @@ export class EstimatorService {
         reason: `Estimator for job ${jobId} not found.`,
       };
     }
-    if (job.currentInfo().attempts == 0) {
+    if (job.currentInfo().workDone == 0) {
       return {
         accepted: false,
         reason: `No work made for job ${jobId}.`,

@@ -89,3 +89,28 @@ export function calculatePairs(s: string) {
 export function absDiff(a: bigint, b: bigint): bigint {
   return a > b ? a - b : b - a;
 }
+
+export function exactlyNumbersCombinations(
+  numbers: number,
+  total: number,
+): number {
+  if (numbers < 0 || numbers > total) return 0;
+  return (
+    10.0 ** numbers * // each number can be one of 10 (0-9)
+    binomialCoefficient(total, numbers) * // choose positions for numbers
+    6.0 ** (total - numbers) // remaining positions can be any letter (a-f)
+  );
+}
+
+/** Calculates the difficulty of finding an address with at least a certain number of numbers. */
+export function numbersHeavyDifficulty(numbers: number, total: number): number {
+  if (numbers < 30) return 1.0; // Threshold
+
+  let qualifyingCombinations = 0.0;
+  for (let i = numbers; i <= total; i++) {
+    qualifyingCombinations += exactlyNumbersCombinations(i, total);
+  }
+
+  if (qualifyingCombinations === 0) return totalCombinations(total);
+  return totalCombinations(total) / qualifyingCombinations;
+}

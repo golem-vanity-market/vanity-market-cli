@@ -1,17 +1,16 @@
 import { getAddress } from "ethers";
 import {
   exactlyLettersCombinationsDifficulty,
-  totalCombinations,
   snakeDifficulty,
   calculatePairs,
-  absDiff,
+  numbersHeavyDifficulty,
 } from "./math";
 
 export type ProofCategory =
   | "leading-zeroes" // The number of leading zeroes in the address.
   | "leading-any" // The number of leading characters that are the same.
-  | "letters-heavy" // The number of letters in the address (ciphers can be different).
-  | "numbers-only" // Only ciphers, score determined by smallest decimal.
+  | "letters-heavy" // Addresses with a high number of letters (a-f).
+  | "numbers-heavy" // Addresses with a high number of ciphers (0-9).
   | "snake-score-no-case"; // The number of repeating characters in the address. Case insensitive.
 
 export interface AddressSinglePatternScore {
@@ -27,12 +26,8 @@ export interface AddressScore {
   bestCategory: AddressSinglePatternScore;
 }
 
-const MAX_U256_HEX = "ffffffffffffffffffffffffffffffffffffffff";
-const MAX_U256_BIGINT = BigInt("0x" + MAX_U256_HEX);
-
 export function calculateLeadingZeroes(
   addressStr: string,
-  currentNum: bigint,
 ): AddressSinglePatternScore {
   let score = 0;
   for (let i = 0; i < addressStr.length; i++) {
@@ -41,34 +36,22 @@ export function calculateLeadingZeroes(
     }
     score++;
   }
-  const difficulty = Number(MAX_U256_BIGINT) / Number(currentNum + 1n);
+  const difficulty = Math.pow(16, score);
   return { category: "leading-zeroes", score, difficulty };
 }
 
 export function calculateLeadingAny(
   addressStr: string,
-  currentNum: bigint,
 ): AddressSinglePatternScore {
   const firstChar = addressStr[0];
   let score = 0;
-  for (let i = 1; i < addressStr.length; i++) {
-    if (addressStr[i] !== firstChar) {
+  for (const char of addressStr) {
+    if (char !== firstChar) {
       break;
     }
     score++;
   }
-
-  let minAnyDifference = MAX_U256_BIGINT;
-  for (const char of "0123456789abcdef") {
-    const idealNum = BigInt("0x" + char.repeat(40));
-    const difference = absDiff(idealNum, currentNum);
-    if (difference < minAnyDifference) {
-      minAnyDifference = difference;
-    }
-  }
-  const difficulty =
-    Number(MAX_U256_BIGINT / 2n) / Number(minAnyDifference + 1n) / 15.0;
-
+  const difficulty = Math.pow(16, score);
   return { category: "leading-any", score, difficulty };
 }
 
@@ -78,20 +61,10 @@ function calculateLettersHeavy(addressStr: string): AddressSinglePatternScore {
   return { category: "letters-heavy", score, difficulty };
 }
 
-function calculateNumbersOnly(addressStr: string): AddressSinglePatternScore {
+function calculateNumbersHeavy(addressStr: string): AddressSinglePatternScore {
   const score = (addressStr.match(/[0-9]/g) || []).length;
-  let difficulty = 1.0;
-
-  if (score === 40) {
-    const number = parseFloat(addressStr);
-    const maxNumber = 1e40 - 1;
-    const difficulty1 = totalCombinations(40) / 10 ** 40 / (number / maxNumber);
-    const difficulty2 =
-      totalCombinations(40) / 10 ** 40 / ((maxNumber - number) / maxNumber);
-    difficulty = Math.max(difficulty1, difficulty2);
-  }
-
-  return { category: "numbers-only", score, difficulty };
+  const difficulty = numbersHeavyDifficulty(score, 40);
+  return { category: "numbers-heavy", score, difficulty };
 }
 
 function calculateSnakeNoCase(addressStr: string): AddressSinglePatternScore {
@@ -109,13 +82,12 @@ export function scoreSingleAddress(address: string): AddressScore {
   const addressMixedCase = getAddress(addressLowerCase); // EIP-55 checksum
 
   const addressStr = addressLowerCase.substring(2);
-  const currentNum = BigInt("0x" + addressStr);
 
   const scoreEntries: AddressSinglePatternScore[] = [
-    calculateLeadingZeroes(addressStr, currentNum),
-    calculateLeadingAny(addressStr, currentNum),
+    calculateLeadingZeroes(addressStr),
+    calculateLeadingAny(addressStr),
     calculateLettersHeavy(addressStr),
-    calculateNumbersOnly(addressStr),
+    calculateNumbersHeavy(addressStr),
     calculateSnakeNoCase(addressStr),
   ];
 

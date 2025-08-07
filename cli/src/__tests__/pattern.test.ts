@@ -38,13 +38,13 @@ describe("Pattern Scoring", () => {
       expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
-    it("should correctly identify 'numbers-only' as the best category", () => {
-      const address = "0x0000000000000000000000000000000000000001";
+    it("should correctly identify 'numbers-heavy' as the best category", () => {
+      const address = "0x1234123412341234123412341234123412341234";
       const result = scoreSingleAddress(address);
 
-      expect(result.bestCategory.category).toBe("numbers-only");
+      expect(result.bestCategory.category).toBe("numbers-heavy");
       expect(result.bestCategory.score).toBe(40);
-      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
+      expect(result.bestCategory.difficulty).toBe(1 / (10 / 16) ** 40); // every (40) character is a number (10 choices out of 16)
     });
 
     it("should correctly identify 'snake-score-no-case' as the best category", () => {
@@ -67,7 +67,7 @@ describe("Pattern Scoring", () => {
         "leading-zeroes",
         "leading-any",
         "letters-heavy",
-        "numbers-only",
+        "numbers-heavy",
         "snake-score-no-case",
       ];
 
