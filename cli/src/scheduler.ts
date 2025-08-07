@@ -1,27 +1,37 @@
 import { BudgetMonitor } from "./budget";
+import type { GolemSessionManager } from "./node_manager/golem_session";
 import {
-  GolemSessionManager,
-  OnErrorHandler,
-} from "./node_manager/golem_session";
-import { AppContext, setJobId } from "./app_context";
-import { GenerationParams } from "./params";
-import { EstimatorService } from "./estimator_service";
-import { getProviderEstimatorSummaryMessage } from "./ui/displaySummary";
-import { Problem } from "./lib/db/schema";
-import { SchedulerRecorder } from "./scheduler/types";
+  type AppContext,
+  setIterationNo,
+  withJobId,
+  withWorkerNo,
+} from "./app_context";
+import type { GenerationParams } from "./params";
+import type { EstimatorService } from "./estimator_service";
+import type { Problem } from "./lib/db/schema";
+import type { SchedulerRecorder } from "./scheduler/types";
 import { v4 as uuidv4 } from "uuid";
+import { getProviderEstimatorSummaryMessage } from "./ui/displaySummary";
+import { sleep } from "@golem-sdk/golem-js";
 
 /**
  * The purpose of the Scheduler is to continuously generate tasks until either enough addresses are found or the budget is exhausted.
  */
 export class Scheduler {
   schedulerRecorder: SchedulerRecorder;
+  iterationNo = 0;
+  _generationParams: GenerationParams | null;
   constructor(
     private readonly sessionManager: GolemSessionManager,
     private readonly estimator: EstimatorService,
     recorder: SchedulerRecorder,
   ) {
     this.schedulerRecorder = recorder;
+    this._generationParams = null;
+  }
+
+  public generationParams(): GenerationParams | null {
+    return this._generationParams;
   }
 
   public async runGenerationProcess(
@@ -35,23 +45,13 @@ export class Scheduler {
       specifier: params.vanityAddressPrefix.fullPrefix(),
     };
 
-    this.schedulerRecorder.startGenerationJob(
+    await this.schedulerRecorder.startGenerationJob(
       ctx,
       jobId,
       problem,
       params,
       this.sessionManager.getProcessingUnitType(),
     );
-
-    const onError: OnErrorHandler = async ({ error, provider }) => {
-      ctx
-        .L()
-        .info(
-          `Provider ${provider.name} encountered an error: ${error.message}. Removing them from the pool.`,
-        );
-      // Determine if the error is recoverable and update reputation here
-      return false; // Destroy the rental
-    };
 
     const budgetMonitor = new BudgetMonitor(
       this.sessionManager,
@@ -61,22 +61,20 @@ export class Scheduler {
 
     budgetMonitor.startMonitoring({
       onAllocationAmendError: (error) => {
-        ctx.L().error("Error monitoring and amending budget:", error);
+        ctx.error(`Error monitoring and amending budget: ${error}`);
         ctx.consoleError(
           "⚠️ Cannot extend allocation, do you have enough GLMs? Stopping work ...",
         );
         this.sessionManager.stopWork("Cannot extend allocation");
       },
       onAllocationAmendSuccess: (allocation) => {
-        ctx
-          .L()
-          .info(
-            `Extended allocation to (timeout=${allocation.timeout}, budget=${allocation.totalAmount})`,
-          );
+        ctx.info(
+          `Extended allocation to (timeout=${allocation.timeout}, budget=${allocation.totalAmount})`,
+        );
         budgetMonitor.displayBudgetInfo(ctx, allocation);
       },
       onBudgetExhausted: () => {
-        ctx.L().info("Budget exhausted, stopping work ...");
+        ctx.info("Budget exhausted, stopping work ...");
         ctx.consoleInfo("💰⚠️ Budget exhausted, stopping work ...");
         this.sessionManager.stopWork("Budget exhausted");
       },
@@ -85,12 +83,17 @@ export class Scheduler {
     console.log(
       `🔨 Starting work with ${params.numberOfWorkers} concurrent providers...`,
     );
-
-    const newCtx = setJobId(ctx, jobId);
+    const newCtx = withJobId(ctx, jobId);
     // Create and start multiple providers in parallel
-    const workerPromises = Array.from({ length: params.numberOfWorkers }, () =>
-      this.workInLoop(newCtx, params, onError),
-    );
+
+    const workerPromises = [];
+
+    for (let i = 0; i < params.numberOfWorkers; i++) {
+      this._generationParams = params;
+
+      workerPromises.push(this.workInLoop(withWorkerNo(newCtx, i), params));
+      await sleep(0.3);
+    }
 
     await Promise.allSettled(workerPromises);
 
@@ -109,17 +112,16 @@ export class Scheduler {
   private async workInLoop(
     ctx: AppContext,
     params: GenerationParams,
-    onError: OnErrorHandler,
   ): Promise<void> {
     // This loop continues as long as the overall job is not done
     while (!this.sessionManager.isWorkStopped()) {
+      this.iterationNo += 1;
+      const iterationNo = this.iterationNo;
       // Check if the target number of results is reached
       if (this.sessionManager.noResults >= params.numResults) {
-        ctx
-          .L()
-          .info(
-            `Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
-          );
+        ctx.info(
+          `Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
+        );
         console.log(
           `🥳 Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
         );
@@ -131,14 +133,13 @@ export class Scheduler {
         // A single provider runs one iteration. When it's done, the loop
         // will check conditions again and start another if needed.
         const iterInfo = await this.sessionManager.runSingleIteration(
-          ctx,
+          setIterationNo(ctx, iterationNo),
           params,
-          onError,
         );
 
         if (iterInfo == null) {
-          ctx.L().info("No provider available, trying again.");
-          console.log("No provider available, trying again.");
+          ctx.info(`No provider available`);
+          await sleep(5);
           continue;
         }
         const esp = await this.estimator.getCurrentEstimate(
@@ -154,16 +155,15 @@ export class Scheduler {
         ctx.consoleInfo(
           getProviderEstimatorSummaryMessage(esp, iterInfo.provider.name),
         );
-
         // TODO: add here the reputation model update
       } catch (error) {
         if (this.sessionManager.isWorkStopped()) {
           // we can safely assume that the error is due to the work being stopped
-          ctx.L().info("Work was stopped, exiting the provider loop.");
+          ctx.info(`Work was stopped, exiting the provider loop.`);
           break;
         }
-        ctx.L().error("Unhandled error during a provider iteration:", error);
-        console.error("Error in provider, continuing if possible:", error);
+        ctx.error(`Unhandled error during a provider iteration: ${error}`);
+        await sleep(5);
         // don't rethrow the error, just continue the loop, we'll get another provider
         // next time we call `runSingleIteration`
       }

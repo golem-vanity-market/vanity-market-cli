@@ -4,6 +4,8 @@ import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";
 import { ResultsService } from "./results_service";
 import { EstimatorInfo } from "./estimator/estimator";
+//import { bannedProviders } from "./node_manager/selector";
+import { displayDifficulty } from "./utils/format";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
@@ -24,6 +26,13 @@ export interface ProviderCurrentEstimate extends EstimatorInfo {
   costPerHour?: number;
 }
 
+export interface EstimatorDynamicParams {
+  minimumAcceptedSpeed: number;
+  minimumAcceptedEfficiency: number;
+}
+
+export let uploaderJobId: string;
+
 export class EstimatorService {
   private proofQueue: Map<string, ProofEntryResult[]> = new Map();
 
@@ -35,9 +44,49 @@ export class EstimatorService {
   private options;
   private ctx;
 
+  private dynamicParams: EstimatorDynamicParams = {
+    minimumAcceptedSpeed: parseFloat(process.env.SPEED_LOWER_THRESHOLD || "1"),
+    minimumAcceptedEfficiency: parseFloat(
+      process.env.EFFICIENCY_LOWER_THRESHOLD || "0.1",
+    ),
+  };
+
   constructor(ctx: AppContext, opt: EstimatorServiceOptions) {
     this.ctx = ctx;
     this.options = opt;
+  }
+
+  public getDynamicParams(): EstimatorDynamicParams {
+    return structuredClone(this.dynamicParams);
+  }
+
+  public setDynamicParams(params: EstimatorDynamicParams): void {
+    this.dynamicParams = structuredClone(params);
+  }
+
+  public allEstimatorsInfo(): object {
+    const estimatorArray = [];
+    for (const [jobId, estimator] of this.estimators.entries()) {
+      estimatorArray.push({
+        jobId: jobId,
+        currentInfo: estimator.currentInfo(),
+        currentCost: estimator.currentCost,
+      });
+    }
+    return {
+      estimators: estimatorArray,
+      totalEstimator: this.totalEstimator
+        ? this.totalEstimator.currentInfo()
+        : null,
+    };
+  }
+
+  public totalOnly(): object {
+    return {
+      totalEstimator: this.totalEstimator
+        ? this.totalEstimator.currentInfo()
+        : null,
+    };
   }
 
   public getEstimator(jobId: string): Estimator {
@@ -52,6 +101,7 @@ export class EstimatorService {
     jobId: string,
     providerName: string,
     providerId: string,
+    providerWalletAddress: string,
     diff: number,
   ) {
     if (!this.totalEstimator) {
@@ -99,6 +149,12 @@ export class EstimatorService {
       throw new Error(`No proof queue found for job ${jobId}.`);
     }
 
+    const estimator = this.estimators.get(jobId);
+    if (!estimator) {
+      this.ctx.L().error(`Estimator for job ${jobId} not found.`);
+      throw Error("Estimator not found for job: " + jobId);
+    }
+
     for (const entry of proofQueue) {
       const estimator = this.estimators.get(entry.jobId);
       if (!estimator) {
@@ -124,8 +180,51 @@ export class EstimatorService {
     }
   }
 
-  public didProviderDoneWork(_agreementId: string, _amountF: number) {
-    return true; // TODO: Placeholder for termination logic
+  public check_if_terminate(jobId: string, givenCost: number | null): boolean {
+    const efficiencyLowerThreshold =
+      this.dynamicParams.minimumAcceptedEfficiency;
+    const speedLowerThreshold = this.dynamicParams.minimumAcceptedSpeed;
+    const SPEED_ESTIMATION_TIMEFRAME = parseInt(
+      process.env.SPEED_ESTIMATION_TIMEFRAME || "300",
+    ); // 5 minutes in seconds
+    const estimator = this.estimators.get(jobId);
+    if (estimator) {
+      if (estimator.stopping) {
+        this.ctx.L().info(`Estimator for job ${jobId} is stopping.`);
+        return true;
+      }
+      const info = estimator.currentInfo();
+
+      let speedEstimation;
+
+      if (givenCost !== null) {
+        speedEstimation = estimator.estimatedSpeedGivenCost(
+          SPEED_ESTIMATION_TIMEFRAME,
+          givenCost,
+        );
+      } else {
+        speedEstimation = estimator.estimatedSpeed(SPEED_ESTIMATION_TIMEFRAME);
+      }
+
+      console.log("Info cost: ", info.cost);
+      if (info.cost > 0) {
+        console.log("Efficiency: ", speedEstimation.efficiency);
+        if (
+          speedEstimation.efficiency &&
+          (speedEstimation.efficiency < efficiencyLowerThreshold ||
+            speedEstimation.speed < speedLowerThreshold)
+        ) {
+          estimator.stopping = true;
+          //@todo add to banned providers
+          //bannedProviders.add(estimator.providerId);
+          this.ctx.consoleInfo(
+            `⚠️ Low efficiency or speed detected for ${estimator.providerName}: ${speedEstimation.efficiency} TH/GLM, ${displayDifficulty(speedEstimation.speed)}. Stopping.`,
+          );
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   private get messageLoopSecs(): number {
@@ -147,6 +246,7 @@ export class EstimatorService {
       };
     }
     job.setCurrentCost(cost);
+    job.addProvedWork(0);
 
     let totalCost = 0;
     for (const estimator of this.estimators.values()) {
@@ -157,6 +257,16 @@ export class EstimatorService {
       accepted: true,
       reason: `Cost for job ${jobId} accepted: ${cost} GLM.`,
     };
+  }
+
+  public reportEmpty(jobId: string) {
+    const job = this.estimators.get(jobId);
+    if (!job) {
+      return;
+    }
+    job.addProvedWork(0);
+
+    this.totalEstimator?.addProvedWork(0);
   }
 
   public pushProofToQueue(result: ProofEntryResult): boolean {

@@ -1,6 +1,6 @@
-import { AppContext } from "../app_context";
-import { Problem } from "../lib/db/schema";
-import { GenerationParams, ProcessingUnitType } from "../params";
+import type { AppContext } from "../app_context";
+import type { Problem } from "../lib/db/schema";
+import type { GenerationParams, ProcessingUnitType } from "../params";
 
 export interface SchedulerRecorder {
   startGenerationJob(

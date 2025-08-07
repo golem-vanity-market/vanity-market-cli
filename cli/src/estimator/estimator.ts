@@ -10,6 +10,7 @@ export interface EstimatorInfo {
   estimatedSpeed10m: SpeedEstimation;
   estimatedSpeed20m: SpeedEstimation;
   estimatedSpeed1h: SpeedEstimation;
+  estimatedSpeed1y: SpeedEstimation;
   providerName: string;
   providerId: string;
   cost: number;
@@ -97,6 +98,7 @@ const MAX_HISTORY_SIZE = 1000;
 const HISTORY_TRUNCATE_AT_ONCE = 100;
 
 export class Estimator {
+  uploadUid: string | null = null; // Optional upload UID for tracking
   targetDifficulty: number;
   workDoneSinceLastSuccess: number = 0;
   totalWorkDone: number = 0;
@@ -117,7 +119,7 @@ export class Estimator {
   private _appendEntry(entry: EstimatorHistoryEntry) {
     this._entries.push(entry);
     if (this._entries.length > MAX_HISTORY_SIZE) {
-      this._entries.splice(0, HISTORY_TRUNCATE_AT_ONCE);
+      this._entries.splice(1, HISTORY_TRUNCATE_AT_ONCE); // Keep the history size manageable, but keep the oldest entry
     }
   }
 
@@ -167,6 +169,34 @@ export class Estimator {
       successes: this.totalSuccesses,
       cost: this.currentCost,
     });
+  }
+
+  /**
+   * Calculates the hashrate over a given recent time frame, assuming a given cost at the end.
+   */
+  public estimatedSpeedGivenCost(
+    timeFrameSecs: number,
+    givenCost: number,
+  ): SpeedEstimation {
+    const entryOld = this._getOldestRecentEntry(timeFrameSecs);
+    const entryNew = this._findNewestUsableEntry();
+
+    let efficiency = null;
+    if (givenCost > entryOld.cost) {
+      const workDiff = entryNew.totalWorkDone - entryOld.totalWorkDone;
+      const costDiff = givenCost - entryOld.cost;
+      efficiency = workDiff / costDiff / 1e12; // Efficiency in TH/GLM
+    }
+
+    return new SpeedEstimation(
+      new Date(entryNew.timePoint),
+      new Date(entryOld.timePoint),
+      entryNew.totalWorkDone,
+      entryOld.totalWorkDone,
+      givenCost,
+      entryOld.cost,
+      efficiency,
+    );
   }
 
   /**
@@ -246,6 +276,11 @@ export class Estimator {
     );
     const luckFactor = this.luckFactor(this.workDoneSinceLastSuccess);
     const remainingTimeSec = this.estimateTime();
+    const estimatedSpeed1y = this.estimatedSpeed(365 * 24 * 60 * 60);
+    const estimatedSpeed1h = this.estimatedSpeed(3600);
+    const estimatedSpeed10m = this.estimatedSpeed(10 * 60);
+    const estimatedSpeed20m = this.estimatedSpeed(20 * 60);
+    const estimatedSpeed5m = this.estimatedSpeed(5 * 60);
 
     const totalEfficiency =
       this.currentCost > 0
@@ -258,10 +293,11 @@ export class Estimator {
       luckFactor: luckFactor,
       probabilityFactor: probabilityFactor,
       remainingTimeSec: remainingTimeSec,
-      estimatedSpeed5m: this.estimatedSpeed(300),
-      estimatedSpeed10m: this.estimatedSpeed(600),
-      estimatedSpeed20m: this.estimatedSpeed(1200),
-      estimatedSpeed1h: this.estimatedSpeed(3600),
+      estimatedSpeed5m: estimatedSpeed5m,
+      estimatedSpeed10m: estimatedSpeed10m,
+      estimatedSpeed20m: estimatedSpeed20m,
+      estimatedSpeed1h: estimatedSpeed1h,
+      estimatedSpeed1y: estimatedSpeed1y,
       providerName: this.providerName,
       providerId: this.providerId,
       cost: this.currentCost,

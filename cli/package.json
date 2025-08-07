@@ -1,6 +1,6 @@
 {
   "name": "@unoperate/golem-vaddr-cli",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Vanity address generator CLI",
   "bin": {
     "golem-addr": "dist/index.js"
@@ -75,7 +75,7 @@
     "cli-progress": "^3.12.0",
     "commander": "^11.0.0",
     "dotenv": "^16.5.0",
-    "drizzle-orm": "^0.44.2",
+    "drizzle-orm": "^0.44.4",
     "elliptic": "^6.6.1",
     "ethers": "^6.14.3",
     "js-sha3": "^0.9.3",
