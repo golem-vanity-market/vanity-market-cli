@@ -35,12 +35,13 @@ import {
 } from "../validator";
 
 import {
-  getJobProviderID,
   type GolemSessionRecorder,
   type Reputation,
-  withJobProviderID,
+  getProviderJobId,
+  withProviderJobID,
 } from "./types";
 import { ReputationImpl } from "../reputation/reputation";
+import { ProviderJobModel } from "../lib/db/schema";
 
 /**
  * Parameters for the GolemSessionManager constructor
@@ -338,7 +339,7 @@ export class GolemSessionManager {
       //TODO Reputation
       //is that the best place?
 
-      await this.dbRecorder.jobStarted(ctx, getJobProviderID(ctx));
+      await this.dbRecorder.providerJobStarted(ctx, getProviderJobId(ctx));
 
       ctx.info(`Executing command: ${command}`);
       const startTime = Date.now();
@@ -375,11 +376,7 @@ export class GolemSessionManager {
       }
 
        */
-
-      //TODO reputation
-      //push all proofs to db
-      //process results and set hashrate/offences/glmspent
-      await this.dbRecorder.jobCompleted(ctx, getJobProviderID(ctx));
+      await this.dbRecorder.providerJobCompleted(ctx, getProviderJobId(ctx));
 
       const stdout = res.stdout ? String(res.stdout) : "";
 
@@ -404,7 +401,7 @@ export class GolemSessionManager {
         //TODO reputation
         // push proofs to table
         // if some failed to parse, set offense to nonsense
-        await this.dbRecorder.resultFailedParsing(ctx, getJobProviderID(ctx));
+        await this.dbRecorder.resultFailedParsing(ctx, getProviderJobId(ctx));
 
         ctx.error(`failed to parse lines: ${cmdResult.failedLines}`);
         throw new Error("Failed to parse result lines");
@@ -422,8 +419,8 @@ export class GolemSessionManager {
       return cmdResult;
     } catch (error) {
       if (this.stopWorkAC.signal.aborted) {
-        ctx.info(`Work was stopped by user`);
-        await this.dbRecorder.jobStopped(ctx, getJobProviderID(ctx));
+        ctx.L().info("Work was stopped by user");
+        await this.dbRecorder.providerJobStopped(ctx, getProviderJobId(ctx));
         return {
           agreementId,
           provider: rental.agreement.provider,
@@ -435,10 +432,10 @@ export class GolemSessionManager {
         };
       }
       // TODO: inform estimator and reputation model
-      ctx.error(`Error during profanity_cuda execution: ${error}`);
-      await this.dbRecorder.jobFailed(
+      ctx.L().error(`Error during profanity_cuda execution: ${error}`);
+      await this.dbRecorder.providerJobFailed(
         ctx,
-        getJobProviderID(ctx),
+        getProviderJobId(ctx),
         String(error),
       );
 
@@ -515,6 +512,9 @@ export class GolemSessionManager {
     let wasSuccess = true;
 
     const rental = await this.rentalPool.acquire(this.stopWorkAC.signal); // wait as long as needed to find a provider (cancelled by stopWorkAC)
+
+    await this.dbRecorder.agreementCreate(ctx, getJobId(ctx), rental.agreement);
+
     const providerName = rental.agreement.provider.name;
 
     ctx.info(`Checking if terminate rental with provider: ${providerName}`);
@@ -531,13 +531,13 @@ export class GolemSessionManager {
     let shouldKeepRental: boolean;
     let cmdResult: CommandResult | null = null;
 
-    // TODO Reputation select additional problems for hashrate verification
-    const provJobId = await this.dbRecorder.agreementAcquired(
+    // TODO Reputation select additional problems for hashrateverification
+    const providerJobId = await this.dbRecorder.providerJobCreate(
       ctx,
       getJobId(ctx),
       rental.agreement,
     );
-    ctx = withJobProviderID(ctx, provJobId);
+    ctx = withProviderJobID(ctx, providerJobId);
 
     try {
       await this.initEstimatorForRental(rental, generationParams);
@@ -551,6 +551,10 @@ export class GolemSessionManager {
 
       await this.processCommandResult(ctx, cmdResult, generationParams);
       ctx.info(`Processing results completed`);
+
+      await this.estimatorService.process(rental.agreement.id);
+
+      await this.storeHashRate(ctx, providerJobId, rental.agreement.id);
 
       if (this.isWorkStopped()) {
         ctx.info(`Work was stopped by user, releasing rental`);
@@ -614,6 +618,30 @@ export class GolemSessionManager {
     return cmdResult;
   }
 
+  private async storeHashRate(
+    ctx: AppContext,
+    providerJobId: string,
+    agreementId: string,
+  ) {
+    const providerJobs: ProviderJobModel[] =
+      await this.dbRecorder.getProviderJob(ctx, providerJobId);
+    const providerJob = providerJobs[0];
+    if (providerJob.endTime) {
+      const providerJobStartTime = new Date(providerJob.startTime);
+      const providerJobEndTime = new Date(providerJob.endTime);
+      const providerJobSeconds =
+        (providerJobEndTime.getTime() - providerJobStartTime.getTime()) / 1000;
+      const speedEstimation = this.estimatorService
+        .getEstimator(agreementId)
+        .estimatedSpeedSingleRun(providerJobSeconds);
+      return this.dbRecorder.addHashRate(
+        ctx,
+        providerJobId,
+        speedEstimation.speed,
+      );
+    }
+  }
+
   private async initEstimatorForRental(
     rental: ResourceRental,
     generationParams: GenerationParams,
@@ -637,7 +665,7 @@ export class GolemSessionManager {
   ): Promise<void> {
     if (cmd.results.length === 0) {
       ctx.info("No results found in the command output");
-      this.estimatorService.reportEmpty(getJobProviderID(ctx));
+      this.estimatorService.reportEmpty(getProviderJobId(ctx));
       return;
     }
 
@@ -659,7 +687,7 @@ export class GolemSessionManager {
       if (!isValid.isValid) {
         await this.dbRecorder.resultInvalidVanityKey(
           ctx,
-          getJobProviderID(ctx),
+          getProviderJobId(ctx),
         );
         ctx
           .L()
@@ -678,7 +706,7 @@ export class GolemSessionManager {
 
       // (1) if we have info about the pattern for the result
       // we can use it to write the right proof
-      await this.dbRecorder.proofsStore(ctx, getJobProviderID(ctx), [result]);
+      await this.dbRecorder.proofsStore(ctx, getProviderJobId(ctx), [result]);
       this.estimatorService.pushProofToQueue(entry);
 
       if (isUserPrefix) {

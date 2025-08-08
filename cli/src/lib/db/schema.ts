@@ -1,10 +1,4 @@
-import {
-  integer,
-  real,
-  sqliteTable,
-  text,
-  numeric,
-} from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { InferInsertModel, InferSelectModel, sql } from "drizzle-orm";
 import { ProofCategory } from "../../pattern/pattern";
 
@@ -22,9 +16,11 @@ export const offenceNames = [
   "repeat",
   "nonsense",
 ] as const;
+export const debitNoteStatusNames = ["accepted", "rejected"] as const;
 export type ProcessingUnit = (typeof processingUnitNames)[number];
 export type JobStatus = (typeof statusNames)[number];
 export type JobOffence = (typeof offenceNames)[number];
+export type DebitNoteStatus = (typeof debitNoteStatusNames)[number];
 
 export type problemType = "prefix" | "suffix";
 
@@ -72,14 +68,12 @@ export const providerJobsTable = sqliteTable("provider_job", {
   jobId: text("job_id")
     .notNull()
     .references(() => jobsTable.id, { onDelete: "cascade" }),
-  agreementId: text("agreement_id"),
+  agreementId: text("agreement_id")
+    .notNull()
+    .references(() => agreementsTable.agreementId, { onDelete: "cascade" }),
   status: text({ enum: statusNames }).notNull().$type<JobStatus>(),
   offence: text({ enum: offenceNames }).$type<JobOffence>(),
-  providerId: text("provider_id").notNull(),
-  providerName: text("provider_name").notNull(),
-  providerWalletAddress: text("provider_wallet_address").notNull(),
-  glmSpent: numeric("glm_spent"),
-  hashRate: numeric("hash_rate"),
+  hashRate: real("hash_rate"),
   vanityAdditionalProblems: text({ mode: "json" }).$type<Problem[]>(),
   startTime: text("start_time")
     .notNull()
@@ -105,3 +99,34 @@ export const proofsTable = sqliteTable("proof", {
 
 export type ProofModel = InferSelectModel<typeof proofsTable>;
 export type NewProofModel = InferInsertModel<typeof proofsTable>;
+
+export const agreementsTable = sqliteTable("agreement", {
+  agreementId: text("agreement_id").primaryKey(),
+  providerId: text("provider_id").notNull(),
+  providerName: text("provider_name").notNull(),
+  providerWalletAddress: text("provider_wallet_address").notNull(),
+  jobId: text("job_id")
+    .notNull()
+    .references(() => jobsTable.id, { onDelete: "cascade" }),
+});
+
+export type AgremeentModel = InferSelectModel<typeof agreementsTable>;
+export type NewAgreementModel = InferInsertModel<typeof agreementsTable>;
+
+export const debitNotesTable = sqliteTable("debitNote", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  debitNoteId: text("debitnote_id"),
+  agreementId: text("agreement_id")
+    .notNull()
+    .references(() => agreementsTable.agreementId, { onDelete: "cascade" }),
+  glmAmount: real("glm_amount"),
+  timestamp: text("timestamp")
+    .notNull()
+    .default(sql`(current_timestamp)`),
+  status: text({ enum: debitNoteStatusNames })
+    .notNull()
+    .$type<DebitNoteStatus>(),
+});
+
+export type DebitNoteModel = InferSelectModel<typeof debitNotesTable>;
+export type NewDebitNoteModel = InferInsertModel<typeof debitNotesTable>;

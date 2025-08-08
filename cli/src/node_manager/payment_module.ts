@@ -13,6 +13,7 @@ import {
 } from "@golem-sdk/golem-js/dist/payment";
 import { GolemServices } from "@golem-sdk/golem-js/dist/golem-network";
 import { PaymentModuleOptions } from "@golem-sdk/golem-js/dist/payment/payment.module";
+import { debitNotesTable, NewDebitNoteModel } from "../lib/db/schema";
 
 export class VanityPaymentModule extends PaymentModuleImpl {
   public static estimatorService: EstimatorService;
@@ -72,6 +73,16 @@ export class VanityPaymentModule extends PaymentModuleImpl {
           );
         return debitNote;
       }
+      const newDebitNote: NewDebitNoteModel = {
+        agreementId: debitNote.agreementId,
+        debitNoteId: debitNote.id,
+        glmAmount: amountF,
+        status: resp.accepted ? "accepted" : "rejected",
+      };
+      await VanityPaymentModule.ctx
+        .getDB()
+        .insert(debitNotesTable)
+        .values(newDebitNote);
       return await super.acceptDebitNote(debitNote, allocation, amount);
     } catch (error) {
       VanityPaymentModule.ctx
