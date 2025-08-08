@@ -1,93 +1,81 @@
+import { Problem } from "../lib/db/schema";
 import {
   binomialCoefficient,
   exactlyLettersCombinations,
   exactlyLettersCombinationsDifficulty,
   totalCombinations,
 } from "../pattern/math";
-import { scoreSingleAddress, ProofCategory } from "../pattern/pattern";
+import { scoreProblems } from "../pattern/pattern";
+
+const ALL_PROBLEMS: Problem[] = [
+  { type: "leading-any" },
+  { type: "trailing-any" },
+  { type: "user-prefix", specifier: "0x1234567890abcdef" },
+  { type: "letters-heavy" },
+  { type: "numbers-heavy" },
+  { type: "snake-score-no-case" },
+];
 
 describe("Pattern Scoring", () => {
-  describe("scoreSingleAddress", () => {
-    it("should correctly score an address with a user-defined pattern", () => {
+  describe("scoreProblems", () => {
+    it("should correctly score an address with a user-defined prefix", () => {
       const address = "0x1234567890abcd0f1234567890abcdef12345678";
-      const result = scoreSingleAddress(address, "0x1234567890abcdef"); // 14/16 chars will match
+      const result = scoreProblems(address, ALL_PROBLEMS); // 14/16 chars will match
       const expectedScore = 14;
-      expect(result.bestCategory.category).toBe("user-pattern");
-      expect(result.bestCategory.score).toBe(expectedScore);
-      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
+      expect(result.category).toBe("user-prefix");
+      expect(result.score).toBe(expectedScore);
+      expect(result.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
     it("should correctly identify 'leading-any' as the best category", () => {
       const address = "0xaaaaaaaaaaaaaaaaaaaa01234567890123456789";
-      const result = scoreSingleAddress(address, "0x1234");
+      const result = scoreProblems(address, ALL_PROBLEMS);
       const expectedScore = 20;
 
-      expect(result.bestCategory.category).toBe("leading-any");
-      expect(result.bestCategory.score).toBe(expectedScore);
-      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
+      expect(result.category).toBe("leading-any");
+      expect(result.score).toBe(expectedScore);
+      expect(result.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
     it("should correctly identify 'trailing-any' as the best category", () => {
       const address = "0xabcd5678901234567890aaaaaaaaaaaaaaaaaaaa";
-      const result = scoreSingleAddress(address, "0x1234");
+      const result = scoreProblems(address, ALL_PROBLEMS);
       const expectedScore = 20;
 
-      expect(result.bestCategory.category).toBe("trailing-any");
-      expect(result.bestCategory.score).toBe(expectedScore);
-      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
+      expect(result.category).toBe("trailing-any");
+      expect(result.score).toBe(expectedScore);
+      expect(result.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
     it("should correctly identify 'letters-heavy' as the best category", () => {
       const address = "0xabcDefabcdefabcdefabcdefabcdefabcdefabcd";
-      const result = scoreSingleAddress(address, "0x1234");
+      const result = scoreProblems(address, ALL_PROBLEMS);
       const expectedScore = 40; // 40 letters
 
-      expect(result.bestCategory.category).toBe("letters-heavy");
-      expect(result.bestCategory.score).toBe(expectedScore);
-      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
+      expect(result.category).toBe("letters-heavy");
+      expect(result.score).toBe(expectedScore);
+      expect(result.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
     it("should correctly identify 'numbers-heavy' as the best category", () => {
       const address = "0x1234123412341234123412341234123412341234";
-      const result = scoreSingleAddress(address, "0x1234");
+      const result = scoreProblems(address, ALL_PROBLEMS);
 
-      expect(result.bestCategory.category).toBe("numbers-heavy");
-      expect(result.bestCategory.score).toBe(40);
-      expect(result.bestCategory.difficulty).toBe(1 / (10 / 16) ** 40); // every (40) character is a number (10 choices out of 16)
+      expect(result.category).toBe("numbers-heavy");
+      expect(result.score).toBe(40);
+      expect(result.difficulty).toBe(1 / (10 / 16) ** 40); // every (40) character is a number (10 choices out of 16)
     });
 
     it("should correctly identify 'snake-score-no-case' as the best category", () => {
       // This address has a high snake score but is weak in other categories
       const address = "0x2111111111111111111111111111111111111112";
-      const result = scoreSingleAddress(address, "0x1234");
+      const result = scoreProblems(address, ALL_PROBLEMS);
 
       const expectedScore = 37; // 37 '1's in a row
 
-      expect(result.bestCategory.category).toBe("snake-score-no-case");
-      expect(result.bestCategory.score).toBe(expectedScore);
-      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
-    });
-
-    it("should return a full score object with all categories", () => {
-      const address = "0xffffffffffffffffffffffffffffffffffffffff";
-      const result = scoreSingleAddress(address, "0x1234");
-
-      const expectedCategories: ProofCategory[] = [
-        "leading-any",
-        "letters-heavy",
-        "numbers-heavy",
-        "snake-score-no-case",
-      ];
-
-      for (const category of expectedCategories) {
-        expect(result.scores[category]).toBeDefined();
-      }
-    });
-
-    it("should throw an error for an invalid address format", () => {
-      expect(() => scoreSingleAddress("0x123", "0x1234")).toThrow(
-        "Invalid Ethereum address format",
-      );
+      expect(result.category).toBe("snake-score-no-case");
+      expect(result.score).toBe(expectedScore);
+      expect(result.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
   });
   describe("Math Functions", () => {

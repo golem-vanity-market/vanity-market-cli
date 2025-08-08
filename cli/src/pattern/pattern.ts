@@ -1,4 +1,3 @@
-import { getAddress } from "ethers";
 import {
   exactlyLettersCombinationsDifficulty,
   snakeDifficulty,
@@ -8,9 +7,10 @@ import {
   exactlyLettersCombinationsBigInt,
 } from "./math";
 import { ProcessingUnitType } from "../params";
+import { Problem } from "../lib/db/schema";
 
-export type ProofCategory =
-  | "user-pattern" // The address starts with the user-defined prefix.
+export type GeneratedAddressCategory =
+  | "user-prefix" // The address starts with the user-defined prefix.
   | "leading-any" // The number of leading characters that are the same.
   | "trailing-any" // The number of trailing characters that are the same.
   | "letters-heavy" // Addresses with a high number of letters (a-f).
@@ -18,11 +18,11 @@ export type ProofCategory =
   | "snake-score-no-case"; // The number of repeating characters in the address. Case insensitive.
 
 type ProofThresholds = {
-  [key in ProofCategory]?: number;
+  [key in GeneratedAddressCategory]?: number;
 };
 
 export const CPU_PROOF_THRESHOLDS: ProofThresholds = {
-  "user-pattern": 6, // At least 6 characters matching user provided pattern
+  "user-prefix": 6, // At least 6 characters matching user provided pattern
   "leading-any": 6, // At least 6 leading identical characters
   "trailing-any": 6, // At least 6 trailing identical characters
   "letters-heavy": 32, // At least 32 letters (a-f)
@@ -31,7 +31,7 @@ export const CPU_PROOF_THRESHOLDS: ProofThresholds = {
 };
 
 export const GPU_PROOF_THRESHOLDS: ProofThresholds = {
-  "user-pattern": 8, // At least 8 characters matching user provided pattern
+  "user-prefix": 8, // At least 8 characters matching user provided pattern
   "leading-any": 8, // At least 8 leading identical characters
   "trailing-any": 8, // At least 8 trailing identical characters
   "letters-heavy": 35, // At least 35 letters (a-f)
@@ -40,7 +40,7 @@ export const GPU_PROOF_THRESHOLDS: ProofThresholds = {
 };
 
 export interface AddressSinglePatternScore {
-  category: ProofCategory;
+  category: GeneratedAddressCategory;
   score: number;
   difficulty: number;
 }
@@ -48,14 +48,13 @@ export interface AddressSinglePatternScore {
 export interface AddressScore {
   addressLowerCase: string;
   addressMixedCase: string;
-  scores: Record<ProofCategory, AddressSinglePatternScore>;
+  scores: Record<GeneratedAddressCategory, AddressSinglePatternScore>;
   bestCategory: AddressSinglePatternScore;
 }
 
 export interface AddressProofResult {
-  addressScore: AddressScore;
   workDone: number;
-  passedCategory: ProofCategory | null;
+  passedProblem: Problem | null;
 }
 
 export function calculateLeadingAny(
@@ -106,63 +105,56 @@ function calculateSnakeNoCase(addressStr: string): AddressSinglePatternScore {
   return { category: "snake-score-no-case", score, difficulty };
 }
 
-function calculateUserPattern(
+function calculateUserPrefix(
   addressStr: string,
   userPattern: string,
 ): AddressSinglePatternScore {
   const patternLength = userPattern.length;
+  const userPatternFixed = (
+    userPattern.startsWith("0x") ? userPattern.slice(2) : userPattern
+  ).toLowerCase();
   // score == how many starting chars match
   let score = 0;
   for (let i = 0; i < patternLength; i++) {
-    if (addressStr[i] === userPattern[i]) {
+    if (addressStr[i] === userPatternFixed[i]) {
       score++;
     } else {
       break;
     }
   }
   const difficulty = Math.pow(16, score);
-  return { category: "user-pattern", score, difficulty };
+  return { category: "user-prefix", score, difficulty };
 }
 
-export function scoreSingleAddress(
-  address: string,
-  userPattern: string,
-): AddressScore {
-  if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
-    throw new Error("Invalid Ethereum address format");
+export function scoreProblem(address: string, problem: Problem) {
+  switch (problem.type) {
+    case "user-prefix":
+      return calculateUserPrefix(address, problem.specifier);
+    case "leading-any":
+      return calculateLeadingAny(address);
+    case "trailing-any":
+      return calculateTrailingAny(address);
+    case "letters-heavy":
+      return calculateLettersHeavy(address);
+    case "numbers-heavy":
+      return calculateNumbersHeavy(address);
+    case "snake-score-no-case":
+      return calculateSnakeNoCase(address);
+    default:
+      throw new Error(`Unknown problem type: ${problem}`);
   }
+}
 
-  const addressLowerCase = address.toLowerCase();
-  const addressMixedCase = getAddress(addressLowerCase); // EIP-55 checksum
-
-  const addressStr = addressLowerCase.substring(2);
-  const patternStr = userPattern.toLowerCase().substring(2);
-
-  const scoreEntries: AddressSinglePatternScore[] = [
-    calculateUserPattern(addressStr, patternStr),
-    calculateLeadingAny(addressStr),
-    calculateTrailingAny(addressStr),
-    calculateLettersHeavy(addressStr),
-    calculateNumbersHeavy(addressStr),
-    calculateSnakeNoCase(addressStr),
-  ];
-
-  const bestCategory = scoreEntries.reduce((a, b) =>
-    a.difficulty > b.difficulty ? a : b,
-  );
-
-  return {
-    addressLowerCase,
-    addressMixedCase,
-    scores: scoreEntries.reduce(
-      (acc, entry) => {
-        acc[entry.category] = entry;
-        return acc;
-      },
-      {} as Record<ProofCategory, AddressSinglePatternScore>,
-    ),
-    bestCategory,
-  };
+/**
+ * Score address against multiple problems and return best score (highest difficulty).
+ */
+export function scoreProblems(address: string, problems: Problem[]) {
+  const addressFixed = (
+    address.startsWith("0x") ? address.slice(2) : address
+  ).toLowerCase();
+  return problems
+    .map((problem) => scoreProblem(addressFixed, problem))
+    .reduce((a, b) => (a.difficulty > b.difficulty ? a : b));
 }
 
 const TOTAL_ADDRESS_SPACE = 16n ** 40n;
@@ -173,11 +165,11 @@ const TOTAL_ADDRESS_SPACE = 16n ** 40n;
  * NOTE: This calculation sums the spaces for each category, ignoring overlaps.
  */
 export function calculateProbabilitySpace(
-  category: ProofCategory,
+  category: GeneratedAddressCategory,
   threshold: number,
 ): bigint {
   switch (category) {
-    case "user-pattern": {
+    case "user-prefix": {
       // The number of addresses with at least `threshold` characters matching the user-defined pattern.
       if (threshold > 40 || threshold < 1) return 0n;
       return 16n ** BigInt(40 - threshold);
@@ -228,56 +220,83 @@ export function calculateProbabilitySpace(
   }
 }
 
-function calculateTotalProbabilitySpace(thresholds: ProofThresholds): bigint {
-  let total = 0n;
-  for (const [category, threshold] of Object.entries(thresholds)) {
-    total += calculateProbabilitySpace(category as ProofCategory, threshold);
+function calculateWorkUnitForProblems(
+  problems: Problem[],
+  thresholds: ProofThresholds,
+): number {
+  let totalProbabilitySpace = 0n;
+
+  for (const problem of problems) {
+    const category = problem.type;
+    const threshold = thresholds[category];
+    if (threshold === undefined) continue;
+    totalProbabilitySpace += calculateProbabilitySpace(category, threshold);
   }
-  return total || 1n;
+
+  return Number(TOTAL_ADDRESS_SPACE / totalProbabilitySpace || 1n);
 }
 
-export const CPU_PROBABILITY_SPACE_SUM =
-  calculateTotalProbabilitySpace(CPU_PROOF_THRESHOLDS);
-export const GPU_PROBABILITY_SPACE_SUM =
-  calculateTotalProbabilitySpace(GPU_PROOF_THRESHOLDS);
-
-// How much work each "proof" represents.
-export const WORK_DONE_PER_CPU_PROOF = Number(
-  TOTAL_ADDRESS_SPACE / CPU_PROBABILITY_SPACE_SUM,
-);
-export const WORK_DONE_PER_GPU_PROOF = Number(
-  TOTAL_ADDRESS_SPACE / GPU_PROBABILITY_SPACE_SUM,
-);
-
+/**
+ * Check if the address meets the proof requirements for the given problems and processing unit.
+ * If yes, return the problem passed and estimated work done.
+ */
 export function checkAddressProof(
   address: string,
-  userPattern: string,
+  problems: Problem[],
   processingUnit: ProcessingUnitType,
 ): AddressProofResult {
-  const addressScore = scoreSingleAddress(address, userPattern);
-  let passedCategory: ProofCategory | null = null;
-
   const thresholds =
     processingUnit === ProcessingUnitType.CPU
       ? CPU_PROOF_THRESHOLDS
       : GPU_PROOF_THRESHOLDS;
-  const workPerProof =
-    processingUnit === ProcessingUnitType.CPU
-      ? WORK_DONE_PER_CPU_PROOF
-      : WORK_DONE_PER_GPU_PROOF;
 
-  for (const category of Object.keys(thresholds) as ProofCategory[]) {
-    const threshold = thresholds[category];
-    if (threshold === undefined) continue;
-    if (addressScore.scores[category].score >= threshold) {
-      passedCategory = category;
-      break;
+  const workPerProof = calculateWorkUnitForProblems(problems, thresholds);
+
+  const userPrefixProblem = problems.find(
+    (p): p is Extract<Problem, { type: "user-prefix" }> =>
+      p.type === "user-prefix",
+  );
+
+  // If one of the problems was a user-prefix, first check if we got it perfectly
+  if (
+    userPrefixProblem &&
+    address.startsWith(userPrefixProblem.specifier.toLowerCase())
+  ) {
+    return {
+      workDone: workPerProof,
+      passedProblem: userPrefixProblem,
+    };
+  }
+
+  const matchingProblems = [];
+
+  for (const problem of problems) {
+    const problemScore = scoreProblem(address, problem);
+    if (
+      problemScore.score >
+      (thresholds[problem.type] || Number.POSITIVE_INFINITY)
+    ) {
+      matchingProblems.push({
+        problem,
+        score: problemScore.score,
+        difficulty: problemScore.difficulty,
+      });
     }
   }
 
+  if (matchingProblems.length === 0) {
+    return {
+      passedProblem: null,
+      workDone: 0,
+    };
+  }
+
+  const bestMatch = matchingProblems.reduce((prev, curr) => {
+    return prev.difficulty < curr.difficulty ? prev : curr;
+  });
+
   return {
-    addressScore,
-    workDone: passedCategory ? workPerProof : 0,
-    passedCategory,
+    passedProblem: bestMatch.problem,
+    workDone: workPerProof,
   };
 }

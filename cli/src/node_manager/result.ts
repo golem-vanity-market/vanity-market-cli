@@ -1,7 +1,8 @@
 import { ProviderInfo } from "@golem-sdk/golem-js";
 import { ProcessingUnitType } from "../params";
 import { AppContext } from "../app_context";
-import { AddressProofResult, checkAddressProof } from "../pattern/pattern";
+import { checkAddressProof } from "../pattern/pattern";
+import { Problem } from "../lib/db/schema";
 
 export type CommandStatus = "success" | "not_found" | "stopped";
 
@@ -9,9 +10,12 @@ export type VanityResult = {
   address: string;
   salt: string;
   pubKey: string;
-  pattern: string;
-  isUserPattern: boolean;
-  proof: AddressProofResult;
+  problem: Problem | null;
+  workDone: number;
+};
+
+export type VanityResultMatchingProblem = VanityResult & {
+  problem: Problem;
 };
 
 export interface IterationInfo {
@@ -35,7 +39,7 @@ export interface ParsedResults {
 export function parseVanityResults(
   ctx: AppContext,
   lines: string[],
-  pattern: string,
+  problems: Problem[],
   processingUnit: ProcessingUnitType,
 ): ParsedResults {
   const results: VanityResult[] = [];
@@ -45,7 +49,7 @@ export function parseVanityResults(
     try {
       line = line.trim();
       if (line.startsWith("0x")) {
-        const r = parseVanityResult(line, pattern, processingUnit);
+        const r = parseVanityResult(line, problems, processingUnit);
         if (r == null) {
           ctx.L().warn(`Invalid vanity result line from provider:`, line);
           failedLines.push(line);
@@ -66,7 +70,7 @@ export function parseVanityResults(
 
 export function parseVanityResult(
   line: string,
-  keyPattern: string,
+  problems: Problem[],
   processingUnit: ProcessingUnitType,
 ): VanityResult | null {
   const trimmedLine = line.trim();
@@ -82,12 +86,17 @@ export function parseVanityResult(
   const salt = parts[0].trim();
   const address = parts[1].trim();
   const pubKey = parts[2].trim();
+
+  const { passedProblem, workDone } = checkAddressProof(
+    address,
+    problems,
+    processingUnit,
+  );
   return {
     address,
     salt,
     pubKey,
-    isUserPattern: address.toLowerCase().startsWith(keyPattern.toLowerCase()),
-    pattern: keyPattern,
-    proof: checkAddressProof(address, keyPattern.toLowerCase(), processingUnit),
+    problem: passedProblem,
+    workDone,
   };
 }

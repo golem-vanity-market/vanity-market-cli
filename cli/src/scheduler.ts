@@ -8,7 +8,6 @@ import {
 } from "./app_context";
 import type { GenerationParams } from "./params";
 import type { EstimatorService } from "./estimator_service";
-import type { Problem } from "./lib/db/schema";
 import type { SchedulerRecorder } from "./scheduler/types";
 import { v4 as uuidv4 } from "uuid";
 import { getProviderEstimatorSummaryMessage } from "./ui/displaySummary";
@@ -40,15 +39,9 @@ export class Scheduler {
   ): Promise<void> {
     const jobId = uuidv4();
 
-    const problem: Problem = {
-      type: "prefix",
-      specifier: params.vanityAddressPrefix.fullPrefix(),
-    };
-
     await this.schedulerRecorder.startGenerationJob(
       ctx,
       jobId,
-      problem,
       params,
       this.sessionManager.getProcessingUnitType(),
     );

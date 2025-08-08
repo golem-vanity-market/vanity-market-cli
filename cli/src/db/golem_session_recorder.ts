@@ -7,15 +7,13 @@ import {
   providerJobsTable,
   NewProofModel,
   proofsTable,
-  GeneratedAddressCategory,
   agreementsTable,
   NewAgreementModel,
 } from "../lib/db/schema";
 import { GolemSessionRecorder } from "../node_manager/types";
-import { VanityResult } from "../node_manager/result";
+import { VanityResultMatchingProblem } from "../node_manager/result";
 
 import { v4 as uuidv4 } from "uuid";
-import { computePrefixDifficulty } from "../difficulty";
 
 export class GollemSessionRecorderImpl implements GolemSessionRecorder {
   async agreementCreate(
@@ -154,27 +152,15 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
   async proofsStore(
     ctx: AppContext,
     providerJobId: string,
-    results: VanityResult[],
+    results: VanityResultMatchingProblem[],
   ): Promise<void> {
     const newProofs: NewProofModel[] = results.map((res) => {
-      const vanityProblem: GeneratedAddressCategory = res.isUserPattern
-        ? {
-            type: "user-pattern",
-            pattern: res.pattern,
-            difficulty: computePrefixDifficulty(res.pattern),
-          }
-        : {
-            type: "proof",
-            category: res.proof.addressScore.bestCategory.category,
-            score: res.proof.addressScore.bestCategory.score,
-            difficulty: res.proof.addressScore.bestCategory.difficulty,
-          };
       return {
         providerJobId: providerJobId,
         addr: res.address,
         salt: res.salt,
         pubKey: res.pubKey,
-        vanityProblem,
+        vanityProblem: res.problem,
       };
     });
     await ctx.getDB().insert(proofsTable).values(newProofs);

@@ -26,6 +26,7 @@ import {
   type ParsedResults,
   type CommandResult,
   type VanityResult,
+  VanityResultMatchingProblem,
 } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
@@ -383,7 +384,7 @@ export class GolemSessionManager {
       const parsedResults: ParsedResults = parseVanityResults(
         ctx,
         stdout.split("\n"),
-        generationParams.vanityAddressPrefix.fullPrefix().toLowerCase(),
+        generationParams.problems,
         this.processingUnitType,
       );
 
@@ -679,7 +680,7 @@ export class GolemSessionManager {
         pubKey: result.pubKey,
         provider: cmd.provider,
         jobId: cmd.agreementId,
-        workDone: result.proof.workDone,
+        workDone: result.workDone,
       };
 
       const isValid = await validateVanityResult(ctx, result);
@@ -699,16 +700,18 @@ export class GolemSessionManager {
         );
       }
 
+      // if the result matches any problems we save it
+      if (result.problem) {
+        await this.dbRecorder.proofsStore(ctx, getProviderJobId(ctx), [
+          result as VanityResultMatchingProblem,
+        ]);
+        this.estimatorService.pushProofToQueue(entry);
+      }
+
       const isUserPrefix = validateAddressMatchPattern(
         result.address,
         generationParams.vanityAddressPrefix.fullPrefix(),
       );
-
-      // (1) if we have info about the pattern for the result
-      // we can use it to write the right proof
-      await this.dbRecorder.proofsStore(ctx, getProviderJobId(ctx), [result]);
-      this.estimatorService.pushProofToQueue(entry);
-
       if (isUserPrefix) {
         this.resultService.processValidatedEntry(
           entry,

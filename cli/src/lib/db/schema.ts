@@ -1,6 +1,6 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { InferInsertModel, InferSelectModel, sql } from "drizzle-orm";
-import { ProofCategory } from "../../pattern/pattern";
+import { GeneratedAddressCategory } from "../../pattern/pattern";
 
 export const processingUnitNames = ["cpu", "gpu"] as const;
 export const statusNames = [
@@ -22,37 +22,19 @@ export type JobStatus = (typeof statusNames)[number];
 export type JobOffence = (typeof offenceNames)[number];
 export type DebitNoteStatus = (typeof debitNoteStatusNames)[number];
 
-export type problemType = "prefix" | "suffix";
-
-/**
- * Problem provided by the user
- */
-export interface Problem {
-  type: problemType;
-  specifier: string;
-}
-
-/**
- * Generated address category - either a user-defined pattern (according to the job's problem)
- * or a proof
- */
-export type GeneratedAddressCategory =
+export type Problem =
   | {
-      type: "user-pattern";
-      pattern: string;
-      difficulty: number;
+      type: Exclude<GeneratedAddressCategory, "user-prefix">;
     }
   | {
-      type: "proof";
-      score: number;
-      difficulty: number;
-      category: ProofCategory;
+      type: "user-prefix";
+      specifier: string; // optional, relevant for specific problems like user provided prefix
     };
 
 export const jobsTable = sqliteTable("job", {
   id: text("id").primaryKey(),
   publicKey: text("public_key").notNull(),
-  vanityProblem: text({ mode: "json" }).notNull().$type<Problem>(),
+  vanityProblems: text({ mode: "json" }).notNull().$type<Problem[]>(),
   numWorkers: integer("num_workers").notNull(),
   budgetGlm: real("budget_glm").notNull(),
   processingUnit: text({ enum: processingUnitNames })
@@ -74,7 +56,6 @@ export const providerJobsTable = sqliteTable("provider_job", {
   status: text({ enum: statusNames }).notNull().$type<JobStatus>(),
   offence: text({ enum: offenceNames }).$type<JobOffence>(),
   hashRate: real("hash_rate"),
-  vanityAdditionalProblems: text({ mode: "json" }).$type<Problem[]>(),
   startTime: text("start_time")
     .notNull()
     .default(sql`(current_timestamp)`),
@@ -92,9 +73,7 @@ export const proofsTable = sqliteTable("proof", {
   addr: text("addr").notNull(),
   salt: text("salt").notNull(),
   pubKey: text("pub_key").notNull(),
-  vanityProblem: text({ mode: "json" })
-    .notNull()
-    .$type<GeneratedAddressCategory>(),
+  vanityProblem: text({ mode: "json" }).notNull().$type<Problem>(),
 });
 
 export type ProofModel = InferSelectModel<typeof proofsTable>;
