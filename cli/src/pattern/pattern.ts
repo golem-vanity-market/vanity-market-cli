@@ -260,7 +260,9 @@ export function checkAddressProof(
   // If one of the problems was a user-prefix, first check if we got it perfectly
   if (
     userPrefixProblem &&
-    address.startsWith(userPrefixProblem.specifier.toLowerCase())
+    address
+      .toLocaleLowerCase()
+      .startsWith(userPrefixProblem.specifier.toLowerCase())
   ) {
     return {
       workDone: workPerProof,
@@ -268,12 +270,15 @@ export function checkAddressProof(
     };
   }
 
-  const matchingProblems = [];
+  const addressFixed = (
+    address.startsWith("0x") ? address.slice(2) : address
+  ).toLowerCase();
 
+  const matchingProblems = [];
   for (const problem of problems) {
-    const problemScore = scoreProblem(address, problem);
+    const problemScore = scoreProblem(addressFixed, problem);
     if (
-      problemScore.score >
+      problemScore.score >=
       (thresholds[problem.type] || Number.POSITIVE_INFINITY)
     ) {
       matchingProblems.push({
@@ -292,7 +297,7 @@ export function checkAddressProof(
   }
 
   const bestMatch = matchingProblems.reduce((prev, curr) => {
-    return prev.difficulty < curr.difficulty ? prev : curr;
+    return prev.difficulty < curr.difficulty ? curr : prev;
   });
 
   return {
