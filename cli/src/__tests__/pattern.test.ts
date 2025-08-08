@@ -8,9 +8,18 @@ import { scoreSingleAddress, ProofCategory } from "../pattern/pattern";
 
 describe("Pattern Scoring", () => {
   describe("scoreSingleAddress", () => {
+    it("should correctly score an address with a user-defined pattern", () => {
+      const address = "0x1234567890abcd0f1234567890abcdef12345678";
+      const result = scoreSingleAddress(address, "0x1234567890abcdef"); // 14/16 chars will match
+      const expectedScore = 14;
+      expect(result.bestCategory.category).toBe("user-pattern");
+      expect(result.bestCategory.score).toBe(expectedScore);
+      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
+    });
+
     it("should correctly identify 'leading-any' as the best category", () => {
       const address = "0xaaaaaaaaaaaaaaaaaaaa01234567890123456789";
-      const result = scoreSingleAddress(address);
+      const result = scoreSingleAddress(address, "0x1234");
       const expectedScore = 20;
 
       expect(result.bestCategory.category).toBe("leading-any");
@@ -20,7 +29,7 @@ describe("Pattern Scoring", () => {
 
     it("should correctly identify 'letters-heavy' as the best category", () => {
       const address = "0xabcDefabcdefabcdefabcdefabcdefabcdefabcd";
-      const result = scoreSingleAddress(address);
+      const result = scoreSingleAddress(address, "0x1234");
       const expectedScore = 40; // 40 letters
 
       expect(result.bestCategory.category).toBe("letters-heavy");
@@ -30,7 +39,7 @@ describe("Pattern Scoring", () => {
 
     it("should correctly identify 'numbers-heavy' as the best category", () => {
       const address = "0x1234123412341234123412341234123412341234";
-      const result = scoreSingleAddress(address);
+      const result = scoreSingleAddress(address, "0x1234");
 
       expect(result.bestCategory.category).toBe("numbers-heavy");
       expect(result.bestCategory.score).toBe(40);
@@ -40,7 +49,7 @@ describe("Pattern Scoring", () => {
     it("should correctly identify 'snake-score-no-case' as the best category", () => {
       // This address has a high snake score but is weak in other categories
       const address = "0x2111111111111111111111111111111111111112";
-      const result = scoreSingleAddress(address);
+      const result = scoreSingleAddress(address, "0x1234");
 
       const expectedScore = 37; // 37 '1's in a row
 
@@ -51,7 +60,7 @@ describe("Pattern Scoring", () => {
 
     it("should return a full score object with all categories", () => {
       const address = "0xffffffffffffffffffffffffffffffffffffffff";
-      const result = scoreSingleAddress(address);
+      const result = scoreSingleAddress(address, "0x1234");
 
       const expectedCategories: ProofCategory[] = [
         "leading-any",
@@ -66,7 +75,7 @@ describe("Pattern Scoring", () => {
     });
 
     it("should throw an error for an invalid address format", () => {
-      expect(() => scoreSingleAddress("0x123")).toThrow(
+      expect(() => scoreSingleAddress("0x123", "0x1234")).toThrow(
         "Invalid Ethereum address format",
       );
     });

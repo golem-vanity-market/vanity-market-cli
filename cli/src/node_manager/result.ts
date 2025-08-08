@@ -88,6 +88,6 @@ export function parseVanityResult(
     pubKey,
     isUserPattern: address.toLowerCase().startsWith(keyPattern.toLowerCase()),
     pattern: keyPattern,
-    proof: checkAddressProof(address, processingUnit),
+    proof: checkAddressProof(address, keyPattern.toLowerCase(), processingUnit),
   };
 }

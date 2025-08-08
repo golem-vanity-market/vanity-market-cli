@@ -10,19 +10,31 @@ import {
 import { ProcessingUnitType } from "../params";
 
 export type ProofCategory =
+  | "user-pattern" // The address starts with the user-defined prefix.
   | "leading-any" // The number of leading characters that are the same.
   | "letters-heavy" // Addresses with a high number of letters (a-f).
   | "numbers-heavy" // Addresses with a high number of ciphers (0-9).
   | "snake-score-no-case"; // The number of repeating characters in the address. Case insensitive.
 
-export const CPU_PROOF_THRESHOLDS: Record<ProofCategory, number> = {
-  "leading-any": 8, // At least 6 leading identical characters
-  "letters-heavy": 30, // At least 30 letters (a-f)
-  "numbers-heavy": 33, // At least 33 numbers (0-9)
-  "snake-score-no-case": 10, // At least 10 pairs of adjacent identical characters
+type ProofThresholds = {
+  [key in ProofCategory]?: number;
 };
 
-export const GPU_PROOF_THRESHOLDS: Record<ProofCategory, number> = {
+export const CPU_PROOF_THRESHOLDS: ProofThresholds = {
+  "user-pattern": 6, // At least 6 characters matching user provided pattern
+
+  // TODO: add more thresholds when CPU cruncher is updated to return more proofs.
+  // Right now it returns pretty much only user-prefix, so doing these checks
+  // only pollutes the probability space.
+
+  // "leading-any": 8, // At least 8 leading identical characters
+  // "letters-heavy": 30, // At least 30 letters (a-f)
+  // "numbers-heavy": 33, // At least 33 numbers (0-9)
+  // "snake-score-no-case": 10, // At least 10 pairs of adjacent identical characters
+};
+
+export const GPU_PROOF_THRESHOLDS: ProofThresholds = {
+  "user-pattern": 8, // At least 8 characters matching user provided pattern
   "leading-any": 10, // At least 10 leading identical characters
   "letters-heavy": 35, // At least 35 letters (a-f)
   "numbers-heavy": 35, // At least 35 numbers (0-9)
@@ -81,7 +93,28 @@ function calculateSnakeNoCase(addressStr: string): AddressSinglePatternScore {
   return { category: "snake-score-no-case", score, difficulty };
 }
 
-export function scoreSingleAddress(address: string): AddressScore {
+function calculateUserPattern(
+  addressStr: string,
+  userPattern: string,
+): AddressSinglePatternScore {
+  const patternLength = userPattern.length;
+  // score == how many starting chars match
+  let score = 0;
+  for (let i = 0; i < patternLength; i++) {
+    if (addressStr[i] === userPattern[i]) {
+      score++;
+    } else {
+      break;
+    }
+  }
+  const difficulty = Math.pow(16, score);
+  return { category: "user-pattern", score, difficulty };
+}
+
+export function scoreSingleAddress(
+  address: string,
+  userPattern: string,
+): AddressScore {
   if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
     throw new Error("Invalid Ethereum address format");
   }
@@ -90,8 +123,10 @@ export function scoreSingleAddress(address: string): AddressScore {
   const addressMixedCase = getAddress(addressLowerCase); // EIP-55 checksum
 
   const addressStr = addressLowerCase.substring(2);
+  const patternStr = userPattern.toLowerCase().substring(2);
 
   const scoreEntries: AddressSinglePatternScore[] = [
+    calculateUserPattern(addressStr, patternStr),
     calculateLeadingAny(addressStr),
     calculateLettersHeavy(addressStr),
     calculateNumbersHeavy(addressStr),
@@ -128,6 +163,12 @@ export function calculateProbabilitySpace(
   threshold: number,
 ): bigint {
   switch (category) {
+    case "user-pattern": {
+      // The number of addresses with at least `threshold` characters matching the user-defined pattern.
+      if (threshold > 40 || threshold < 1) return 0n;
+      return 16n ** BigInt(40 - threshold);
+    }
+
     case "leading-any": {
       // The number of addresses with at least `threshold` identical leading characters.
       if (threshold > 40 || threshold < 1) return 0n;
@@ -167,14 +208,12 @@ export function calculateProbabilitySpace(
   }
 }
 
-function calculateTotalProbabilitySpace(
-  thresholds: Record<ProofCategory, number>,
-): bigint {
+function calculateTotalProbabilitySpace(thresholds: ProofThresholds): bigint {
   let total = 0n;
   for (const [category, threshold] of Object.entries(thresholds)) {
     total += calculateProbabilitySpace(category as ProofCategory, threshold);
   }
-  return total;
+  return total || 1n;
 }
 
 export const CPU_PROBABILITY_SPACE_SUM =
@@ -192,9 +231,10 @@ export const WORK_DONE_PER_GPU_PROOF = Number(
 
 export function checkAddressProof(
   address: string,
+  userPattern: string,
   processingUnit: ProcessingUnitType,
 ): AddressProofResult {
-  const addressScore = scoreSingleAddress(address);
+  const addressScore = scoreSingleAddress(address, userPattern);
   let passedCategory: ProofCategory | null = null;
 
   const thresholds =
@@ -207,7 +247,9 @@ export function checkAddressProof(
       : WORK_DONE_PER_GPU_PROOF;
 
   for (const category of Object.keys(thresholds) as ProofCategory[]) {
-    if (addressScore.scores[category].score >= thresholds[category]) {
+    const threshold = thresholds[category];
+    if (threshold === undefined) continue;
+    if (addressScore.scores[category].score >= threshold) {
       passedCategory = category;
       break;
     }

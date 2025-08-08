@@ -155,12 +155,14 @@ export class EstimatorService {
       throw Error("Estimator not found for job: " + agreementId);
     }
 
+    let totalWorkThisRun = 0;
     for (const entry of proofQueue) {
       const isUserPattern = entry.addr
         .toLowerCase()
         .startsWith(this.options.vanityPrefix.fullPrefix().toLowerCase());
       this.totalEstimator?.addProvedWork(entry.workDone, isUserPattern);
       estimator.addProvedWork(entry.workDone, isUserPattern);
+      totalWorkThisRun += entry.workDone;
 
       if (this.savedProofs.has(entry.addr.toLowerCase())) {
         this.ctx
@@ -171,6 +173,11 @@ export class EstimatorService {
         continue; // Skip duplicate entries
       }
       this.savedProofs.set(entry.addr.toLowerCase(), null);
+    }
+    if (proofQueue.length > 0) {
+      this.ctx.info(
+        `Provider ${proofQueue[0].provider.name} found ${proofQueue.length} proofs and done: ${totalWorkThisRun} work`,
+      );
     }
   }
 
