@@ -52,8 +52,9 @@ function snakeCombinations(pairs: number, total: number): number {
   const pairPositions = binomialCoefficient(total - 1, pairs);
 
   // The number of groups is (total - pairs)
-  // First group: 16 choices (any hex digit)
-  // Each subsequent group: 15 choices (not equal to previous group)
+  // A group is a contiguous sequence of identical characters.
+  // The first group in the string can have any of 16 hex digits (0-9, a-f)
+  // And each group after that must be a different hex digit than the previous group (15 choices).
   const firstCharChoices = 16.0;
   const nextCharChoices = 15.0 ** (total - 1 - pairs);
 
