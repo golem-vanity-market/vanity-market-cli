@@ -1,11 +1,12 @@
 import { displayDifficulty, displayTime } from "../utils/format";
 
 export interface EstimatorInfo {
-  workDone: number;
+  attempts: number;
   totalSuccesses: number;
   luckFactor: number;
   probabilityFactor: number;
   remainingTimeSec: number | null;
+  estimatedSpeed: SpeedEstimation | null;
   estimatedSpeed5m: SpeedEstimation;
   estimatedSpeed10m: SpeedEstimation;
   estimatedSpeed20m: SpeedEstimation;
@@ -16,55 +17,57 @@ export interface EstimatorInfo {
   cost: number;
   lastUpdated: Date;
   totalEfficiency: number | null;
-  stopping?: boolean;
+  // @todo This field should be elsewhere, but we lack object that is keeping job state and allows to control job
+  stopping?: boolean; // Optional field to indicate if the estimation is stopping
 }
 
-export function formatEstimatorInfo(info: EstimatorInfo): string {
-  const workDoneStr = displayDifficulty(info.workDone);
+export function formatEstimatorInfo(info: EstimatorInfo) {
+  const attemptsStr = displayDifficulty(info.attempts);
+  const _luckFactorStr = (info.luckFactor * 100).toFixed(1) + "%";
   const probFactorStr = (info.probabilityFactor * 100).toFixed(1) + "%";
   const remainingTime =
     info.remainingTimeSec !== null
       ? displayTime("", info.remainingTimeSec)
       : "N/A";
   const estimatedSpeed =
-    info.estimatedSpeed1h !== null
-      ? displayDifficulty(info.estimatedSpeed1h.speed) + "/s"
+    info.estimatedSpeed !== null
+      ? displayDifficulty(info.estimatedSpeed.speed) + "s"
       : "N/A";
 
-  return `Work Done: ${workDoneStr} | Prob ${probFactorStr} | Rem. Time: ${remainingTime} | Speed: ${estimatedSpeed}`;
+  return `Attempts: ${attemptsStr} | Prob ${probFactorStr} | Remaining Time: ${remainingTime} | Estimated Speed: ${estimatedSpeed}`;
 }
 
 interface EstimatorHistoryEntry {
   timePoint: Date;
-  totalWorkDone: number;
+  attempts: number;
   successes: number;
   cost: number;
 }
 
-export class SpeedEstimation {
+class SpeedEstimation {
   currentTimePoint: Date;
   startTimePoint: Date;
-  currentWork: number;
-  startWork: number;
-  currentCost: number;
+  currentAttempts: number;
+  startAttempts: number;
+  currentCost: number; // Default value, can be set later
   startCost: number;
-  efficiency: number | null;
-  speed: number; // H/s
+  efficiency: number | null; // Default value, can be set later
+  speed: number;
   costPerHour: number;
 
   constructor(
     currentTimePoint: Date,
     startTimePoint: Date,
-    currentWork: number,
-    startWork: number,
-    currentCost: number = 0,
-    startCost: number = 0,
-    efficiency: number | null = null,
+    currentAttempts: number,
+    startAttempts: number,
+    currentCost: number = 0, // Default value, can be set later
+    startCost: number = 0, // Default value, can be set later
+    efficiency: number | null = null, // Default value, can be set later
   ) {
     this.currentTimePoint = currentTimePoint;
     this.startTimePoint = startTimePoint;
-    this.currentWork = currentWork;
-    this.startWork = startWork;
+    this.currentAttempts = currentAttempts;
+    this.startAttempts = startAttempts;
     this.currentCost = currentCost;
     this.startCost = startCost;
     this.efficiency = efficiency;
@@ -72,42 +75,39 @@ export class SpeedEstimation {
     this.costPerHour = this._costPerHour();
   }
 
-  /* Calculates speed in hashes per second (H/s) */
   _speed(): number {
-    const timeDiffMs =
+    const timeDiff =
       this.currentTimePoint.getTime() - this.startTimePoint.getTime();
-    if (timeDiffMs <= 0) {
+    if (timeDiff <= 0) {
       return 0;
     }
-    const workDiff = this.currentWork - this.startWork;
-    return workDiff / (timeDiffMs / 1000);
+    return (this.currentAttempts - this.startAttempts) / (timeDiff / 1000); // Speed in attempts per second
   }
 
   _costPerHour(): number {
-    const timeDiffMs =
+    const timeDiff =
       this.currentTimePoint.getTime() - this.startTimePoint.getTime();
-    if (timeDiffMs <= 0) {
+    if (timeDiff <= 0) {
       return 0;
     }
-    const costDiff = this.currentCost - this.startCost;
-    return costDiff / (timeDiffMs / 3600000);
+    return (this.currentCost - this.startCost) / (timeDiff / 3600000); // Cost per hour
   }
 }
 
 const MAX_HISTORY_SIZE = 1000;
 const HISTORY_TRUNCATE_AT_ONCE = 100;
-
+const MAX_USABLE_HISTORY_SIZE = MAX_HISTORY_SIZE - HISTORY_TRUNCATE_AT_ONCE;
 export class Estimator {
   uploadUid: string | null = null; // Optional upload UID for tracking
   targetDifficulty: number;
-  workDoneSinceLastSuccess: number = 0;
-  totalWorkDone: number = 0;
+  currentAttempts: number = 0;
+  totalAttempts: number = 0; // Total attempts made
   totalSuccesses: number = 0;
   providerName: string;
   providerId: string;
   currentCost: number = 0;
-  stopping: boolean = false;
-  private _entries: EstimatorHistoryEntry[] = [];
+  stopping: boolean = false; // Flag to indicate if the estimation is stopping
+  _entries: EstimatorHistoryEntry[] = [];
 
   constructor(targetDifficulty: number, provName: string, providerId: string) {
     this.targetDifficulty = targetDifficulty;
@@ -123,58 +123,85 @@ export class Estimator {
     }
   }
 
-  private _getOldestRecentEntry(maxAgeSec: number): EstimatorHistoryEntry {
-    if (this._entries.length === 0) {
-      return { timePoint: new Date(), totalWorkDone: 0, successes: 0, cost: 0 };
+  _findOldestUsableEntry(): EstimatorHistoryEntry {
+    if (this._entries.length < MAX_USABLE_HISTORY_SIZE) {
+      return this._entries[0];
     }
-    const newestTime =
-      this._entries[this._entries.length - 1].timePoint.getTime();
-    const cutoff = newestTime - maxAgeSec * 1000;
-
-    // Find the first entry that is more recent than the cutoff time
-    const foundEntry = this._entries.find(
-      (entry) => entry.timePoint.getTime() >= cutoff,
-    );
-    return foundEntry || this._entries[this._entries.length - 1];
+    return this._entries[this._entries.length - MAX_USABLE_HISTORY_SIZE];
   }
 
-  private _findNewestUsableEntry(): EstimatorHistoryEntry {
+  _getOldestRecentEntry(maxAgeSec: number): EstimatorHistoryEntry {
+    const cutoff =
+      this._entries[this._entries.length - 1].timePoint.getTime() -
+      maxAgeSec * 1000;
+
+    for (let i = 0; i < this._entries.length; i++) {
+      if (this._entries[i].timePoint.getTime() >= cutoff) {
+        return this._entries[i];
+      }
+    }
+
     return this._entries[this._entries.length - 1];
   }
 
-  private _lastUpdated(): Date {
-    if (this._entries.length === 0) {
-      return new Date(0);
+  _getOldestRecentEntryFromEnd(maxAgeSec: number): EstimatorHistoryEntry {
+    const cutoff = new Date().getTime() - maxAgeSec * 1000;
+    let result = this._entries[this._entries.length - 1];
+    let i = this._entries.length - 1;
+    while (i >= 0 && result.timePoint.getTime() >= cutoff) {
+      result = this._entries[i];
+      i--;
     }
-    return this._findNewestUsableEntry().timePoint;
+    return result;
+  }
+
+  _findNewestUsableEntry(): EstimatorHistoryEntry {
+    return this._entries[this._entries.length - 1];
+  }
+
+  _lastUpdated(): Date {
+    if (this._entries.length === 0) {
+      return new Date(0); // Return epoch if no entries
+    }
+    return this._entries[this._entries.length - 1].timePoint;
+  }
+
+  info() {
+    console.log(`Target difficulty: ${this.targetDifficulty}`);
+  }
+
+  estimateTime(): number | null {
+    //by default estimate this base on last 10 minutes
+    const speed = this.estimatedSpeed(600);
+    if (speed === null || speed.speed <= 0) {
+      return null;
+    }
+    return this.targetDifficulty / speed.speed;
   }
 
   public setCurrentCost(cost: number) {
     this.currentCost = cost;
   }
 
-  public addProvedWork(difficultySum: number, isSuccess: boolean = false) {
+  public addProvedWork(attempts: number, isSuccess: boolean = false) {
     if (isSuccess) {
-      this.workDoneSinceLastSuccess = 0; // Reset work for the next target
-      this.totalSuccesses += 1;
+      this.currentAttempts = 0; // Reset attempts on success
     } else {
-      this.workDoneSinceLastSuccess += difficultySum;
+      this.currentAttempts += attempts;
     }
-
-    this.totalWorkDone += difficultySum;
-
+    this.totalAttempts += attempts;
+    if (isSuccess) {
+      this.totalSuccesses += 1;
+    }
     this._appendEntry({
       timePoint: new Date(),
-      totalWorkDone: this.totalWorkDone,
+      attempts: this.totalAttempts,
       successes: this.totalSuccesses,
       cost: this.currentCost,
     });
   }
 
-  /**
-   * Calculates the hashrate over a given recent time frame, assuming a given cost at the end.
-   */
-  public estimatedSpeedGivenCost(
+  estimatedSpeedGivenCost(
     timeFrameSecs: number,
     givenCost: number,
   ): SpeedEstimation {
@@ -182,117 +209,118 @@ export class Estimator {
     const entryNew = this._findNewestUsableEntry();
 
     let efficiency = null;
-    if (givenCost > entryOld.cost) {
-      const workDiff = entryNew.totalWorkDone - entryOld.totalWorkDone;
-      const costDiff = givenCost - entryOld.cost;
-      efficiency = workDiff / costDiff / 1e12; // Efficiency in TH/GLM
+    if (givenCost - entryOld.cost > 0) {
+      efficiency =
+        (entryNew.attempts - entryOld.attempts) /
+        (givenCost - entryOld.cost) /
+        1e12; // Efficiency in TH/GLM
     }
 
     return new SpeedEstimation(
       new Date(entryNew.timePoint),
       new Date(entryOld.timePoint),
-      entryNew.totalWorkDone,
-      entryOld.totalWorkDone,
+      entryNew.attempts,
+      entryOld.attempts,
       givenCost,
       entryOld.cost,
       efficiency,
     );
   }
 
-  /**
-   * Calculates the hashrate over a given recent time frame.
-   */
-  public estimatedSpeed(timeFrameSecs: number): SpeedEstimation {
+  estimatedSpeed(timeFrameSecs: number): SpeedEstimation {
     const entryOld = this._getOldestRecentEntry(timeFrameSecs);
     const entryNew = this._findNewestUsableEntry();
-
     let efficiency = null;
-    if (entryNew.cost > entryOld.cost) {
-      const workDiff = entryNew.totalWorkDone - entryOld.totalWorkDone;
-      const costDiff = entryNew.cost - entryOld.cost;
-      efficiency = workDiff / costDiff / 1e12; // Efficiency in TH/GLM
+    if (entryNew.cost - entryOld.cost > 0) {
+      efficiency =
+        (entryNew.attempts - entryOld.attempts) /
+        (entryNew.cost - entryOld.cost) /
+        1e12; // Efficiency in TH/GLM
     }
 
     return new SpeedEstimation(
       new Date(entryNew.timePoint),
       new Date(entryOld.timePoint),
-      entryNew.totalWorkDone,
-      entryOld.totalWorkDone,
+      entryNew.attempts,
+      entryOld.attempts,
       entryNew.cost,
       entryOld.cost,
       efficiency,
     );
   }
 
-  /**
-   * Estimates the probability of finding a solution given a certain amount of work.
-   * Uses the formula P = 1 - e^(-W/D) for accuracy.
-   */
-  public estimateProbability(workDone: number): number {
-    if (workDone <= 0 || this.targetDifficulty <= 0) {
-      return 0;
+  estimatedSpeedSingleRun(timeFrameSecs: number): SpeedEstimation {
+    const entryOld = this._getOldestRecentEntryFromEnd(timeFrameSecs);
+    const entryNew = this._findNewestUsableEntry();
+    let efficiency = null;
+    if (entryNew.cost - entryOld.cost > 0) {
+      efficiency =
+        (entryNew.attempts - entryOld.attempts) /
+        (entryNew.cost - entryOld.cost) /
+        1e12; // Efficiency in TH/GLM
     }
-    return 1 - Math.exp(-workDone / this.targetDifficulty);
-  }
-
-  /**
-   * Estimates the remaining time to find a solution based on recent hashrate.
-   * @returns Remaining time in seconds, or null if speed is zero.
-   */
-  public estimateTime(): number | null {
-    const speedEstimation = this.estimatedSpeed(600);
-    if (speedEstimation === null || speedEstimation.speed <= 0) {
-      return null;
-    }
-    const remainingWork = this.targetDifficulty - this.workDoneSinceLastSuccess;
-    if (remainingWork <= 0) {
-      return 0;
-    }
-    return remainingWork / speedEstimation.speed;
-  }
-
-  /**
-   * Calculates how "lucky" the current run is.
-   * Values < 100% mean lucky, > 100% mean unlucky.
-   */
-  public luckFactor(workDone: number): number {
-    if (workDone <= 0) {
-      return 0; // Not started yet
-    }
-    const probability = this.estimateProbability(workDone);
-    if (probability === 1) return Number.POSITIVE_INFINITY;
-    // Expected work for this probability: -D * ln(1 - P)
-    const expectedWork = -this.targetDifficulty * Math.log(1 - probability);
-    return workDone / expectedWork;
-  }
-
-  public workFor50PercentChance(): number {
-    return this.targetDifficulty * Math.LN2;
-  }
-
-  public currentInfo(): EstimatorInfo {
-    const probabilityFactor = this.estimateProbability(
-      this.workDoneSinceLastSuccess,
+    const oldDate = new Date(new Date().getTime() - timeFrameSecs * 1000);
+    return new SpeedEstimation(
+      new Date(entryNew.timePoint),
+      new Date(oldDate),
+      entryNew.attempts,
+      entryOld.attempts,
+      entryNew.cost,
+      entryOld.cost,
+      efficiency,
     );
-    const luckFactor = this.luckFactor(this.workDoneSinceLastSuccess);
+  }
+
+  estimateProbability(attempts: number): number {
+    if (attempts <= 0) {
+      return 0;
+    }
+
+    return 1 - Math.pow(1 - 1 / this.targetDifficulty, attempts);
+  }
+
+  estimateAttemptsGivenProbability(probability: number): number {
+    if (probability < 0 || probability > 1) {
+      throw new Error("Probability must be between 0 and 1.");
+    }
+
+    return Math.log(1 - probability) / Math.log(1 - 1 / this.targetDifficulty);
+  }
+
+  luckFactor(attempts: number): number {
+    if (attempts <= 0) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    const probability = this.estimateProbability(attempts);
+    return 1 / probability - 1;
+  }
+
+  currentInfo(): EstimatorInfo {
+    if (this.currentAttempts < 0) {
+      throw new Error("Number of attempts must be greater than zero.");
+    }
+
+    const luckFactor = this.luckFactor(this.currentAttempts);
     const remainingTimeSec = this.estimateTime();
-    const estimatedSpeed1y = this.estimatedSpeed(365 * 24 * 60 * 60);
+    const estimatedSpeed1y = this.estimatedSpeed(365 * 24 * 60 * 60); // 1 year
     const estimatedSpeed1h = this.estimatedSpeed(3600);
     const estimatedSpeed10m = this.estimatedSpeed(10 * 60);
     const estimatedSpeed20m = this.estimatedSpeed(20 * 60);
     const estimatedSpeed5m = this.estimatedSpeed(5 * 60);
+    const estimatedSpeed = this.estimatedSpeed(60);
 
     const totalEfficiency =
       this.currentCost > 0
-        ? this.totalWorkDone / this.currentCost / 1e12
+        ? this.totalAttempts / this.currentCost / 1e12
         : null;
-
     return {
-      workDone: this.totalWorkDone,
       totalSuccesses: this.totalSuccesses,
+      attempts: this.totalAttempts,
       luckFactor: luckFactor,
-      probabilityFactor: probabilityFactor,
+      probabilityFactor: this.estimateProbability(this.currentAttempts),
       remainingTimeSec: remainingTimeSec,
+      estimatedSpeed: estimatedSpeed,
       estimatedSpeed5m: estimatedSpeed5m,
       estimatedSpeed10m: estimatedSpeed10m,
       estimatedSpeed20m: estimatedSpeed20m,
@@ -303,7 +331,7 @@ export class Estimator {
       cost: this.currentCost,
       lastUpdated: this._lastUpdated(),
       totalEfficiency,
-      stopping: this.stopping,
+      stopping: this.stopping || false, // Include stopping status
     };
   }
 }
