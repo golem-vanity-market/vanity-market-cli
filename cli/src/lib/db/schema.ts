@@ -28,7 +28,7 @@ export type Problem =
     }
   | {
       type: "user-prefix";
-      specifier: string; // optional, relevant for specific problems like user provided prefix
+      specifier: string;
     };
 
 export const jobsTable = sqliteTable("job", {
