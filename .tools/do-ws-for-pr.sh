@@ -28,26 +28,31 @@ BRANCH_NAME=$(echo "$PR_INFO" | jq -r '.headRefName')
 BRANCH_DIR_POSTFIX=$(echo "$PR_INFO" | jq -r '.headRefName' | tr '/' '-')
 PR_TITLE=$(echo "$PR_INFO" | jq -r '.title')
 
+GIT_TOP_DIR=$(git rev-parse --show-toplevel)
+TEMP_DIR_FOR_WS="${GIT_TOP_DIR}/temp"
+WORKTREE_DIR="${TEMP_DIR_FOR_WS}/golem-vanity.market-$BRANCH_DIR_POSTFIX"
+
 echo "PR Title: $PR_TITLE"
 echo "Branch: $BRANCH_NAME"
 
 # Step 2: Create Worktree
 echo "Step 2: Creating worktree..."
-mkdir -p temp
+mkdir -p "$TEMP_DIR_FOR_WS"
 
 # Remove existing worktree if it exists
-if [ -d "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" ]; then
+if [ -d "$WORKTREE_DIR" ]; then
     echo "Removing existing worktree..."
-    git worktree remove "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" --force
+    git worktree remove "$WORKTREE_DIR" --force
 fi
 
-git worktree add "temp/golem-vanity.market-$BRANCH_DIR_POSTFIX" "$BRANCH_NAME"
+git worktree add "$WORKTREE_DIR" "$BRANCH_NAME"
 
-echo "Workspace created successfully at: temp/golem-vanity.market-$BRANCH_DIR_POSTFIX"
+echo "Workspace created successfully at: $WORKTREE_DIR"
 
 # Step 3: Call do-prepare-pr.sh
 echo "Step 3: Calling do-prepare-pr.sh..."
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+SCRIPT_DIR=${GIT_TOP_DIR}/.tools
 
 "$SCRIPT_DIR/do-prepare-pr-claude.sh" "$PR_NUMBER"
 
