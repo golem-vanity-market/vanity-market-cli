@@ -1,4 +1,47 @@
-import { Estimator } from "../estimator/estimator";
+import { Estimator, SpeedEstimation } from "../estimator/estimator";
+
+describe("SpeedEstimation", () => {
+  const startTime = new Date("2023-01-01T00:00:00Z");
+  const endTime = new Date("2023-01-01T00:00:10Z"); // 10 seconds later
+
+  it("should calculate speed correctly", () => {
+    const estimation = new SpeedEstimation(
+      endTime,
+      startTime,
+      100_000, // currentAttempts
+      0, // startAttempts
+    );
+    // 100,000 attempts in 10 seconds = 10,000 attempts/sec
+    expect(estimation.speed).toBe(10_000);
+  });
+
+  it("should calculate cost per hour correctly", () => {
+    const estimation = new SpeedEstimation(
+      endTime,
+      startTime,
+      100_000,
+      0,
+      0.05, // currentCost
+      0.01, // startCost
+    );
+    // Cost diff = 0.04. Time diff = 10s = 10/3600 hours.
+    // Cost per hour = 0.04 / (10 / 3600) = 0.04 * 360 = 14.4
+    expect(estimation.costPerHour).toBeCloseTo(14.4);
+  });
+
+  it("should return 0 for speed and cost if time difference is zero or negative", () => {
+    const estimation = new SpeedEstimation(
+      startTime,
+      startTime,
+      100_000,
+      0,
+      0.05,
+      0.01,
+    );
+    expect(estimation.speed).toBe(0);
+    expect(estimation.costPerHour).toBe(0);
+  });
+});
 
 describe("Estimator", () => {
   const TARGET_DIFFICULTY = 1_000_000;
@@ -14,126 +57,111 @@ describe("Estimator", () => {
     jest.useRealTimers();
   });
 
-  describe("Initialization", () => {
-    it("should initialize with correct target difficulty and zero work", () => {
-      expect(estimator.targetDifficulty).toBe(TARGET_DIFFICULTY);
-      expect(estimator.totalWorkDone).toBe(0);
-      expect(estimator.workDoneSinceLastSuccess).toBe(0);
+  describe("addProvedWork", () => {
+    it("should reset currentAttempts but accumulate totalAttempts on success", () => {
+      estimator.addProvedWork(500_000);
+      expect(estimator.currentAttempts).toBe(500_000);
+      expect(estimator.totalAttempts).toBe(500_000);
       expect(estimator.totalSuccesses).toBe(0);
-    });
 
-    it("should have one initial entry in its history upon creation", () => {
-      expect(estimator["_entries"][0].totalWorkDone).toBe(0);
-      expect(estimator["_entries"]).toHaveLength(1);
+      estimator.addProvedWork(100_000, true);
+
+      expect(estimator.currentAttempts).toBe(0); // Reset on success
+      expect(estimator.totalAttempts).toBe(600_000); // Accumulates total
+      expect(estimator.totalSuccesses).toBe(1); // Incremented
     });
   });
 
-  describe("Adding Work and Calculating Speed", () => {
+  describe("Speed and Time Estimation", () => {
     it("should calculate speed correctly after a single interval", () => {
-      jest.advanceTimersByTime(10 * 1000);
+      jest.advanceTimersByTime(10 * 1000); // 10 seconds
       estimator.addProvedWork(100_000);
 
       const speedInfo = estimator.estimatedSpeed(60);
-      // Expected speed = work / time = 100,000 / 10s = 10,000 H/s
+      // Expected speed = attempts / time = 100,000 / 10s = 10,000 attempts/s
       expect(speedInfo.speed).toBeCloseTo(10_000);
-      expect(estimator.totalWorkDone).toBe(100_000);
     });
 
-    it("should calculate average speed correctly over multiple intervals", () => {
-      // Interval 1: 100k work in 10s
-      jest.advanceTimersByTime(10 * 1000);
-      estimator.addProvedWork(100_000);
+    it("should calculate average speed over a specified time window", () => {
+      // 0s: start (0 attempts)
+      jest.advanceTimersByTime(10 * 1000); // t=10s
+      estimator.addProvedWork(100_000); // total: 100k
 
-      // Interval 2: 150k work in the next 5s
-      jest.advanceTimersByTime(5 * 1000);
-      estimator.addProvedWork(150_000);
+      jest.advanceTimersByTime(10 * 1000); // t=20s
+      estimator.addProvedWork(100_000); // total: 200k
 
-      // Total work = 250,000. Total time = 15s.
-      // Expected average speed = 250,000 / 15s = 16,666.66... H/s
-      const speedInfo = estimator.estimatedSpeed(60);
-      expect(speedInfo.speed).toBeCloseTo(16_666.666);
-      expect(estimator.totalWorkDone).toBe(250_000);
-    });
+      jest.advanceTimersByTime(10 * 1000); // t=30s
+      estimator.addProvedWork(300_000); // total: 500k
 
-    it("should calculate speed based on the specified time window", () => {
-      // 0s: start
-      // 10s: add 100k work (speed here is 10k H/s)
-      jest.advanceTimersByTime(10 * 1000);
-      estimator.addProvedWork(100_000);
-
-      // 20s: add 100k work (speed in this interval is 10k H/s)
-      jest.advanceTimersByTime(10 * 1000);
-      estimator.addProvedWork(100_000);
-
-      // 30s: add 300k work (speed in this interval is 30k H/s)
-      jest.advanceTimersByTime(10 * 1000);
-      estimator.addProvedWork(300_000);
-
-      // Speed over the last 15 seconds:
-      // Should only consider the last data point (at 30s) and the one before (at 20s).
-      // Work done in that window: 300,000. Time: 10s.
-      // The _getOldestRecentEntry(15) will grab the entry at t=20s.
+      // Speed over the last 15 seconds from the latest entry (at t=30s).
+      // _getOldestRecentEntry(15) will find the entry at t=20s.
       const speedInfo = estimator.estimatedSpeed(15);
 
-      // (TotalWorkAt30s - TotalWorkAt20s) / (30s - 20s)
-      // (500_000 - 200_000) / 10s = 30,000 H/s
+      // (TotalAttemptsAt30s - TotalAttemptsAt20s) / (TimeAt30s - TimeAt20s)
+      // (500_000 - 200_000) / 10s = 30,000 attempts/s
       expect(speedInfo.speed).toBeCloseTo(30_000);
-    });
-  });
-
-  describe("Time and Probability Estimation", () => {
-    beforeEach(() => {
-      // Establish a consistent speed of 20,000 H/s for these tests
-      jest.advanceTimersByTime(10 * 1000);
-      estimator.addProvedWork(200_000);
-      estimator.workDoneSinceLastSuccess = 200_000;
     });
 
     it("should estimate remaining time correctly", () => {
-      // Target = 1M. Done = 200k. Remaining = 800k.
-      // Speed = 20k H/s.
-      // Expected ETA = 800,000 / 20,000 = 40 seconds.
+      // 20,000 attempts/s
+      jest.advanceTimersByTime(10 * 1000);
+      estimator.addProvedWork(200_000);
+
+      // Expected ETA = 1,000,000 / 20,000 = 50 seconds.
       const eta = estimator.estimateTime();
-      expect(eta).toBeCloseTo(40);
-    });
-
-    it("should calculate the work for 50% chance correctly", () => {
-      const expectedWork = TARGET_DIFFICULTY * Math.LN2;
-      expect(estimator.workFor50PercentChance()).toBeCloseTo(expectedWork);
-    });
-
-    it('should calculate "unfortunate iteration" correctly', () => {
-      const workFor50 = estimator.workFor50PercentChance(); // ~693147
-
-      // Case 1: Unlucky (passed 2 "half-lives")
-      estimator.workDoneSinceLastSuccess = 1_500_000;
-      const unfortunateIteration = Math.floor(
-        estimator.workDoneSinceLastSuccess / workFor50,
-      );
-      expect(unfortunateIteration).toBe(2); // floor(1,500,000 / 693147) = floor(2.16) = 2
-
-      // Case 2: Not yet unlucky
-      estimator.workDoneSinceLastSuccess = 500_000;
-      const fortunateIteration = Math.floor(
-        estimator.workDoneSinceLastSuccess / workFor50,
-      );
-      expect(fortunateIteration).toBe(0); // floor(500,000 / 693147) = floor(0.72) = 0
+      expect(eta).toBeCloseTo(50);
     });
   });
 
-  describe("Handling Success", () => {
-    it("should reset workDoneSinceLastSuccess but not totalWorkDone on success", () => {
-      estimator.addProvedWork(500_000);
-      expect(estimator.workDoneSinceLastSuccess).toBe(500_000);
-      expect(estimator.totalWorkDone).toBe(500_000);
-      expect(estimator.totalSuccesses).toBe(0);
+  describe("Probability and Luck Factor", () => {
+    it("should estimate attempts for a given probability", () => {
+      const prob = 0.5;
+      const expectedAttempts =
+        Math.log(1 - prob) / Math.log(1 - 1 / TARGET_DIFFICULTY);
+      expect(estimator.estimateAttemptsGivenProbability(prob)).toBeCloseTo(
+        expectedAttempts,
+      );
+      // For 50% chance, attempts should be close to N * ln(2)
+      expect(estimator.estimateAttemptsGivenProbability(0.5)).toBeCloseTo(
+        TARGET_DIFFICULTY * Math.LN2,
+        0, // compare whole numbers
+      );
+    });
 
-      // Now, report a success with an additional 100k work
-      estimator.addProvedWork(100_000, true);
+    it("should calculate luck factor", () => {
+      // Luck factor is high for low probability events
+      const prob = estimator.estimateProbability(1);
+      expect(estimator.luckFactor(1)).toBeCloseTo(1 / prob - 1);
 
-      expect(estimator.workDoneSinceLastSuccess).toBe(0); // This should be reset
-      expect(estimator.totalWorkDone).toBe(600_000); // This should accumulate
-      expect(estimator.totalSuccesses).toBe(1); // This should increment
+      // Luck factor approaches 0 as probability approaches 1
+      const attemptsFor99percent =
+        estimator.estimateAttemptsGivenProbability(0.99);
+      expect(estimator.luckFactor(attemptsFor99percent)).toBeCloseTo(
+        1 / 0.99 - 1,
+      );
+    });
+  });
+
+  describe("currentInfo", () => {
+    it("should gather and return all information correctly", () => {
+      jest.advanceTimersByTime(10 * 1000);
+      estimator.setCurrentCost(0.1);
+      estimator.addProvedWork(200_000);
+
+      const info = estimator.currentInfo();
+
+      expect(info.attempts).toBe(200_000);
+      expect(info.providerName).toBe("test-provider");
+      expect(info.cost).toBe(0.1);
+      expect(info.probabilityFactor).toBe(
+        estimator.estimateProbability(200_000),
+      );
+      expect(info.luckFactor).toBe(estimator.luckFactor(200_000));
+      expect(info.remainingTimeSec).toBeCloseTo(50); // 1M / (200k/10s)
+      expect(info.estimatedSpeed?.speed).toBeCloseTo(20_000);
+      // Total efficiency = total attempts / total cost / 1e12
+      // 200_000 / 0.1 / 1e12 = 2e6 / 1e12 = 2e-6
+      expect(info.totalEfficiency).toBeCloseTo(2e-6);
     });
   });
 });
