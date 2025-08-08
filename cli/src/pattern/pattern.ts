@@ -12,6 +12,7 @@ import { ProcessingUnitType } from "../params";
 export type ProofCategory =
   | "user-pattern" // The address starts with the user-defined prefix.
   | "leading-any" // The number of leading characters that are the same.
+  | "trailing-any" // The number of trailing characters that are the same.
   | "letters-heavy" // Addresses with a high number of letters (a-f).
   | "numbers-heavy" // Addresses with a high number of ciphers (0-9).
   | "snake-score-no-case"; // The number of repeating characters in the address. Case insensitive.
@@ -22,20 +23,17 @@ type ProofThresholds = {
 
 export const CPU_PROOF_THRESHOLDS: ProofThresholds = {
   "user-pattern": 6, // At least 6 characters matching user provided pattern
-
-  // TODO: add more thresholds when CPU cruncher is updated to return more proofs.
-  // Right now it returns pretty much only user-prefix, so doing these checks
-  // only pollutes the probability space.
-
-  // "leading-any": 8, // At least 8 leading identical characters
-  // "letters-heavy": 30, // At least 30 letters (a-f)
-  // "numbers-heavy": 33, // At least 33 numbers (0-9)
-  // "snake-score-no-case": 10, // At least 10 pairs of adjacent identical characters
+  "leading-any": 6, // At least 6 leading identical characters
+  "trailing-any": 6, // At least 6 trailing identical characters
+  "letters-heavy": 32, // At least 32 letters (a-f)
+  "numbers-heavy": 40, // At least 40 numbers (0-9)
+  "snake-score-no-case": 15, // At least 15 pairs of adjacent identical characters
 };
 
 export const GPU_PROOF_THRESHOLDS: ProofThresholds = {
   "user-pattern": 8, // At least 8 characters matching user provided pattern
-  "leading-any": 10, // At least 10 leading identical characters
+  "leading-any": 8, // At least 8 leading identical characters
+  "trailing-any": 8, // At least 8 trailing identical characters
   "letters-heavy": 35, // At least 35 letters (a-f)
   "numbers-heavy": 35, // At least 35 numbers (0-9)
   "snake-score-no-case": 15, // At least 15 pairs of adjacent identical characters
@@ -73,6 +71,21 @@ export function calculateLeadingAny(
   }
   const difficulty = Math.pow(16, score);
   return { category: "leading-any", score, difficulty };
+}
+
+export function calculateTrailingAny(
+  addressStr: string,
+): AddressSinglePatternScore {
+  const lastChar = addressStr[addressStr.length - 1];
+  let score = 0;
+  for (let i = addressStr.length - 1; i >= 0; i--) {
+    if (addressStr[i] !== lastChar) {
+      break;
+    }
+    score++;
+  }
+  const difficulty = Math.pow(16, score);
+  return { category: "trailing-any", score, difficulty };
 }
 
 function calculateLettersHeavy(addressStr: string): AddressSinglePatternScore {
@@ -128,6 +141,7 @@ export function scoreSingleAddress(
   const scoreEntries: AddressSinglePatternScore[] = [
     calculateUserPattern(addressStr, patternStr),
     calculateLeadingAny(addressStr),
+    calculateTrailingAny(addressStr),
     calculateLettersHeavy(addressStr),
     calculateNumbersHeavy(addressStr),
     calculateSnakeNoCase(addressStr),
@@ -171,6 +185,12 @@ export function calculateProbabilitySpace(
 
     case "leading-any": {
       // The number of addresses with at least `threshold` identical leading characters.
+      if (threshold > 40 || threshold < 1) return 0n;
+      return 16n * 16n ** BigInt(40 - threshold);
+    }
+
+    case "trailing-any": {
+      // The number of addresses with at least `threshold` identical trailing characters.
       if (threshold > 40 || threshold < 1) return 0n;
       return 16n * 16n ** BigInt(40 - threshold);
     }

@@ -27,6 +27,16 @@ describe("Pattern Scoring", () => {
       expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
     });
 
+    it("should correctly identify 'trailing-any' as the best category", () => {
+      const address = "0xabcd5678901234567890aaaaaaaaaaaaaaaaaaaa";
+      const result = scoreSingleAddress(address, "0x1234");
+      const expectedScore = 20;
+
+      expect(result.bestCategory.category).toBe("trailing-any");
+      expect(result.bestCategory.score).toBe(expectedScore);
+      expect(result.bestCategory.difficulty).toBeGreaterThan(1e15); // Should be very high
+    });
+
     it("should correctly identify 'letters-heavy' as the best category", () => {
       const address = "0xabcDefabcdefabcdefabcdefabcdefabcdefabcd";
       const result = scoreSingleAddress(address, "0x1234");
