@@ -39,5 +39,3 @@ Add full_restart.sh to cron
 ```
 
 Of course fix it to point to the directory where full_restart.sh is located.
-
-

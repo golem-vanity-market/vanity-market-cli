@@ -13,7 +13,9 @@ import secrets
 import string
 
 # generate random app key
-app_key = ''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12))
+app_key = "".join(
+    secrets.choice(string.ascii_letters + string.digits) for _ in range(12)
+)
 
 
 def download_file(url, save_path):
@@ -234,7 +236,7 @@ yagna_base_path = os.path.join(service_base_path, "yagna")
 
 git_clone_path = os.path.join(service_base_path, "golem-vanity.market")
 
-for (dirpath, dirnames, filenames) in os.walk("templates"):
+for dirpath, dirnames, filenames in os.walk("templates"):
     for filename in filenames:
         if filename.endswith(".template"):
             template_file = filename
@@ -243,24 +245,35 @@ for (dirpath, dirnames, filenames) in os.walk("templates"):
                 content = f.read()
 
             # Replace placeholder
-            updated_content = content.replace("%%YAGNA_SERVICE_NAME%%", yagna_service_name)
-            updated_content = updated_content.replace("%%VANITY_SERVICE_NAME%%", vanity_service_name)
+            updated_content = content.replace(
+                "%%YAGNA_SERVICE_NAME%%", yagna_service_name
+            )
+            updated_content = updated_content.replace(
+                "%%VANITY_SERVICE_NAME%%", vanity_service_name
+            )
             updated_content = updated_content.replace("%%NODE_NAME%%", node_name)
-            updated_content = updated_content.replace("%%YAGNA_ROOT_DIR%%", yagna_base_path)
-            updated_content = updated_content.replace("%%CLI_ROOT_DIR%%", os.path.join(git_clone_path, "cli"))
+            updated_content = updated_content.replace(
+                "%%YAGNA_ROOT_DIR%%", yagna_base_path
+            )
+            updated_content = updated_content.replace(
+                "%%CLI_ROOT_DIR%%", os.path.join(git_clone_path, "cli")
+            )
 
             output_file = template_file.replace(".template", "")
 
             # Write updated file
             if template_file.endswith(".service.template"):
-                output_file_path = os.path.join(service_base_path, "services",
-                                                output_file.replace(".service", "-" + node_name + ".service"))
+                output_file_path = os.path.join(
+                    service_base_path,
+                    "services",
+                    output_file.replace(".service", "-" + node_name + ".service"),
+                )
             else:
                 output_file_path = os.path.join(service_base_path, output_file)
             with open(output_file_path, "w") as f:
                 f.write(updated_content)
 
-            if os.name != 'nt':  # Not Windows
+            if os.name != "nt":  # Not Windows
                 os.chmod(output_file_path, 0o755)
 
             print(f"Processed: {template_file} -> {output_file}")
@@ -285,7 +298,9 @@ if args.prepare_yagna:
 if args.install_services:
     if os.name != "nt":
         print(f"Installing services to {service_install_path}")
-        for service_file in glob.glob(os.path.join(service_base_path, "services", "*.service")):
+        for service_file in glob.glob(
+            os.path.join(service_base_path, "services", "*.service")
+        ):
             os.system("sudo cp {} {}".format(service_file, service_install_path))
             print(f"Installed: {service_file} to {service_install_path}")
 

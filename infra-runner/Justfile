@@ -1,0 +1,5 @@
+fmt:
+    uvx ruff format *.py
+
+prettier:
+    npx prettier . --write

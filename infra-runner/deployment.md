@@ -1,6 +1,7 @@
 # Vanity manual Setup Guide
 
 ## 1. Directory and User
+
 - **Data directory**: `/vanity-node-0`
 - **User running the service**: `ubuntu`
 
@@ -13,6 +14,7 @@ sudo chown -R ubuntu:ubuntu /vanity-node-0
 ---
 
 ## 2. Yagna Binary
+
 - Yagna should be placed in:
   ```
   /vanity-node-0/yagna
@@ -22,12 +24,15 @@ sudo chown -R ubuntu:ubuntu /vanity-node-0
 ---
 
 ## 3. Yagna Configuration
+
 Create the `.env` file:
+
 ```
 /vanity-node-0/yagna/.env
 ```
 
 ### Example `.env` file:
+
 ```env
 YAGNA_DATADIR=yagnadir
 YAGNA_API_URL=http://127.0.0.1:7600
@@ -43,6 +48,7 @@ YAGNA_AUTOCONF_ID_SECRET=...
 ---
 
 ## 4. Firewall Configuration
+
 Open ports **7600** and **11600** on your firewall:
 
 ```bash
@@ -53,12 +59,15 @@ sudo ufw allow 11600
 ---
 
 ## 5. Systemd Service
+
 Create the service file:
+
 ```
 /etc/systemd/system/yagna-node-0.service
 ```
 
 ### Example service file:
+
 ```ini
 [Unit]
 Description=Yagna node 0
@@ -82,6 +91,7 @@ WantedBy=multi-user.target
 ---
 
 ### Quick reference for systemd commands:
+
 1. Reload systemd:
    ```bash
    sudo systemctl daemon-reload
@@ -109,7 +119,6 @@ git clone git@github.com:Unoperate/golem-vanity.market.git
 
 Configuration goes into:
 
-
 /vanity-node-0/golem-vanity.market/cli/.env
 
 ```
@@ -126,7 +135,6 @@ MINIMUM_CPU_CORES=8
 GOLEM_PINO_LOG_LEVEL=info
 ```
 
-
 ### Generate keys
 
 Navigate to golem-vanity.market/tools and run:
@@ -137,9 +145,7 @@ deno generate.ts
 
 That will generate the public key `generated.pub` to use in the service.
 
-
 /etc/systemd/system/vanity-node-0.service
-
 
 ```
 [Unit]
@@ -163,6 +169,5 @@ WantedBy=multi-user.target
 ```
 
 If you have different node version, change the node paths accordingly.
-
 
 These two services work together.
