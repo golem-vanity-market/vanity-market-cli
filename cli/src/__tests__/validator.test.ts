@@ -5,6 +5,7 @@ import {
 import { VanityResult } from "../node_manager/result";
 import { AppContext } from "../app_context";
 import { getCtxForTests } from "./utils";
+import { AddressProofResult } from "../pattern/pattern";
 
 const correctTestData = {
   entries: [
@@ -66,8 +67,8 @@ describe("VanityResult Validator", () => {
           salt: entry.salt,
           pubKey: entry.pubKey,
           pattern: entry.pattern,
-          estimatedComplexity: 1000000, // Placeholder value
-          type: "user-pattern",
+          isUserPattern: true,
+          proof: {} as AddressProofResult,
         };
 
         const validationResult = validateVanityResult(ctx, result);
@@ -87,8 +88,8 @@ describe("VanityResult Validator", () => {
           salt: testCase.salt,
           pubKey: testCase.pubKey,
           pattern: testCase.pattern,
-          estimatedComplexity: 1000000,
-          type: "user-pattern",
+          isUserPattern: false,
+          proof: {} as AddressProofResult,
         };
         console.log(`Testing: ${testName}`);
         const validationResult = validateVanityResult(ctx, result);

@@ -387,6 +387,7 @@ export class GolemSessionManager {
         ctx,
         stdout.split("\n"),
         generationParams.vanityAddressPrefix.fullPrefix().toLowerCase(),
+        this.processingUnitType,
       );
 
       const cmdResult: CommandResult = {
@@ -650,10 +651,7 @@ export class GolemSessionManager {
         pubKey: result.pubKey,
         provider: cmd.provider,
         jobId: cmd.agreementId,
-        difficulty:
-          result.type === "user-pattern"
-            ? computePrefixDifficulty(result.pattern)
-            : result.score.bestCategory.difficulty,
+        workDone: result.proof.workDone,
       };
 
       const isValid = await validateVanityResult(ctx, result);

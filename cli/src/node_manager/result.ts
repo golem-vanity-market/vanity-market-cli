@@ -1,27 +1,18 @@
 import { ProviderInfo } from "@golem-sdk/golem-js";
 import { ProcessingUnitType } from "../params";
 import { AppContext } from "../app_context";
-import { AddressScore, scoreSingleAddress } from "../pattern/pattern";
-import { computePrefixDifficulty } from "../difficulty";
+import { AddressProofResult, checkAddressProof } from "../pattern/pattern";
 
 export type CommandStatus = "success" | "not_found" | "stopped";
 
-export type VanityResult =
-  | {
-      address: string;
-      salt: string;
-      pubKey: string;
-      type: "user-pattern";
-      pattern: string;
-      estimatedComplexity: number;
-    }
-  | {
-      address: string;
-      salt: string;
-      pubKey: string;
-      type: "proof";
-      score: AddressScore;
-    };
+export type VanityResult = {
+  address: string;
+  salt: string;
+  pubKey: string;
+  pattern: string;
+  isUserPattern: boolean;
+  proof: AddressProofResult;
+};
 
 export interface IterationInfo {
   agreementId: string;
@@ -45,6 +36,7 @@ export function parseVanityResults(
   ctx: AppContext,
   lines: string[],
   pattern: string,
+  processingUnit: ProcessingUnitType,
 ): ParsedResults {
   const results: VanityResult[] = [];
   const failedLines: string[] = [];
@@ -53,7 +45,7 @@ export function parseVanityResults(
     try {
       line = line.trim();
       if (line.startsWith("0x")) {
-        const r = parseVanityResult(line, pattern);
+        const r = parseVanityResult(line, pattern, processingUnit);
         if (r == null) {
           ctx.L().warn(`Invalid vanity result line from provider:`, line);
           failedLines.push(line);
@@ -75,6 +67,7 @@ export function parseVanityResults(
 export function parseVanityResult(
   line: string,
   keyPattern: string,
+  processingUnit: ProcessingUnitType,
 ): VanityResult | null {
   const trimmedLine = line.trim();
   if (!trimmedLine.startsWith("0x")) {
@@ -89,23 +82,12 @@ export function parseVanityResult(
   const salt = parts[0].trim();
   const address = parts[1].trim();
   const pubKey = parts[2].trim();
-
-  if (address.toLowerCase().startsWith(keyPattern.toLowerCase())) {
-    return {
-      address,
-      salt,
-      pubKey,
-      type: "user-pattern",
-      pattern: keyPattern,
-      estimatedComplexity: computePrefixDifficulty(keyPattern),
-    };
-  }
-
   return {
     address,
     salt,
     pubKey,
-    type: "proof",
-    score: scoreSingleAddress(address),
+    isUserPattern: address.toLowerCase().startsWith(keyPattern.toLowerCase()),
+    pattern: keyPattern,
+    proof: checkAddressProof(address, processingUnit),
   };
 }

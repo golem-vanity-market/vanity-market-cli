@@ -114,3 +114,43 @@ export function numbersHeavyDifficulty(numbers: number, total: number): number {
   if (qualifyingCombinations === 0) return totalCombinations(total);
   return totalCombinations(total) / qualifyingCombinations;
 }
+
+/**
+ * Calculates "n choose k" using BigInt for perfect precision.
+ */
+export function combinationsBigInt(n: bigint, k: bigint): bigint {
+  if (k < 0n || k > n) return 0n;
+  if (k === 0n || k === n) return 1n;
+  if (k > n / 2n) k = n - k;
+
+  let result = 1n;
+  for (let i = 1n; i <= k; i++) {
+    result = (result * (n - i + 1n)) / i;
+  }
+  return result;
+}
+
+/**
+ * Calculates the number of addresses with EXACTLY a certain number of letters, using BigInt.
+ */
+export function exactlyLettersCombinationsBigInt(
+  letters: number,
+  total: number,
+): bigint {
+  if (letters < 0 || letters > total) return 0n;
+  const n = BigInt(total);
+  const k = BigInt(letters);
+  // (6^letters) * (10^(total-letters)) * combinations(total, letters)
+  return 6n ** k * 10n ** (n - k) * combinationsBigInt(n, k);
+}
+
+/**
+ * Calculates the number of addresses with EXACTLY a certain number of adjacent pairs, using BigInt.
+ */
+export function snakeCombinationsBigInt(pairs: number, total: number): bigint {
+  if (pairs < 0 || pairs >= total) return 0n;
+  const p = BigInt(pairs);
+  const n = BigInt(total);
+  // 16 * 15^(total-1-pairs) * combinations(total-1, pairs)
+  return 16n * 15n ** (n - 1n - p) * combinationsBigInt(n - 1n, p);
+}

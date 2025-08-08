@@ -6,5 +6,5 @@ export interface ProofEntryResult {
   pubKey: string;
   provider: ProviderInfo;
   jobId: string;
-  difficulty: number;
+  workDone: number;
 }

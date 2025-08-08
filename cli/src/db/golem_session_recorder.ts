@@ -12,6 +12,7 @@ import { GolemSessionRecorder } from "../node_manager/types";
 import { VanityResult } from "../node_manager/result";
 
 import { v4 as uuidv4 } from "uuid";
+import { computePrefixDifficulty } from "../difficulty";
 
 export class GollemSessionRecorderImpl implements GolemSessionRecorder {
   async agreementAcquired(
@@ -120,19 +121,18 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
     results: VanityResult[],
   ): Promise<any> {
     const newProofs: NewProofModel[] = results.map((res) => {
-      const vanityProblem: GeneratedAddressCategory =
-        res.type === "user-pattern"
-          ? {
-              type: "user-pattern",
-              pattern: res.pattern,
-              difficulty: res.estimatedComplexity,
-            }
-          : {
-              type: "proof",
-              category: res.score.bestCategory.category,
-              score: res.score.bestCategory.score,
-              difficulty: res.score.bestCategory.difficulty,
-            };
+      const vanityProblem: GeneratedAddressCategory = res.isUserPattern
+        ? {
+            type: "user-pattern",
+            pattern: res.pattern,
+            difficulty: computePrefixDifficulty(res.pattern),
+          }
+        : {
+            type: "proof",
+            category: res.proof.addressScore.bestCategory.category,
+            score: res.proof.addressScore.bestCategory.score,
+            difficulty: res.proof.addressScore.bestCategory.difficulty,
+          };
       return {
         providerJobId: jobProviderId,
         addr: res.address,

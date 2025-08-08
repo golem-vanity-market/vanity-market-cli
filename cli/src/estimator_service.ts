@@ -165,8 +165,8 @@ export class EstimatorService {
       const isUserPattern = entry.addr
         .toLowerCase()
         .startsWith(this.options.vanityPrefix.fullPrefix().toLowerCase());
-      this.totalEstimator?.addProvedWork(entry.difficulty, isUserPattern);
-      estimator.addProvedWork(entry.difficulty, isUserPattern);
+      this.totalEstimator?.addProvedWork(entry.workDone, isUserPattern);
+      estimator.addProvedWork(entry.workDone, isUserPattern);
 
       if (this.savedProofs.has(entry.addr.toLowerCase())) {
         this.ctx
