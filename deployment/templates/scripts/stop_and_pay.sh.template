@@ -1,0 +1,16 @@
+#!/bin/bash
+set -xeuo pipefail
+
+# stop process
+sudo systemctl stop %%VANITY_SERVICE_NAME%%.service
+
+# order payment now 
+(cd yagna && ./yagna payment process now --network polygon)
+
+# wait for payment to complete
+
+sleep 600
+
+# confirm payments:
+
+(cd yagna && ./yagna payment status --network polygon)
