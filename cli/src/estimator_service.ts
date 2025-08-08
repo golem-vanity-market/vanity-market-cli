@@ -200,9 +200,7 @@ export class EstimatorService {
         speedEstimation = estimator.estimatedSpeed(SPEED_ESTIMATION_TIMEFRAME);
       }
 
-      console.log("Info cost: ", info.cost);
       if (info.cost > 0) {
-        console.log("Efficiency: ", speedEstimation.efficiency);
         if (
           speedEstimation.efficiency &&
           (speedEstimation.efficiency < efficiencyLowerThreshold ||

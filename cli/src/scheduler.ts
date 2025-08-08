@@ -80,7 +80,7 @@ export class Scheduler {
       },
     });
 
-    console.log(
+    ctx.consoleInfo(
       `🔨 Starting work with ${params.numberOfWorkers} concurrent providers...`,
     );
     const newCtx = withJobId(ctx, jobId);
@@ -99,7 +99,7 @@ export class Scheduler {
 
     budgetMonitor.stop();
 
-    console.log(
+    ctx.consoleInfo(
       `✅ Generation process completed. Found ${this.sessionManager.noResults}/${params.numResults} addresses.`,
     );
   }
@@ -122,7 +122,7 @@ export class Scheduler {
         ctx.info(
           `Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
         );
-        console.log(
+        ctx.consoleInfo(
           `🥳 Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
         );
         this.sessionManager.stopWork("Target number of results reached"); // Stop all other providers
@@ -142,7 +142,6 @@ export class Scheduler {
           await sleep(5);
           continue;
         }
-        console.log(new Date(), "calling estimator");
         const esp = await this.estimator.getCurrentEstimate(
           iterInfo.agreementId,
         );
