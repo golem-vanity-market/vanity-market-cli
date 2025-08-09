@@ -31,18 +31,23 @@ This directory contains scripts for working with the Everit JIRA Timetracker Plu
 ### Fetching Time Entries (`fetch_timetracker.py`)
 
 ```bash
-# Fetch July 2025 entries (default: Summary API)
+# Fetch July 2025 entries (uses Details API)
 uv run fetch_timetracker.py 712020:907c1770-daad-499f-977c-ab455303bdd1 2025-07-01 2025-07-31
 
-# Fetch using Details API instead
-uv run fetch_timetracker.py 712020:907c1770-daad-499f-977c-ab455303bdd1 2025-07-01 2025-07-31 --use-details-api
-
 # With custom output filename
-uv run fetch_timetracker.py <USER_ID> 2025-07-01 2025-07-31 -o custom_output.json
+uv run fetch_timetracker.py 712020:907c1770-daad-499f-977c-ab455303bdd1 2025-07-01 2025-07-31 -o custom_output.json
 
 # Show help
 uv run fetch_timetracker.py --help
 ```
+
+**Required Parameters:**
+- `user_id`: JIRA user account ID (e.g., `712020:907c1770-daad-499f-977c-ab455303bdd1`)
+- `start_date`: Start date in YYYY-MM-DD format
+- `end_date`: End date in YYYY-MM-DD format
+
+**Optional Parameters:**
+- `-o, --output`: Custom output filename (default: auto-generated based on date range)
 
 ### Submitting Work Entries (`report_time.py`)
 
@@ -70,30 +75,63 @@ uv run report_time.py --help
 **Optional Parameters:**
 - `--tags`: Comma-separated worklog tags (e.g., `bug,backend`)
 
-### API Options (for `fetch_timetracker.py`)
+### API Implementation Details
 
-- **Summary API** (default): Aggregated reporting with flexible grouping
-- **Details API** (`--use-details-api`): Individual worklog entries with granular data
+**`fetch_timetracker.py`:**
+- Uses **Details API** (`/public/report/details`) to fetch individual worklog entries
+- Automatically sets `maxResults: 1000` and `startAt: 0` for comprehensive data retrieval
+- Validates date range (start_date must be before or equal to end_date)
+
+**`report_time.py`:**
+- Uses **Worklog API** (`/public/worklog`) to create new time entries
+- Includes automatic tag name-to-ID resolution using Tag API (`/public/tag`)
+- Validates all parameters (dates, times, durations, issue IDs) before submission
+- Includes CSRF protection header (`x-requested-by`) to prevent 400 errors
 
 ## Output
 
 ### `fetch_timetracker.py` Output
 
-The script generates a JSON file with:
+**JSON File Structure:**
+```json
+{
+  "metadata": {
+    "user_id": "712020:907c1770-daad-499f-977c-ab455303bdd1",
+    "start_date": "2025-07-01",
+    "end_date": "2025-07-31",
+    "fetched_at": "2025-08-09T10:30:45.123456",
+    "total_entries": 15
+  },
+  "api_response": {
+    "values": [...worklog entries...],
+    ...
+  }
+}
+```
 
-- **Metadata**: User ID, date range, fetch timestamp, entry count
-- **API Response**: Full response from the Everit API
-
-Default filename format: `time_tracking_YYYYMM.json` (e.g., `time_tracking_202507.json`)
+**Filename Generation:**
+- Same month: `time_tracking_YYYYMM.json` (e.g., `time_tracking_202507.json`)
+- Different months: `time_tracking_YYYY-MM-DD_to_YYYY-MM-DD.json`
+- Custom: Use `-o filename.json` parameter
 
 ### `report_time.py` Output
 
-The script provides console feedback showing:
-
-- Work entry details (date, time, duration, issue ID)
-- Tag resolution (if tags are used)
+**Console Output:**
+- Parameter validation results
+- Tag resolution details (when using `--tags`)
+- API request debugging information
 - Success confirmation with worklog ID
-- Debug information for troubleshooting
+- Duration formatting (e.g., "2h 30m" for 150 minutes)
+
+**Example Success Output:**
+```
+Submitting work entry for 2025-07-15 starting at 09:30
+Issue ID: 13048
+Duration: 120 minutes (2h)
+Description: Fixed authentication bug
+✓ Work entry submitted successfully
+Worklog ID: 12345
+```
 
 ## Troubleshooting
 
@@ -110,6 +148,7 @@ The script provides console feedback showing:
 - Valid date format (YYYY-MM-DD)
 - Valid time format (HH:MM, 24-hour)
 - Positive duration in minutes
+- Valid TR_TOKEN environment variable set
 
 #### `fetch_timetracker.py` 400 Bad Request Error
 
@@ -155,14 +194,34 @@ The script provides console feedback showing:
 
 ## Development
 
-The script includes debug output showing:
+### Debug Information
 
-- API endpoint URL
-- Request payload
-- Response status code
-- Response headers and content
+Both scripts provide comprehensive debug output:
 
-To enable debugging, the script automatically shows this information when requests fail.
+**`fetch_timetracker.py`:**
+- API endpoint URL and payload
+- Response status codes and headers
+- Entry count and metadata
+- Automatic debug output on errors
+
+**`report_time.py`:**
+- Parameter validation results
+- Tag resolution process (name → ID mapping)
+- API request details and responses
+- Duration formatting and calculations
+- Worklog ID confirmation
+
+### Code Structure
+
+**Shared Features:**
+- Input validation with argparse type validators
+- Environment variable handling (`TR_TOKEN`)
+- Comprehensive error handling with detailed messages
+- Timezone support (`Europe/Warsaw`)
+
+**Specific Features:**
+- `fetch_timetracker.py`: JSON file output with metadata wrapper
+- `report_time.py`: Tag API integration for automatic ID resolution
 
 ## Recent Updates ✅
 
@@ -173,13 +232,14 @@ To enable debugging, the script automatically shows this information when reques
 3. **Parameter Validation**: Added validation for issue IDs (must be positive integers)
 4. **Updated Examples**: All examples now use numeric IDs (e.g., 13048 instead of GOL-37)
 
-### `fetch_timetracker.py` Improvements
+### `fetch_timetracker.py` Implementation
 
-1. **Fixed Authentication Headers**: Changed to lowercase (`x-everit-api-key`)
-2. **Added Dual API Support**: Both Summary and Details APIs available
-3. **Fixed Parameter Requirements**: Added mandatory `startAt` for Summary API
-4. **Enhanced CLI**: Added `--use-details-api` option for endpoint selection
-5. **Better Debug Output**: Shows API type, endpoint, and formatted payload
+1. **Details API Only**: Uses `/public/report/details` endpoint exclusively
+2. **Fixed Authentication Headers**: Uses lowercase headers (`x-everit-api-key`, `x-timezone`)
+3. **Automatic Metadata**: Adds metadata wrapper with user ID, dates, and entry count
+4. **Smart Filename Generation**: Auto-generates filenames based on date range
+5. **Date Range Validation**: Ensures start_date ≤ end_date
+6. **Comprehensive Error Handling**: Shows detailed error information for debugging
 
 ### API Documentation Updates
 
