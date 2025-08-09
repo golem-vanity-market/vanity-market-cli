@@ -1,6 +1,9 @@
-# JIRA Timetracker API Client
+# JIRA Timetracker API Clients
 
-This script fetches time tracking entries from the Everit JIRA Timetracker Plugin API.
+This directory contains scripts for working with the Everit JIRA Timetracker Plugin API:
+
+- **`fetch_timetracker.py`**: Fetch existing time tracking entries 
+- **`report_time.py`**: Submit new work entries
 
 ## Setup
 
@@ -19,9 +22,13 @@ This script fetches time tracking entries from the Everit JIRA Timetracker Plugi
 3. **Find your User ID:**
    - Your current User ID: `712020:907c1770-daad-499f-977c-ab455303bdd1` (Wojciech Barczyński)
 
+4. **Find Issue IDs:**
+   - Use the Atlassian MCP tools or JIRA web interface to find numeric issue IDs
+   - Example: Issue GOL-37 has ID `13048`
+
 ## Usage
 
-### Basic Commands
+### Fetching Time Entries (`fetch_timetracker.py`)
 
 ```bash
 # Fetch July 2025 entries (default: Summary API)
@@ -37,12 +44,40 @@ uv run fetch_timetracker.py <USER_ID> 2025-07-01 2025-07-31 -o custom_output.jso
 uv run fetch_timetracker.py --help
 ```
 
-### API Options
+### Submitting Work Entries (`report_time.py`)
+
+```bash
+# Submit 2 hours of work starting at 9:30 AM (issue ID 13048)
+uv run report_time.py 2025-07-15 09:30 "Fixed authentication bug" 120 13048
+
+# Submit with tags
+uv run report_time.py 2025-07-15 14:00 "Code review" 30 13049 --tags review,backend
+
+# Submit 30 minutes of documentation work
+uv run report_time.py 2025-07-15 16:30 "Updated API docs" 30 13050 --tags documentation
+
+# Show help
+uv run report_time.py --help
+```
+
+**Required Parameters for `report_time.py`:**
+- `work_date`: Date in YYYY-MM-DD format
+- `work_start_time`: Start time in HH:MM format (24-hour)
+- `description`: Work description text
+- `duration_minutes`: Duration in minutes (e.g., 60 = 1 hour)
+- `issue_id`: **Numeric JIRA issue ID** (e.g., 13048, not GOL-37)
+
+**Optional Parameters:**
+- `--tags`: Comma-separated worklog tags (e.g., `bug,backend`)
+
+### API Options (for `fetch_timetracker.py`)
 
 - **Summary API** (default): Aggregated reporting with flexible grouping
 - **Details API** (`--use-details-api`): Individual worklog entries with granular data
 
 ## Output
+
+### `fetch_timetracker.py` Output
 
 The script generates a JSON file with:
 
@@ -51,16 +86,39 @@ The script generates a JSON file with:
 
 Default filename format: `time_tracking_YYYYMM.json` (e.g., `time_tracking_202507.json`)
 
+### `report_time.py` Output
+
+The script provides console feedback showing:
+
+- Work entry details (date, time, duration, issue ID)
+- Tag resolution (if tags are used)
+- Success confirmation with worklog ID
+- Debug information for troubleshooting
+
 ## Troubleshooting
 
-### 400 Bad Request Error
+### Common Issues
 
-**Current Status**: The script successfully authenticates but receives validation errors (`{"additionalErrors":[],"fieldErrors":[]}`).
+#### `report_time.py` 400 Bad Request Error
+
+**Fixed Issues** ✅:
+- Missing CSRF header (`x-requested-by`) - now included
+- Issue key vs ID mismatch - now requires numeric issue IDs only
+
+**Current Requirements**:
+- Use **numeric issue IDs** (e.g., `13048`) instead of issue keys (e.g., `GOL-37`)
+- Valid date format (YYYY-MM-DD)
+- Valid time format (HH:MM, 24-hour)
+- Positive duration in minutes
+
+#### `fetch_timetracker.py` 400 Bad Request Error
+
+**Current Status**: Authentication works but may receive validation errors.
 
 **Likely Causes**:
 
 1. **Parameter Validation**: The API may have specific requirements for:
-   - User ID format or existence in the system
+   - User ID format or existence in the system  
    - Date range limitations (future dates, maximum range)
    - Required parameters not documented
 
@@ -72,7 +130,7 @@ Default filename format: `time_tracking_YYYYMM.json` (e.g., `time_tracking_20250
 **Debugging Steps**:
 
 1. **Try Different Date Ranges**: Test with past dates or smaller ranges
-2. **Test Different User IDs**: Verify the user ID exists and is accessible
+2. **Test Different User IDs**: Verify the user ID exists and is accessible  
 3. **Check API Documentation**: Consult latest Everit documentation for parameter requirements
 4. **Contact Admin**: Verify plugin configuration and user permissions
 
@@ -108,7 +166,14 @@ To enable debugging, the script automatically shows this information when reques
 
 ## Recent Updates ✅
 
-### Script Improvements
+### `report_time.py` Improvements
+
+1. **Fixed CSRF Header**: Added required `x-requested-by` header to prevent 400 errors
+2. **Issue ID Validation**: Now requires numeric issue IDs only (no string keys)
+3. **Parameter Validation**: Added validation for issue IDs (must be positive integers)
+4. **Updated Examples**: All examples now use numeric IDs (e.g., 13048 instead of GOL-37)
+
+### `fetch_timetracker.py` Improvements
 
 1. **Fixed Authentication Headers**: Changed to lowercase (`x-everit-api-key`)
 2. **Added Dual API Support**: Both Summary and Details APIs available
