@@ -8,7 +8,6 @@ import {
 } from "./app_context";
 import type { GenerationParams } from "./params";
 import type { EstimatorService } from "./estimator_service";
-import type { Problem } from "./lib/db/schema";
 import type { SchedulerRecorder } from "./scheduler/types";
 import { v4 as uuidv4 } from "uuid";
 import { getProviderEstimatorSummaryMessage } from "./ui/displaySummary";
@@ -40,15 +39,9 @@ export class Scheduler {
   ): Promise<void> {
     const jobId = uuidv4();
 
-    const problem: Problem = {
-      type: "prefix",
-      specifier: params.vanityAddressPrefix.fullPrefix(),
-    };
-
     await this.schedulerRecorder.startGenerationJob(
       ctx,
       jobId,
-      problem,
       params,
       this.sessionManager.getProcessingUnitType(),
     );
@@ -80,7 +73,7 @@ export class Scheduler {
       },
     });
 
-    console.log(
+    ctx.consoleInfo(
       `🔨 Starting work with ${params.numberOfWorkers} concurrent providers...`,
     );
     const newCtx = withJobId(ctx, jobId);
@@ -99,7 +92,7 @@ export class Scheduler {
 
     budgetMonitor.stop();
 
-    console.log(
+    ctx.consoleInfo(
       `✅ Generation process completed. Found ${this.sessionManager.noResults}/${params.numResults} addresses.`,
     );
   }
@@ -122,7 +115,7 @@ export class Scheduler {
         ctx.info(
           `Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
         );
-        console.log(
+        ctx.consoleInfo(
           `🥳 Reached the target number of results: ${this.sessionManager.noResults}/${params.numResults}. Stopping work.`,
         );
         this.sessionManager.stopWork("Target number of results reached"); // Stop all other providers
@@ -142,14 +135,16 @@ export class Scheduler {
           await sleep(5);
           continue;
         }
-        console.log(new Date(), "calling estimator");
         const esp = await this.estimator.getCurrentEstimate(
           iterInfo.agreementId,
         );
 
-        ctx.info(
-          `Provider: ${iterInfo.provider.name}, estimated speed: ${esp.estimatedSpeed}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
-        );
+        ctx
+          .L()
+          .info(
+            `Provider: ${iterInfo.provider.name}, estimated speed: ${esp.estimatedSpeed1h}, total successes: ${esp.totalSuccesses}, remaining time: ${esp.remainingTimeSec} seconds`,
+          );
+
         ctx.consoleInfo(
           getProviderEstimatorSummaryMessage(esp, iterInfo.provider.name),
         );

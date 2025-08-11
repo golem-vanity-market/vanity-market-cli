@@ -44,7 +44,7 @@ interface EstimatorHistoryEntry {
   cost: number;
 }
 
-class SpeedEstimation {
+export class SpeedEstimation {
   currentTimePoint: Date;
   startTimePoint: Date;
   currentAttempts: number;

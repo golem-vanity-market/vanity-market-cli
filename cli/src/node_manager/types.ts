@@ -1,6 +1,6 @@
 import type { AppContext } from "../app_context";
 import type { Agreement } from "@golem-sdk/golem-js";
-import type { VanityResult } from "./result";
+import type { VanityResultMatchingProblem } from "./result";
 import { ProviderJobModel } from "../lib/db/schema";
 
 export interface Reputation {
@@ -41,7 +41,7 @@ export interface GolemSessionRecorder {
   proofsStore(
     ctx: AppContext,
     jobId: string,
-    results: VanityResult[],
+    results: VanityResultMatchingProblem[],
   ): Promise<void>;
 
   getProviderJob(

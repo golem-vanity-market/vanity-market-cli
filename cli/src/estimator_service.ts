@@ -1,7 +1,5 @@
 import { Estimator } from "./estimator/estimator";
 import { GenerationPrefix } from "./params";
-import { ProcessingUnitType } from "./params";
-import { computePrefixDifficulty } from "./difficulty";
 import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";
 import { ResultsService } from "./results_service";
@@ -157,31 +155,15 @@ export class EstimatorService {
       throw Error("Estimator not found for job: " + agreementId);
     }
 
+    let totalWorkThisRun = 0;
     for (const entry of proofQueue) {
-      let prover: string = "N/A";
+      const isUserPattern = entry.addr
+        .toLowerCase()
+        .startsWith(this.options.vanityPrefix.fullPrefix().toLowerCase());
+      this.totalEstimator?.addProvedWork(entry.workDone, isUserPattern);
+      estimator.addProvedWork(entry.workDone, isUserPattern);
+      totalWorkThisRun += entry.workDone;
 
-      if (entry.cpu == ProcessingUnitType.GPU) {
-        prover = this.options.vanityPrefix.toHex().slice(0, 10);
-      } else if (entry.cpu == ProcessingUnitType.CPU) {
-        prover = this.options.vanityPrefix.toHex().slice(0, 8);
-      } else {
-        this.ctx.L().error(`Unsupported worker type: ${entry.cpu}`);
-      }
-
-      const proverDifficulty = computePrefixDifficulty(prover);
-
-      if (entry.addr.startsWith(this.options.vanityPrefix.fullPrefix())) {
-        this.totalEstimator?.addProvedWork(proverDifficulty, true);
-        estimator.addProvedWork(proverDifficulty, true);
-      } else if (entry.addr.startsWith(prover)) {
-        /*displayUserMessage(
-            `Adding proof: ${entry.jobId}: ${entry.addr} diff: ${displayDifficulty(proverDifficulty)}`,
-          );*/
-        this.totalEstimator?.addProvedWork(proverDifficulty);
-        estimator.addProvedWork(proverDifficulty);
-      } else {
-        // empty address
-      }
       if (this.savedProofs.has(entry.addr.toLowerCase())) {
         this.ctx
           .L()
@@ -191,6 +173,11 @@ export class EstimatorService {
         continue; // Skip duplicate entries
       }
       this.savedProofs.set(entry.addr.toLowerCase(), null);
+    }
+    if (proofQueue.length > 0) {
+      this.ctx.info(
+        `Provider ${proofQueue[0].provider.name} found ${proofQueue.length} proofs and done: ${totalWorkThisRun} work`,
+      );
     }
   }
 
@@ -220,9 +207,7 @@ export class EstimatorService {
         speedEstimation = estimator.estimatedSpeed(SPEED_ESTIMATION_TIMEFRAME);
       }
 
-      console.log("Info cost: ", info.cost);
       if (info.cost > 0) {
-        console.log("Efficiency: ", speedEstimation.efficiency);
         if (
           speedEstimation.efficiency &&
           (speedEstimation.efficiency < efficiencyLowerThreshold ||

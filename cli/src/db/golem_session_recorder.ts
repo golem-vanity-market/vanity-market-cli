@@ -11,7 +11,7 @@ import {
   NewAgreementModel,
 } from "../lib/db/schema";
 import { GolemSessionRecorder } from "../node_manager/types";
-import { VanityResult } from "../node_manager/result";
+import { VanityResultMatchingProblem } from "../node_manager/result";
 
 import { v4 as uuidv4 } from "uuid";
 
@@ -152,7 +152,7 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
   async proofsStore(
     ctx: AppContext,
     providerJobId: string,
-    results: VanityResult[],
+    results: VanityResultMatchingProblem[],
   ): Promise<void> {
     const newProofs: NewProofModel[] = results.map((res) => {
       return {
@@ -160,10 +160,7 @@ export class GollemSessionRecorderImpl implements GolemSessionRecorder {
         addr: res.address,
         salt: res.salt,
         pubKey: res.pubKey,
-        vanityProblem: {
-          type: "prefix",
-          specifier: res.pattern,
-        },
+        vanityProblem: res.problem,
       };
     });
     await ctx.getDB().insert(proofsTable).values(newProofs);

@@ -184,6 +184,17 @@ async function handleGenerateCommand(options: any): Promise<void> {
         ? parseInt(options.singlePassSec)
         : 20, // Default single pass duration
       numResults: options.numResults,
+      problems: [
+        {
+          type: "user-prefix",
+          specifier: validatedOptions.vanityAddressPrefix.fullPrefix(),
+        },
+        { type: "leading-any" },
+        { type: "trailing-any" },
+        { type: "letters-heavy" },
+        { type: "numbers-heavy" },
+        { type: "snake-score-no-case" },
+      ],
     };
 
     const formatDateForFilename = (date = new Date()) => {

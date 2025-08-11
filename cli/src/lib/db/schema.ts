@@ -1,5 +1,6 @@
 import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { InferInsertModel, InferSelectModel, sql } from "drizzle-orm";
+import { GeneratedAddressCategory } from "../../pattern/pattern";
 
 export const processingUnitNames = ["cpu", "gpu"] as const;
 export const statusNames = [
@@ -21,17 +22,19 @@ export type JobStatus = (typeof statusNames)[number];
 export type JobOffence = (typeof offenceNames)[number];
 export type DebitNoteStatus = (typeof debitNoteStatusNames)[number];
 
-export type problemType = "prefix" | "suffix";
-
-export interface Problem {
-  type: problemType;
-  specifier: string;
-}
+export type Problem =
+  | {
+      type: Exclude<GeneratedAddressCategory, "user-prefix">;
+    }
+  | {
+      type: "user-prefix";
+      specifier: string;
+    };
 
 export const jobsTable = sqliteTable("job", {
   id: text("id").primaryKey(),
   publicKey: text("public_key").notNull(),
-  vanityProblem: text({ mode: "json" }).notNull().$type<Problem>(),
+  vanityProblems: text({ mode: "json" }).notNull().$type<Problem[]>(),
   numWorkers: integer("num_workers").notNull(),
   budgetGlm: real("budget_glm").notNull(),
   processingUnit: text({ enum: processingUnitNames })
@@ -53,7 +56,6 @@ export const providerJobsTable = sqliteTable("provider_job", {
   status: text({ enum: statusNames }).notNull().$type<JobStatus>(),
   offence: text({ enum: offenceNames }).$type<JobOffence>(),
   hashRate: real("hash_rate"),
-  vanityAdditionalProblems: text({ mode: "json" }).$type<Problem[]>(),
   startTime: text("start_time")
     .notNull()
     .default(sql`(current_timestamp)`),
