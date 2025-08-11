@@ -29,6 +29,7 @@ import { drizzle } from "drizzle-orm/libsql";
 import { GollemSessionRecorderImpl } from "./db/golem_session_recorder";
 import { SchedulerRecorderImpl } from "./db/scheduler_recorder";
 import { SchedulerRecorder } from "./scheduler/types";
+import { ReputationImpl } from "./reputation/reputation";
 
 /**
  * Handles the generate command execution with proper validation and error handling
@@ -210,6 +211,9 @@ async function handleGenerateCommand(options: any): Promise<void> {
       csvOutput:
         process.env.RESULT_CSV_FILE || `results-${formatDateForFilename()}.csv`,
     });
+
+    const reputation = new ReputationImpl();
+
     const estimatorService = new EstimatorService(appCtx, {
       vanityPrefix: validatedOptions.vanityAddressPrefix,
       messageLoopSecs: parseFloat(
@@ -225,6 +229,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
       budgetInitial: generationParams.budgetInitial,
       processingUnitType: validatedOptions.processingUnitType,
       estimatorService,
+      reputation,
       resultService,
     };
 

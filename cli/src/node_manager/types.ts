@@ -5,8 +5,7 @@ import { ProviderJobModel } from "../lib/db/schema";
 
 export interface Reputation {
   isProviderBanned(providerId: string): boolean;
-  addBannedProvider(ctx: AppContext, providerId: string): boolean;
-  markForTermination(providerId: string): boolean;
+  ban(ctx: AppContext, providerId: string, reason: string): boolean;
 }
 export interface GolemSessionRecorder {
   agreementCreate(

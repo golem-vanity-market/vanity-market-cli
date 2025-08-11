@@ -43,9 +43,9 @@ export class VanityPaymentModule extends PaymentModuleImpl {
         throw new Error(`Invalid amount in debit note: ${debitNote.id}`);
       }
 
-      /*
       if (
-        !VanityPaymentModule.estimatorService.didProviderDoneWork(
+        !VanityPaymentModule.estimatorService.checkIfProviderFailedToDoWork(
+          VanityPaymentModule.ctx,
           debitNote.agreementId,
           amountF,
         )
@@ -57,8 +57,6 @@ export class VanityPaymentModule extends PaymentModuleImpl {
           );
         return debitNote;
       }
-
-       */
 
       const resp = VanityPaymentModule.estimatorService.reportCosts(
         debitNote.agreementId,
@@ -105,6 +103,21 @@ export class VanityPaymentModule extends PaymentModuleImpl {
           .error(`Invalid amount in invoice: ${invoice.id}`);
         throw new Error(`Invalid amount in invoice: ${invoice.id}`);
       }
+      if (
+        VanityPaymentModule.estimatorService.checkIfProviderFailedToDoWork(
+          VanityPaymentModule.ctx,
+          invoice.agreementId,
+          amountF,
+        )
+      ) {
+        VanityPaymentModule.ctx
+          .L()
+          .warn(
+            `EstimatorService terminated the agreement for invoice ${invoice.id}`,
+          );
+        return invoice;
+      }
+
       const resp = VanityPaymentModule.estimatorService.reportCosts(
         invoice.agreementId,
         amountF,

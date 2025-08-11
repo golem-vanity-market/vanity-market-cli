@@ -41,7 +41,6 @@ import {
   getProviderJobId,
   withProviderJobID,
 } from "./types";
-import { ReputationImpl } from "../reputation/reputation";
 import { ProviderJobModel } from "../lib/db/schema";
 
 /**
@@ -58,6 +57,8 @@ export interface SessionManagerParams {
   processingUnitType: ProcessingUnitType;
 
   estimatorService: EstimatorService;
+
+  reputation: Reputation;
 
   resultService: ResultsService;
 }
@@ -86,7 +87,7 @@ export class GolemSessionManager {
     this.budgetInitial = params.budgetInitial;
     this.processingUnitType = params.processingUnitType;
     this.estimatorService = params.estimatorService;
-    this.reputation = new ReputationImpl();
+    this.reputation = params.reputation;
     this.resultService = params.resultService;
     this.dbRecorder = recorder;
   }
@@ -519,12 +520,13 @@ export class GolemSessionManager {
     const providerName = rental.agreement.provider.name;
 
     ctx.info(`Checking if terminate rental with provider: ${providerName}`);
-    if (this.estimatorService.check_if_terminate(rental.agreement.id, null)) {
+    if (
+      this.estimatorService.checkIfTerminate(ctx, rental.agreement.id, null)
+    ) {
       ctx.warn(
         `Terminating rental with provider ${providerName} due to estimator decision`,
       );
-      //@todo add to ban
-      //bannedProviders.add(rental.agreement.provider.id);
+      this.reputation.ban(ctx, rental.agreement.provider.id, "low performance");
       await this.rentalPool.destroy(rental, 60_000);
       return null; // No results, rental was terminated
     }

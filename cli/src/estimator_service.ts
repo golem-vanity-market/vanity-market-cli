@@ -4,8 +4,6 @@ import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";
 import { ResultsService } from "./results_service";
 import { EstimatorInfo } from "./estimator/estimator";
-//import { bannedProviders } from "./node_manager/selector";
-import { displayDifficulty } from "./utils/format";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
@@ -181,7 +179,19 @@ export class EstimatorService {
     }
   }
 
-  public check_if_terminate(jobId: string, givenCost: number | null): boolean {
+  public checkIfProviderFailedToDoWork(
+    ctx: AppContext,
+    jobId: string,
+    givenCost: number | null,
+  ): boolean {
+    return this.checkIfTerminate(ctx, jobId, givenCost);
+  }
+
+  public checkIfTerminate(
+    ctx: AppContext,
+    jobId: string,
+    givenCost: number | null,
+  ): boolean {
     const efficiencyLowerThreshold =
       this.dynamicParams.minimumAcceptedEfficiency;
     const speedLowerThreshold = this.dynamicParams.minimumAcceptedSpeed;
@@ -214,11 +224,6 @@ export class EstimatorService {
             speedEstimation.speed < speedLowerThreshold)
         ) {
           estimator.stopping = true;
-          //@todo add to banned providers
-          //bannedProviders.add(estimator.providerId);
-          this.ctx.consoleInfo(
-            `⚠️ Low efficiency or speed detected for ${estimator.providerName}: ${speedEstimation.efficiency} TH/GLM, ${displayDifficulty(speedEstimation.speed)}. Stopping.`,
-          );
           return true;
         }
       }
