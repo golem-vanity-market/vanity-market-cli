@@ -16,7 +16,10 @@ import {
   CPURentalConfig,
   GPURentalConfig,
 } from "./config";
-import { computePrefixDifficulty } from "../difficulty";
+import {
+  computePrefixDifficulty,
+  computeSuffixDifficulty,
+} from "../difficulty";
 import type { EstimatorService } from "../estimator_service";
 import type { ResultsService } from "../results_service";
 import { VanityPaymentModule } from "./payment_module";
@@ -25,15 +28,11 @@ import {
   type IterationInfo,
   type ParsedResults,
   type CommandResult,
-  type VanityResult,
   VanityResultMatchingProblem,
 } from "./result";
 import { ProofEntryResult } from "../estimator/proof";
 import { displayDifficulty } from "../utils/format";
-import {
-  validateAddressMatchPattern,
-  validateVanityResult,
-} from "../validator";
+import { validateVanityResult } from "../validator";
 
 import {
   type GolemSessionRecorder,
@@ -655,8 +654,13 @@ export class GolemSessionManager {
       rental.agreement.provider.id,
       rental.agreement.provider.walletAddress,
       computePrefixDifficulty(
-        generationParams.vanityAddressPrefix.fullPrefix(),
-      ),
+        generationParams.problems.find((p) => p.type === "user-prefix")
+          ?.specifier || "",
+      ) +
+        computeSuffixDifficulty(
+          generationParams.problems.find((p) => p.type === "user-suffix")
+            ?.specifier || "",
+        ),
     );
   }
 
@@ -710,11 +714,7 @@ export class GolemSessionManager {
         this.estimatorService.pushProofToQueue(entry);
       }
 
-      const isUserPrefix = validateAddressMatchPattern(
-        result.address,
-        generationParams.vanityAddressPrefix.fullPrefix(),
-      );
-      if (isUserPrefix) {
+      if (this.isRequestedPattern(entry.addr, generationParams)) {
         this.resultService.processValidatedEntry(
           entry,
           (jobId: string, address: string, addrDifficulty: number) => {
@@ -729,11 +729,19 @@ export class GolemSessionManager {
   }
 
   public isRequestedPattern(
-    result: VanityResult,
+    address: string,
     generationParams: GenerationParams,
   ): boolean {
-    const pattern = generationParams.vanityAddressPrefix.fullPrefix();
-    if (result.address.startsWith(pattern)) {
+    const prefixProblem = generationParams.problems.find(
+      (p) => p.type === "user-prefix",
+    );
+    const suffixProblem = generationParams.problems.find(
+      (p) => p.type === "user-suffix",
+    );
+    if (prefixProblem && address.startsWith(prefixProblem.specifier)) {
+      return true;
+    }
+    if (suffixProblem && address.endsWith(suffixProblem.specifier)) {
       return true;
     }
     return false;

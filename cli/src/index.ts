@@ -18,7 +18,7 @@ import {
 
 import process from "process";
 import { ROOT_CONTEXT } from "@opentelemetry/api";
-import { computePrefixDifficulty } from "./difficulty";
+import { computePrefixDifficulty, computeSuffixDifficulty } from "./difficulty";
 import { displayDifficulty, displayTime } from "./utils/format";
 import { sleep } from "@golem-sdk/golem-js";
 import "dotenv/config";
@@ -35,8 +35,9 @@ import { ReputationImpl } from "./reputation/reputation";
  * Handles the generate command execution with proper validation and error handling
  * @param options - Command options from commander.js
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleGenerateCommand(options: any): Promise<void> {
+async function handleGenerateCommand(
+  options: Record<string, string>,
+): Promise<void> {
   const logger = getPinoLoggerWithOtel(
     APP_NAME,
     process.env.OTEL_LOG_LEVEL || "info",
@@ -123,14 +124,14 @@ async function handleGenerateCommand(options: any): Promise<void> {
       publicKey: publicKey,
       publicKeyPath: options.publicKey,
       vanityAddressPrefix: options.vanityAddressPrefix,
-      budgetInitial: options.budgetInitial,
-      budgetLimit: options.budgetLimit,
-      budgetTopUp: options.budgetTopUp,
+      budgetInitial: parseFloat(options.budgetInitial),
+      budgetLimit: parseFloat(options.budgetLimit),
+      budgetTopUp: parseFloat(options.budgetTopUp),
       resultsFile: options.resultsFile,
       processingUnit: options.processingUnit,
       numResults: BigInt(options.numResults),
       numWorkers: parseInt(options.numWorkers),
-      nonInteractive: options.nonInteractive,
+      nonInteractive: Boolean(options.nonInteractive),
       minOffers: parseInt(options.minOffers),
       minOffersTimeoutSec: parseInt(options.minOffersTimeoutSec),
       dbPath: options.db,
@@ -138,36 +139,68 @@ async function handleGenerateCommand(options: any): Promise<void> {
 
     const validatedOptions = validateGenerateOptions(generateOptions);
 
+    const prefixMessage = validatedOptions.vanityAddressPrefix
+      ? `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix.fullPrefix()}\n`
+      : "";
+    const suffixMessage = validatedOptions.vanityAddressSuffix
+      ? `   Vanity Address Suffix: ${validatedOptions.vanityAddressSuffix.fullSuffix()}\n`
+      : "";
+
     appCtx.consoleInfo(
       "🚀 Starting vanity address generation with the following parameters:\n" +
         `   Public Key File: ${generateOptions.publicKeyPath}\n` +
         `   Public Key: ${validatedOptions.publicKey.toHex()}\n` +
-        `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix.fullPrefix()}\n` +
+        prefixMessage +
+        suffixMessage +
         `   Budget Limit: ${validatedOptions.budgetLimit}\n` +
         `   Worker Type: ${validatedOptions.processingUnitType}\n\n` +
         `✓ All parameters validated successfully\n` +
         `✓ OpenTelemetry tracing enabled for generation process\n`,
     );
 
-    const difficulty = computePrefixDifficulty(
-      validatedOptions.vanityAddressPrefix.fullPrefix(),
-    );
-    const estimatedSecondsToFindOneAddress =
-      validatedOptions.processingUnitType === ProcessingUnitType.CPU
-        ? difficulty / 10000000
-        : difficulty / 250000000;
+    if (validatedOptions.vanityAddressPrefix) {
+      const difficulty = computePrefixDifficulty(
+        validatedOptions.vanityAddressPrefix.fullPrefix(),
+      );
+      const estimatedSecondsToFindOneAddress =
+        validatedOptions.processingUnitType === ProcessingUnitType.CPU
+          ? difficulty / 10000000
+          : difficulty / 250000000;
 
-    appCtx.consoleInfo(
-      `Difficulty of the prefix: ${displayDifficulty(difficulty)}`,
-    );
-    if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
       appCtx.consoleInfo(
-        `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime("GPU ", estimatedSecondsToFindOneAddress)}`,
+        `Difficulty of the prefix: ${displayDifficulty(difficulty)}`,
       );
-    } else {
+      if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
+        appCtx.consoleInfo(
+          `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime("GPU ", estimatedSecondsToFindOneAddress)}`,
+        );
+      } else {
+        appCtx.consoleInfo(
+          `Using CPU worker type. Estimated time: ${displayTime("CPU ", estimatedSecondsToFindOneAddress)}`,
+        );
+      }
+    }
+    if (validatedOptions.vanityAddressSuffix) {
+      const difficulty = computeSuffixDifficulty(
+        validatedOptions.vanityAddressSuffix.fullSuffix(),
+      );
+      const estimatedSecondsToFindOneAddress =
+        validatedOptions.processingUnitType === ProcessingUnitType.CPU
+          ? difficulty / 10000000
+          : difficulty / 250000000;
+
       appCtx.consoleInfo(
-        `Using CPU worker type. Estimated time: ${displayTime("CPU ", estimatedSecondsToFindOneAddress)}`,
+        `Difficulty of the suffix: ${displayDifficulty(difficulty)}`,
       );
+      if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
+        appCtx.consoleInfo(
+          `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime("GPU ", estimatedSecondsToFindOneAddress)}`,
+        );
+      } else {
+        appCtx.consoleInfo(
+          `Using CPU worker type. Estimated time: ${displayTime("CPU ", estimatedSecondsToFindOneAddress)}`,
+        );
+      }
     }
     if (!generateOptions.nonInteractive) {
       appCtx.consoleInfo("Continue in 10 seconds... Press Ctrl+C to cancel");
@@ -177,6 +210,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
     const generationParams: GenerationParams = {
       publicKey: validatedOptions.publicKey.toTruncatedHex(),
       vanityAddressPrefix: validatedOptions.vanityAddressPrefix,
+      vanityAddressSuffix: validatedOptions.vanityAddressSuffix,
       budgetInitial: validatedOptions.budgetInitial,
       budgetTopUp: validatedOptions.budgetTopUp,
       budgetLimit: validatedOptions.budgetLimit,
@@ -184,12 +218,25 @@ async function handleGenerateCommand(options: any): Promise<void> {
       singlePassSeconds: options.singlePassSec
         ? parseInt(options.singlePassSec)
         : 20, // Default single pass duration
-      numResults: options.numResults,
+      numResults: generateOptions.numResults,
       problems: [
-        {
-          type: "user-prefix",
-          specifier: validatedOptions.vanityAddressPrefix.fullPrefix(),
-        },
+        ...(validatedOptions.vanityAddressPrefix
+          ? [
+              {
+                type: "user-prefix",
+                specifier: validatedOptions.vanityAddressPrefix.fullPrefix(),
+              } as const,
+            ]
+          : []),
+        ...(validatedOptions.vanityAddressSuffix
+          ? [
+              {
+                type: "user-suffix",
+                specifier: validatedOptions.vanityAddressSuffix.fullSuffix(),
+              } as const,
+            ]
+          : []),
+
         { type: "leading-any" },
         { type: "trailing-any" },
         { type: "letters-heavy" },
@@ -206,7 +253,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
         .replace("T", "_");
     };
     const resultService = new ResultsService(appCtx, {
-      vanityPrefix: validatedOptions.vanityAddressPrefix,
+      problems: generationParams.problems,
       //location of the file that saves all results
       csvOutput:
         process.env.RESULT_CSV_FILE || `results-${formatDateForFilename()}.csv`,
@@ -215,7 +262,7 @@ async function handleGenerateCommand(options: any): Promise<void> {
     const reputation = new ReputationImpl();
 
     const estimatorService = new EstimatorService(appCtx, {
-      vanityPrefix: validatedOptions.vanityAddressPrefix,
+      problems: generationParams.problems,
       messageLoopSecs: parseFloat(
         process.env.MESSAGE_LOOP_SEC_INTERVAL || "30.0",
       ),
@@ -298,9 +345,13 @@ function main(): void {
       "--public-key <path>",
       "Path to file containing the public key",
     )
-    .requiredOption(
+    .option(
       "--vanity-address-prefix <prefix>",
       "Desired vanity prefix for the generated address",
+    )
+    .option(
+      "--vanity-address-postfix <postfix>",
+      "Desired vanity postfix for the generated address",
     )
     .option(
       "--single-pass-sec <singlePassSec>",

@@ -11,6 +11,7 @@ import { Problem } from "../lib/db/schema";
 
 export type GeneratedAddressCategory =
   | "user-prefix" // The address starts with the user-defined prefix.
+  | "user-suffix" // The address ends with the user-defined suffix.
   | "leading-any" // The number of leading characters that are the same.
   | "trailing-any" // The number of trailing characters that are the same.
   | "letters-heavy" // Addresses with a high number of letters (a-f).
