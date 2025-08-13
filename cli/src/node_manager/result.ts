@@ -56,7 +56,6 @@ export function parseVanityResults(
           continue;
         }
         results.push(r);
-        console.log("Received", r.address);
       }
     } catch (error) {
       console.error("Error parsing vanity result line:", line, error);

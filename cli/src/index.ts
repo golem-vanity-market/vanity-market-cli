@@ -124,6 +124,7 @@ async function handleGenerateCommand(
       publicKey: publicKey,
       publicKeyPath: options.publicKey,
       vanityAddressPrefix: options.vanityAddressPrefix,
+      vanityAddressSuffix: options.vanityAddressSuffix,
       budgetInitial: parseFloat(options.budgetInitial),
       budgetLimit: parseFloat(options.budgetLimit),
       budgetTopUp: parseFloat(options.budgetTopUp),
@@ -350,8 +351,8 @@ function main(): void {
       "Desired vanity prefix for the generated address",
     )
     .option(
-      "--vanity-address-postfix <postfix>",
-      "Desired vanity postfix for the generated address",
+      "--vanity-address-suffix <suffix>",
+      "Desired vanity suffix for the generated address",
     )
     .option(
       "--single-pass-sec <singlePassSec>",
