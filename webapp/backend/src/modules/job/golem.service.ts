@@ -13,6 +13,7 @@ import {
   validateProcessingUnit,
   type GolemSessionRecorder,
   type SchedulerRecorder,
+  type Reputation,
 } from "@unoperate/golem-vaddr-cli/lib";
 import type { JobInput } from "../../../../shared/contracts/job.contract.ts";
 import type { GolemService, Callbacks } from "./types.ts";
@@ -109,22 +110,35 @@ class GolemServiceImpl implements GolemService {
         resultService,
       });
 
+      const banSet = new Set();
+      const reputation: Reputation = {
+        ban: (_, providerId) => {
+          banSet.add(providerId);
+          return true;
+        },
+        isProviderBanned: (providerId) => banSet.has(providerId),
+      };
+
       const sessionParams: SessionManagerParams = {
         rentalDurationSeconds: 15 / 60,
         budgetInitial: 1,
         processingUnitType: validated.processingUnitType,
         estimatorService,
         resultService,
+        reputation,
       };
 
       // TODO:
       const NOOP = async () => {};
       const dbRecorder: GolemSessionRecorder = {
-        agreementAcquired: async () => randomUUID(),
-        jobStarted: NOOP,
-        jobCompleted: NOOP,
-        jobStopped: NOOP,
-        jobFailed: NOOP,
+        addHashRate: NOOP,
+        agreementCreate: NOOP,
+        providerJobCompleted: NOOP,
+        providerJobFailed: NOOP,
+        providerJobCreate: async () => randomUUID(),
+        providerJobStarted: NOOP,
+        providerJobStopped: NOOP,
+        getProviderJob: async () => [],
         resultFailedParsing: NOOP,
         resultInvalidVanityKey: NOOP,
         proofsStore: NOOP,
@@ -172,6 +186,17 @@ class GolemServiceImpl implements GolemService {
         numberOfWorkers: input.numWorkers,
         singlePassSeconds: 20,
         numResults: BigInt(input.numResults),
+        problems: [
+          {
+            type: "user-prefix",
+            specifier: validated.vanityAddressPrefix.fullPrefix(),
+          },
+          { type: "leading-any" },
+          { type: "trailing-any" },
+          { type: "letters-heavy" },
+          { type: "numbers-heavy" },
+          { type: "snake-score-no-case" },
+        ],
       };
 
       await scheduler.runGenerationProcess(appContext, generationParams);
