@@ -159,49 +159,50 @@ async function handleGenerateCommand(
         `✓ OpenTelemetry tracing enabled for generation process\n`,
     );
 
+    const printDifficultyAndEstimate = (
+      label: "prefix" | "suffix",
+      specifier: string,
+    ) => {
+      const difficulty =
+        label == "prefix"
+          ? computePrefixDifficulty(specifier)
+          : computeSuffixDifficulty(specifier);
+      const estimatedSecondsToFindOneAddress =
+        validatedOptions.processingUnitType === ProcessingUnitType.CPU
+          ? difficulty / 10000000
+          : difficulty / 250000000;
+
+      appCtx.consoleInfo(
+        `Difficulty of the ${label}: ${displayDifficulty(difficulty)}`,
+      );
+      if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
+        appCtx.consoleInfo(
+          `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime(
+            "GPU ",
+            estimatedSecondsToFindOneAddress,
+          )}`,
+        );
+      } else {
+        appCtx.consoleInfo(
+          `Using CPU worker type. Estimated time: ${displayTime(
+            "CPU ",
+            estimatedSecondsToFindOneAddress,
+          )}`,
+        );
+      }
+    };
+
     if (validatedOptions.vanityAddressPrefix) {
-      const difficulty = computePrefixDifficulty(
+      printDifficultyAndEstimate(
+        "prefix",
         validatedOptions.vanityAddressPrefix.fullPrefix(),
       );
-      const estimatedSecondsToFindOneAddress =
-        validatedOptions.processingUnitType === ProcessingUnitType.CPU
-          ? difficulty / 10000000
-          : difficulty / 250000000;
-
-      appCtx.consoleInfo(
-        `Difficulty of the prefix: ${displayDifficulty(difficulty)}`,
-      );
-      if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
-        appCtx.consoleInfo(
-          `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime("GPU ", estimatedSecondsToFindOneAddress)}`,
-        );
-      } else {
-        appCtx.consoleInfo(
-          `Using CPU worker type. Estimated time: ${displayTime("CPU ", estimatedSecondsToFindOneAddress)}`,
-        );
-      }
     }
     if (validatedOptions.vanityAddressSuffix) {
-      const difficulty = computeSuffixDifficulty(
+      printDifficultyAndEstimate(
+        "suffix",
         validatedOptions.vanityAddressSuffix.fullSuffix(),
       );
-      const estimatedSecondsToFindOneAddress =
-        validatedOptions.processingUnitType === ProcessingUnitType.CPU
-          ? difficulty / 10000000
-          : difficulty / 250000000;
-
-      appCtx.consoleInfo(
-        `Difficulty of the suffix: ${displayDifficulty(difficulty)}`,
-      );
-      if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
-        appCtx.consoleInfo(
-          `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime("GPU ", estimatedSecondsToFindOneAddress)}`,
-        );
-      } else {
-        appCtx.consoleInfo(
-          `Using CPU worker type. Estimated time: ${displayTime("CPU ", estimatedSecondsToFindOneAddress)}`,
-        );
-      }
     }
     if (!generateOptions.nonInteractive) {
       appCtx.consoleInfo("Continue in 10 seconds... Press Ctrl+C to cancel");
