@@ -110,7 +110,7 @@ describe("Vanity Address Generator CLI - Step 2", () => {
     it("should validate budget-limit is a positive number", () => {
       try {
         execSync(
-          `node ${cliPath} generate --public-key ${validPublicKeyPath} --vanity-address-prefix test --budget-limit -50`,
+          `node ${cliPath} generate --public-key ${validPublicKeyPath} --vanity-address-prefix 0x1234 --budget-limit -50`,
           { encoding: "utf8" },
         );
         fail("Should have thrown an error for negative budget");
