@@ -292,6 +292,10 @@ npm run list-cpu-offers
 npm run list-gpu-offers
 ```
 
+## Pattern Generation Difficulty
+
+For detailed information about vanity address generation difficulty, time estimates, and hardware performance comparisons, see [PATTERN_GEN_DIFF.md](PATTERN_GEN_DIFF.md).
+
 ## Sample commands
 
 Windows

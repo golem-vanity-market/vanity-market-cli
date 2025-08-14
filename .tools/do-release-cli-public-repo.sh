@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 
 TARGET_DIR=/home/eb/workspace-golem/golem-vanity-market-cli
-SRC_GIT_TAG=v0.1.6
+SRC_GIT_TAG=v0.1.8
 SRC_DIR="temp/golem-vanity.market-$SRC_GIT_TAG"
 SRC_DIR_CLI="$SRC_DIR/cli"
 
@@ -17,6 +17,7 @@ fi
 
 # not in the old releases
 cp cli/README_public.md $TARGET_DIR/README.md
+cp cli/PATTERN_GEN_DIFF.md $TARGET_DIR/PATTERN_GEN_DIFF.md
 cp cli/LICENSE $TARGET_DIR/LICENSE
 
 echo "2. Copying CLI code to $TARGET_DIR"
