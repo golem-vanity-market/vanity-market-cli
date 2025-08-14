@@ -213,6 +213,18 @@ function validateGenerateOptions(
   }
 
   if (validPrefix) {
+    if (!validPrefix.startsWith("0x")) {
+      throw new GenerateCmdOptValidationError(
+        "Vanity address prefix must start with '0x'",
+        "vanityAddressPrefix",
+      );
+    }
+    if (!/^[0-9a-f]*$/.test(validPrefix.replace("0x", ""))) {
+      throw new GenerateCmdOptValidationError(
+        "Vanity address prefix must only contain hexadecimal characters",
+        "vanityAddressPrefix",
+      );
+    }
     if (validPrefix.replace("0x", "").length > MAX_VANITY_PREFIX_LENGTH) {
       throw new GenerateCmdOptValidationError(
         `Vanity address prefix too long. Maximum length is ${MAX_VANITY_PREFIX_LENGTH} characters`,
@@ -222,6 +234,12 @@ function validateGenerateOptions(
   }
 
   if (validSuffix) {
+    if (!/^[0-9a-f]*$/.test(validSuffix)) {
+      throw new GenerateCmdOptValidationError(
+        "Vanity address suffix must only contain hexadecimal characters",
+        "vanityAddressSuffix",
+      );
+    }
     if (validSuffix.length > MAX_VANITY_SUFFIX_LENGTH) {
       throw new GenerateCmdOptValidationError(
         `Vanity address suffix too long. Maximum length is ${MAX_VANITY_SUFFIX_LENGTH} characters`,
