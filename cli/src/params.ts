@@ -51,14 +51,14 @@ export class GenerationSuffix {
   val: Uint8Array<ArrayBufferLike>;
   original: string;
 
-  constructor(postfix: string) {
-    const postfixOrig = postfix;
-    while (postfix.length < 8) {
-      postfix = "0" + postfix;
+  constructor(suffix: string) {
+    const suffixOrig = suffix;
+    while (suffix.length < 8) {
+      suffix = "0" + suffix;
     }
-    const byt = getBytes("0x" + postfix.slice(0, 8));
+    const byt = getBytes("0x" + suffix.slice(0, 8));
     this.val = byt;
-    this.original = postfixOrig;
+    this.original = suffixOrig;
   }
 
   fullSuffix(): string {
