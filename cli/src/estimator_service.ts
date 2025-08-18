@@ -1,15 +1,15 @@
 import { Estimator } from "./estimator/estimator";
-import { GenerationPrefix } from "./params";
 import { AppContext } from "./app_context";
 import { ProofEntryResult } from "./estimator/proof";
 import { ResultsService } from "./results_service";
 import { EstimatorInfo } from "./estimator/estimator";
+import { Problem } from "./lib/db/schema";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
   messageLoopSecs?: number;
   processLoopSecs: number;
-  vanityPrefix: GenerationPrefix; // Optional vanity prefix
+  problems: Problem[];
   resultService: ResultsService;
 }
 
@@ -155,9 +155,21 @@ export class EstimatorService {
 
     let totalWorkThisRun = 0;
     for (const entry of proofQueue) {
-      const isUserPattern = entry.addr
-        .toLowerCase()
-        .startsWith(this.options.vanityPrefix.fullPrefix().toLowerCase());
+      const prefixProblem = this.options.problems.find(
+        (p) => p.type === "user-prefix",
+      );
+      const suffixProblem = this.options.problems.find(
+        (p) => p.type === "user-suffix",
+      );
+      const isUserPattern = prefixProblem
+        ? entry.addr
+            .toLowerCase()
+            .startsWith(prefixProblem.specifier.toLowerCase())
+        : suffixProblem
+          ? entry.addr
+              .toLowerCase()
+              .endsWith(suffixProblem.specifier.toLowerCase())
+          : false;
       this.totalEstimator?.addProvedWork(entry.workDone, isUserPattern);
       estimator.addProvedWork(entry.workDone, isUserPattern);
       totalWorkThisRun += entry.workDone;
