@@ -2,6 +2,7 @@
 
 - website: https://www.golem.network/project/vanity-market (updated 2025-08-08)
 - official gihub account: https://github.com/orgs/golem-vanity-market/repositories
+- communication plan: [doc](https://docs.google.com/document/d/1Z7M-ojKYMEqYukNoXyBKx7jFaEer-Rldng4gAXDNHno/)
 
 ## Resources
 
