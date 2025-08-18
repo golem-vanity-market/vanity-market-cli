@@ -348,7 +348,9 @@ export class GolemSessionManager {
       const commandExecutionSec = generationParams.singlePassSeconds;
       const timeoutBufferSec =
         Number(process.env.COMMAND_EXECUTION_TIMEOUT_BUFFER) || 30_000; // buffer for command execution timeout
-      const res = await exe.run(command, {
+      //FIXME: sleep 1 as a workaround for yagna stdout truncate issue, remove when resolved
+      // https://github.com/golemfactory/yagna/issues/3450
+      const res = await exe.run(`${command} && sleep 1`, {
         signalOrTimeout: anyAbortSignal(
           this.stopWorkAC.signal,
           AbortSignal.timeout(commandExecutionSec * 1000 + timeoutBufferSec), // timeout = expected time to execute command + buffer
