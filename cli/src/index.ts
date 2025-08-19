@@ -30,6 +30,9 @@ import { GollemSessionRecorderImpl } from "./db/golem_session_recorder";
 import { SchedulerRecorderImpl } from "./db/scheduler_recorder";
 import { SchedulerRecorder } from "./scheduler/types";
 import { ReputationImpl } from "./reputation/reputation";
+import { startStatusServer } from "./api/server";
+import { ExternalJobUploader } from "./job_uploader";
+import { JobUploaderService } from "./job_uploader_service";
 
 /**
  * Handles the generate command execution with proper validation and error handling
@@ -55,6 +58,7 @@ async function handleGenerateCommand(
     .WithDatabase(db);
 
   let golemSessionManager: GolemSessionManager | null = null;
+
   let isShuttingDown = false;
   const gracefulShutdown = async (exitCode: number) => {
     if (isShuttingDown) {
@@ -284,10 +288,39 @@ async function handleGenerateCommand(
 
     const dbRecorder: GollemSessionRecorderImpl =
       new GollemSessionRecorderImpl();
+
+    let jobUploaderService = null;
+    const uploaderBaseUrl = process.env.JOB_UPLOADER_URL;
+    if (uploaderBaseUrl) {
+      jobUploaderService = new JobUploaderService(
+        appCtx,
+        new ExternalJobUploader(uploaderBaseUrl),
+      );
+    }
+
     golemSessionManager = new GolemSessionManager(
       sessionManagerParams,
       dbRecorder,
+      jobUploaderService,
     );
+
+    const statusServerAddr = process.env.STATUS_SERVER;
+    if (statusServerAddr) {
+      appCtx.L().info(`Starting status server at ${statusServerAddr}...`);
+      startStatusServer(
+        appCtx,
+        statusServerAddr,
+        estimatorService,
+        golemSessionManager,
+        reputation,
+      );
+    } else {
+      appCtx
+        .L()
+        .info(
+          "Status server is not configured. Use STATUS_SERVER environment if you want to use it.",
+        );
+    }
 
     await golemSessionManager.connectToGolemNetwork(appCtx);
     appCtx.consoleInfo("✅ Connected to Golem network successfully");

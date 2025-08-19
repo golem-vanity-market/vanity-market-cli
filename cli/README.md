@@ -302,6 +302,7 @@ Windows
 
 ```
 bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x33333333 --budget-limit 1 --results-file results.json --processing-unit cpu --min-offers-timeout-sec 1 --num-workers 3
+bun src/index.ts generate --public-key sample-key.pub --vanity-address-prefix 0x44448888888 --processing-unit cpu --budget-limit 1 --num-workers 4 --results-file results.json
 ```
 
 Linux/WSL

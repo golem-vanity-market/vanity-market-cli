@@ -29,12 +29,19 @@ export interface EstimatorDynamicParams {
   minimumAcceptedEfficiency: number;
 }
 
-export let uploaderJobId: string;
+export interface EstimatorSimpleInfo {
+  jobId: string;
+  currentInfo: EstimatorInfo;
+  currentCost: number;
+  rental: {
+    provider: string;
+    agreementId: string;
+    status: string;
+  } | null;
+}
 
 export class EstimatorService {
   private proofQueue: Map<string, ProofEntryResult[]> = new Map();
-
-  private savedProofs: Map<string, null> = new Map();
 
   private estimators: Map<string, Estimator> = new Map();
   private costs: Map<string, number> = new Map();
@@ -62,13 +69,14 @@ export class EstimatorService {
     this.dynamicParams = structuredClone(params);
   }
 
-  public allEstimatorsInfo(): object {
-    const estimatorArray = [];
+  public allEstimatorsInfo() {
+    const estimatorArray: EstimatorSimpleInfo[] = [];
     for (const [jobId, estimator] of this.estimators.entries()) {
       estimatorArray.push({
         jobId: jobId,
         currentInfo: estimator.currentInfo(),
         currentCost: estimator.currentCost,
+        rental: null,
       });
     }
     return {
@@ -173,16 +181,6 @@ export class EstimatorService {
       this.totalEstimator?.addProvedWork(entry.workDone, isUserPattern);
       estimator.addProvedWork(entry.workDone, isUserPattern);
       totalWorkThisRun += entry.workDone;
-
-      if (this.savedProofs.has(entry.addr.toLowerCase())) {
-        this.ctx
-          .L()
-          .warn(
-            `Duplicate proof entry found for address: ${entry.addr.toLowerCase()}`,
-          );
-        continue; // Skip duplicate entries
-      }
-      this.savedProofs.set(entry.addr.toLowerCase(), null);
     }
     if (proofQueue.length > 0) {
       this.ctx.info(
@@ -212,10 +210,6 @@ export class EstimatorService {
     ); // 5 minutes in seconds
     const estimator = this.estimators.get(jobId);
     if (estimator) {
-      if (estimator.stopping) {
-        this.ctx.L().info(`Estimator for job ${jobId} is stopping.`);
-        return true;
-      }
       const info = estimator.currentInfo();
 
       let speedEstimation;
@@ -235,7 +229,6 @@ export class EstimatorService {
           (speedEstimation.efficiency < efficiencyLowerThreshold ||
             speedEstimation.speed < speedLowerThreshold)
         ) {
-          estimator.stopping = true;
           return true;
         }
       }

@@ -38,7 +38,7 @@ export const GPU_PROOF_THRESHOLDS: ProofThresholds = {
   "leading-any": 8, // At least 8 leading identical characters
   "trailing-any": 8, // At least 8 trailing identical characters
   "letters-heavy": 35, // At least 35 letters (a-f)
-  "numbers-heavy": 35, // At least 35 numbers (0-9)
+  "numbers-heavy": 40, // At least 35 numbers (0-9)
   "snake-score-no-case": 15, // At least 15 pairs of adjacent identical characters
 };
 

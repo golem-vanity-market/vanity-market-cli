@@ -108,7 +108,7 @@ class GolemServiceImpl implements GolemService {
           process.env.PROCESS_LOOP_SEC_INTERVAL || "1.0"
         ),
         resultService,
-      });
+      }, null);
 
       const banSet = new Set();
       const reputation: Reputation = {

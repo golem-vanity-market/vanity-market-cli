@@ -43,14 +43,18 @@ export interface RentalConfig {
   maxCpuPerHourPrice?: number; // Maximum CPU price per hour in GLM tokens
 }
 
+export function getCruncherVersion() {
+  return process.env.CRUNCHER_VER || "prod-12.4.1";
+}
+
 /**
  * Abstract base class for rental configurations
  */
 export abstract class BaseRentalConfig {
   private _config: RentalConfig;
 
-  constructor(cruncherVersion: string = "prod-12.4.1") {
-    this._config = this.createConfig(cruncherVersion);
+  constructor() {
+    this._config = this.createConfig(getCruncherVersion());
   }
 
   /**
