@@ -24,10 +24,10 @@ type ProofThresholds = {
 
 export const CPU_PROOF_THRESHOLDS: ProofThresholds = {
   "user-prefix": 6, // At least 6 characters matching user provided pattern
-  "user-suffix": 6, // At least 6 characters matching user provided pattern
-  "leading-any": 6, // At least 6 leading identical characters
-  "trailing-any": 6, // At least 6 trailing identical characters
-  "letters-heavy": 32, // At least 32 letters (a-f)
+  "user-suffix": 8, // At least 6 characters matching user provided pattern
+  "leading-any": 8, // At least 6 leading identical characters
+  "trailing-any": 8, // At least 6 trailing identical characters
+  "letters-heavy": 35, // At least 32 letters (a-f)
   "numbers-heavy": 40, // At least 40 numbers (0-9)
   "snake-score-no-case": 15, // At least 15 pairs of adjacent identical characters
 };
