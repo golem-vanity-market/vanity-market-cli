@@ -26,5 +26,3 @@ jobs:
       - name: Show luck histogram
         run: |
           bun src/estimator/estimator-show-histogram.ts
-
-
