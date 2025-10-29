@@ -16,7 +16,7 @@
   "scripts": {
     "prebuild": "ts-node update-version.ts",
     "build": "tsc",
-    "generate": "ts-node ../tools/generate.ts",
+    "generate": "ts-node tools/generate.ts",
     "dev": "ts-node src/index.ts generate --public-key sample-key.pub",
     "crunch": "ts-node src/crunch.ts",
     "format:check": "prettier . --check",
