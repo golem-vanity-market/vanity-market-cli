@@ -98,7 +98,6 @@ jobs:
           KEYSTORE_PASSWORD: verySecurePassword123
 
       - name: Run crunch on Golem
-        working-directory: cli
         run: |
           npm run db:setup
           bun src/index.ts generate \
@@ -118,7 +117,6 @@ jobs:
           EFFICIENCY_LOWER_THRESHOLD: 0.0001
 
       - name: Show results
-        working-directory: cli
         run: |
           cat results.json
 
