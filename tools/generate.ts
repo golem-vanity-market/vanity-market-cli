@@ -34,7 +34,7 @@ async function generateKeystore() {
   const keystoreJson = await wallet.encrypt(pass);
 
   writeFileSync("generated.private", JSON.stringify(JSON.parse(keystoreJson), null, 2).toLowerCase());
-  writeFileSync("../cli/generated.pub", uncompressedPublicKey);
+  writeFileSync("../generated.pub", uncompressedPublicKey);
 }
 
 generateKeystore()

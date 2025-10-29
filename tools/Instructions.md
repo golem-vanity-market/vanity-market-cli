@@ -36,7 +36,7 @@ set KEYSTORE_PASSWORD=your_password
 
 Script tested in windows and linux environments.
 ```
-deno --allow-env --allow-write=generated.private,../cli/generated.pub generate.ts
+deno --allow-env --allow-write=generated.private,../generated.pub generate.ts
 ```
 
 ### 5. Use generated key for vanity address generation (cli)
@@ -46,7 +46,7 @@ deno --allow-env --allow-write=generated.private,../cli/generated.pub generate.t
 To reveal the generated private key, you can use the following command:
 
 ```
-deno --allow-env --allow-read=generated.private,../cli/results.json --allow-write=keys reveal.ts
+deno --allow-env --allow-read=generated.private,../results.json --allow-write=keys reveal.ts
 ```
 
 Your private keys will be ready in form of keystore files encrypted with the password given before.

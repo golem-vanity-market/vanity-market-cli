@@ -17,7 +17,7 @@ async function reveal() {
     }
 
     const PRIVATE_KEY_FILE = "generated.private";
-    const RESULTS_FILE = "../cli/results.json";
+    const RESULTS_FILE = "../results.json";
 
 //read from generated.private
 

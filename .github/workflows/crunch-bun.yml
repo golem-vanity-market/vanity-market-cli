@@ -93,7 +93,7 @@ jobs:
         working-directory: tools
         run: |
           deno install
-          deno --allow-env --allow-write=generated.private,../cli/generated.pub generate.ts
+          deno --allow-env --allow-write=generated.private,../generated.pub generate.ts
         env:
           KEYSTORE_PASSWORD: verySecurePassword123
 
@@ -125,7 +125,7 @@ jobs:
       - name: Reveal keys (secure by deno)
         working-directory: tools
         run: |
-          deno --allow-env --allow-read=generated.private,../cli/results.json --allow-write=keys reveal.ts
+          deno --allow-env --allow-read=generated.private,../results.json --allow-write=keys reveal.ts
           tree
         env:
           KEYSTORE_PASSWORD: verySecurePassword123
