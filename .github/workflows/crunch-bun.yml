@@ -80,7 +80,6 @@ jobs:
           ./yagna service run&
 
       - name: Install dependencies
-        working-directory: cli
         run: |
           bun install
           bun run prebuild
@@ -94,12 +93,11 @@ jobs:
         working-directory: tools
         run: |
           deno install
-          deno --allow-env --allow-write=generated.private,../cli/generated.pub generate.ts
+          deno --allow-env --allow-write=generated.private,../generated.pub generate.ts
         env:
           KEYSTORE_PASSWORD: verySecurePassword123
 
       - name: Run crunch on Golem
-        working-directory: cli
         run: |
           npm run db:setup
           bun src/index.ts generate \
@@ -119,14 +117,13 @@ jobs:
           EFFICIENCY_LOWER_THRESHOLD: 0.0001
 
       - name: Show results
-        working-directory: cli
         run: |
           cat results.json
 
       - name: Reveal keys (secure by deno)
         working-directory: tools
         run: |
-          deno --allow-env --allow-read=generated.private,../cli/results.json --allow-write=keys reveal.ts
+          deno --allow-env --allow-read=generated.private,../results.json --allow-write=keys reveal.ts
           tree
         env:
           KEYSTORE_PASSWORD: verySecurePassword123

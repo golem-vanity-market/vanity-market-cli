@@ -1,0 +1,10 @@
+{
+  "name": "golem-addr-secure-keys",
+  "version": "1.0.0",
+  "description": "Helper for vanity address generator CLI",
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ethers": "=6.14.4"
+  }
+}

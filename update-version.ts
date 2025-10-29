@@ -32,8 +32,7 @@ class VersionUpdateError extends Error {
  * Gets the project root directory
  */
 function getProjectRoot(): string {
-  const scriptDir = __dirname;
-  return dirname(scriptDir);
+  return __dirname;
 }
 
 /**

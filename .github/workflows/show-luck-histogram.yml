@@ -7,8 +7,6 @@ on:
   pull_request:
     branches:
       - main
-    paths:
-      - "cli/**"
 
 jobs:
   show-histogram:
@@ -22,13 +20,9 @@ jobs:
         uses: oven-sh/setup-bun@v2
 
       - name: Install dependencies
-        working-directory: cli
         run: |
           bun install
 
       - name: Show luck histogram
-        working-directory: cli
         run: |
           bun src/estimator/estimator-show-histogram.ts
-
-

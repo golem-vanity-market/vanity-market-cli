@@ -73,7 +73,7 @@ def prepare_client_env_file():
 
     content += "\n"
 
-    env_file_path = "../cli/.env"
+    env_file_path = "../.env"
     with open(env_file_path, "w") as env_file:
         env_file.write(content)
 
