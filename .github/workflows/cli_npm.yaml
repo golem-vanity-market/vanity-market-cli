@@ -4,13 +4,13 @@ on:
   push:
     branches:
       - main
-    paths:
-      - "cli/**"
   pull_request:
     branches:
       - main
-    paths:
-      - "cli/**"
+  workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"  # Every Monday at 03:00 UTC
+
 
 jobs:
   checks:
@@ -19,18 +19,23 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 18
-          cache: "npm"
-          cache-dependency-path: cli/package-lock.json
-      - working-directory: cli
+
+      - uses: actions/setup-node@v5
+
+      - name: Install dependencies
         run: npm install
-      - working-directory: cli
+
+      - name: Set version
         run: npm run prebuild
-      - working-directory: cli
+
+      - name: Check db creation
+        run: npm run db:setup
+
+      - name: Check linter
         run: npm run lint
-      - working-directory: cli
-        run: npm run format
-      - working-directory: cli
+
+      - name: Check format
+        run: npm run format:check
+
+      - name: Run tests
         run: npm run test
