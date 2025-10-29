@@ -14,7 +14,7 @@
     }
   },
   "scripts": {
-    "prebuild": "ts-node tools/update-version.ts",
+    "prebuild": "ts-node update-version.ts",
     "build": "tsc",
     "generate": "ts-node ../tools/generate.ts",
     "dev": "ts-node src/index.ts generate --public-key sample-key.pub",

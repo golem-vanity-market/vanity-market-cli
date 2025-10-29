@@ -80,7 +80,6 @@ jobs:
           ./yagna service run&
 
       - name: Install dependencies
-        working-directory: cli
         run: |
           bun install
           bun run prebuild
