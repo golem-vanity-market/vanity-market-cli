@@ -1,5 +1,0 @@
-#!/bin/bash
-set -xeuo pipefail
-./stop_and_pay.sh
-./clean_and_backup_yagna.sh
-./start_services.sh
