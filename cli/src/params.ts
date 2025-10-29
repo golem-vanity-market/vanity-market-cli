@@ -1,6 +1,48 @@
 import { getBytes, hexlify } from "ethers";
 import { Problem } from "./lib/db/schema";
 
+export interface GenerationParamsShort {
+  vanityAddressPrefix: GenerationPrefix | null;
+  vanityAddressSuffix: GenerationSuffix | null;
+  problems: Problem[];
+  singlePassSeconds: number;
+  publicKey: string;
+  orderId: string | null;
+}
+
+export function getParamsShortToJSONObj(params: GenerationParamsShort) {
+  return {
+    problems: params.problems,
+    pubKey: params.publicKey,
+    orderId: params.orderId,
+  };
+}
+
+export function jsonToGenerationParams(obj: {
+  problems: Problem[];
+  pubKey: string;
+  orderId: string | null;
+}): GenerationParamsShort {
+  let vanityAddressSuffix: GenerationSuffix | null = null;
+  const suffixProblem = obj.problems.find((p) => p.type === "user-suffix");
+  if (suffixProblem) {
+    vanityAddressSuffix = new GenerationSuffix(suffixProblem.specifier);
+  }
+  let vanityAddressPrefix: GenerationPrefix | null = null;
+  const prefixProblem = obj.problems.find((p) => p.type === "user-prefix");
+  if (prefixProblem) {
+    vanityAddressPrefix = new GenerationPrefix(prefixProblem.specifier);
+  }
+  return {
+    vanityAddressPrefix,
+    vanityAddressSuffix,
+    problems: obj.problems,
+    singlePassSeconds: 0,
+    publicKey: obj.pubKey,
+    orderId: obj.orderId,
+  };
+}
+
 /**
  * Interface for task generation parameters
  */

@@ -1,8 +1,4 @@
-// Don't import anything before it!
-import { shutdownOpenTelemetry } from "./instrumentation";
-import { trace, metrics } from "@opentelemetry/api";
-import { MetricsCollector } from "./metrics_collector";
-import { AppContext, getPinoLoggerWithOtel } from "./app_context";
+import { AppContext, getPinoLogger } from "./app_context";
 import { Command } from "commander";
 import { Scheduler } from "./scheduler";
 import { GenerationParams, ProcessingUnitType } from "./params";
@@ -17,22 +13,24 @@ import {
 } from "./node_manager/golem_session";
 
 import process from "process";
-import { ROOT_CONTEXT } from "@opentelemetry/api";
-import { computePrefixDifficulty, computeSuffixDifficulty } from "./difficulty";
-import { displayDifficulty, displayTime } from "./utils/format";
+import {
+  displayDifficulty,
+  displayTime,
+  getErrorMessage,
+} from "./utils/format";
 import { sleep } from "@golem-sdk/golem-js";
 import "dotenv/config";
 import { EstimatorService } from "./estimator_service";
 import { ResultsService } from "./results_service";
 import { APP_NAME, APP_VERSION } from "./version";
 import { drizzle } from "drizzle-orm/libsql";
-import { GollemSessionRecorderImpl } from "./db/golem_session_recorder";
+import { GolemSessionRecorder } from "./db/golem_session_recorder";
 import { SchedulerRecorderImpl } from "./db/scheduler_recorder";
 import { SchedulerRecorder } from "./scheduler/types";
-import { ReputationImpl } from "./reputation/reputation";
+import { newJobUploaderService } from "./uploader/job_uploader_service";
+import { calculateWorkUnitForProblems } from "./pattern/pattern";
 import { startStatusServer } from "./api/server";
-import { ExternalJobUploader } from "./job_uploader";
-import { JobUploaderService } from "./job_uploader_service";
+import { Reputation } from "./reputation/reputation";
 
 /**
  * Handles the generate command execution with proper validation and error handling
@@ -41,21 +39,14 @@ import { JobUploaderService } from "./job_uploader_service";
 async function handleGenerateCommand(
   options: Record<string, string>,
 ): Promise<void> {
-  const logger = getPinoLoggerWithOtel(
-    APP_NAME,
-    process.env.OTEL_LOG_LEVEL || "info",
-  );
+  const logger = getPinoLogger(APP_NAME);
 
-  const tracer = trace.getTracer(APP_NAME, APP_VERSION);
-  const meter = metrics.getMeter(APP_NAME, APP_VERSION);
-  const mCollector = MetricsCollector.newCollector(meter);
   const db = drizzle(`file:${options.db}`);
 
-  const appCtx = new AppContext(ROOT_CONTEXT)
-    .WithLogger(logger)
-    .WithTracer(tracer)
-    .WithCollector(mCollector)
-    .WithDatabase(db);
+  const appCtx = new AppContext()
+    .withLogger(logger)
+    .withDatabase(db)
+    .withShowTags(process.env.SHOW_LOG_TAGS === "1");
 
   let golemSessionManager: GolemSessionManager | null = null;
 
@@ -83,7 +74,11 @@ async function handleGenerateCommand(
             `✅ Results saved to file: ${options.resultsFile}`,
           );
         } catch (error) {
-          appCtx.L().error(`❌ Error saving results to file: ${error}`);
+          appCtx
+            .L()
+            .error(
+              `❌ Error saving results to file: ${getErrorMessage(error)}`,
+            );
         }
       }
 
@@ -106,20 +101,12 @@ async function handleGenerateCommand(
       }
     }
 
-    // and shut down OpenTelemetry
-    try {
-      await shutdownOpenTelemetry();
-      appCtx.consoleInfo("✅ OpenTelemetry shut down successfully");
-    } catch (err) {
-      console.info("❌ Error shutting down OpenTelemetry", err);
-    }
-
     process.exit(exitCode);
   };
 
   // Register signal handlers to initiate graceful shutdown
-  process.on("SIGINT", () => gracefulShutdown(0));
-  process.on("SIGTERM", () => gracefulShutdown(0));
+  process.on("SIGINT", () => void gracefulShutdown(0));
+  process.on("SIGTERM", () => void gracefulShutdown(0));
 
   try {
     const publicKey = readPublicKeyFromFile(options.publicKey);
@@ -129,6 +116,12 @@ async function handleGenerateCommand(
       publicKeyPath: options.publicKey,
       vanityAddressPrefix: options.vanityAddressPrefix,
       vanityAddressSuffix: options.vanityAddressSuffix,
+      vanityAddressLeading: parseInt(options.vanityAddressLeading),
+      vanityAddressTrailing: parseInt(options.vanityAddressTrailing),
+      vanityAddressLettersHeavy: parseInt(options.vanityAddressLettersHeavy),
+      vanityAddressNumbersOnly: Boolean(options.vanityAddressNumbersOnly),
+      vanityAddressSnake: parseInt(options.vanityAddressSnake),
+      vanityAddressMask: options.vanityAddressMask,
       budgetInitial: parseFloat(options.budgetInitial),
       budgetLimit: parseFloat(options.budgetLimit),
       budgetTopUp: parseFloat(options.budgetTopUp),
@@ -144,70 +137,142 @@ async function handleGenerateCommand(
 
     const validatedOptions = validateGenerateOptions(generateOptions);
 
-    const prefixMessage = validatedOptions.vanityAddressPrefix
-      ? `   Vanity Address Prefix: ${validatedOptions.vanityAddressPrefix.fullPrefix()}\n`
-      : "";
-    const suffixMessage = validatedOptions.vanityAddressSuffix
-      ? `   Vanity Address Suffix: ${validatedOptions.vanityAddressSuffix.fullSuffix()}\n`
-      : "";
+    const problems = [
+      ...(validatedOptions.vanityAddressPrefix
+        ? [
+            {
+              type: "user-prefix",
+              specifier: validatedOptions.vanityAddressPrefix.fullPrefix(),
+            } as const,
+          ]
+        : []),
+      ...(validatedOptions.vanityAddressSuffix
+        ? [
+            {
+              type: "user-suffix",
+              specifier: validatedOptions.vanityAddressSuffix.fullSuffix(),
+            } as const,
+          ]
+        : []),
+      ...(validatedOptions.vanityAddressMask
+        ? [
+            {
+              type: "user-mask",
+              specifier: validatedOptions.vanityAddressMask,
+            } as const,
+          ]
+        : []),
+      ...(generateOptions.vanityAddressLeading
+        ? [
+            {
+              type: "leading-any",
+              length: generateOptions.vanityAddressLeading,
+            } as const,
+          ]
+        : []),
+      ...(generateOptions.vanityAddressTrailing
+        ? [
+            {
+              type: "trailing-any",
+              length: generateOptions.vanityAddressTrailing,
+            } as const,
+          ]
+        : []),
+      ...(generateOptions.vanityAddressLettersHeavy
+        ? [
+            {
+              type: "letters-heavy",
+              count: generateOptions.vanityAddressLettersHeavy,
+            } as const,
+          ]
+        : []),
+      ...(generateOptions.vanityAddressNumbersOnly
+        ? [{ type: "numbers-heavy" } as const]
+        : []),
+      ...(generateOptions.vanityAddressSnake
+        ? [
+            {
+              type: "snake-score-no-case",
+              count: generateOptions.vanityAddressSnake,
+            } as const,
+          ]
+        : []),
+    ];
 
+    const patternsMessages = [];
+    if (validatedOptions.vanityAddressPrefix) {
+      patternsMessages.push(
+        `Prefix(${validatedOptions.vanityAddressPrefix.fullPrefix()})`,
+      );
+    }
+    if (validatedOptions.vanityAddressSuffix) {
+      patternsMessages.push(
+        `Suffix(${validatedOptions.vanityAddressSuffix.fullSuffix()})`,
+      );
+    }
+    if (generateOptions.vanityAddressLeading) {
+      patternsMessages.push(
+        `Leading ${generateOptions.vanityAddressLeading} identical characters`,
+      );
+    }
+    if (generateOptions.vanityAddressTrailing) {
+      patternsMessages.push(
+        `Trailing ${generateOptions.vanityAddressTrailing} identical characters`,
+      );
+    }
+    if (generateOptions.vanityAddressLettersHeavy) {
+      patternsMessages.push(
+        `At least ${generateOptions.vanityAddressLettersHeavy} letters`,
+      );
+    }
+    if (generateOptions.vanityAddressNumbersOnly) {
+      patternsMessages.push(`Numbers only`);
+    }
+    if (generateOptions.vanityAddressSnake) {
+      patternsMessages.push(
+        `At least ${generateOptions.vanityAddressSnake} pairs`,
+      );
+    }
+    if (generateOptions.vanityAddressMask) {
+      patternsMessages.push(`Mask(${generateOptions.vanityAddressMask})`);
+    }
+    const patternsMessage = `   Patterns: ${patternsMessages.join(", ")}\n`;
     appCtx.consoleInfo(
       "🚀 Starting vanity address generation with the following parameters:\n" +
         `   Public Key File: ${generateOptions.publicKeyPath}\n` +
         `   Public Key: ${validatedOptions.publicKey.toHex()}\n` +
-        prefixMessage +
-        suffixMessage +
+        patternsMessage +
         `   Budget Limit: ${validatedOptions.budgetLimit}\n` +
         `   Worker Type: ${validatedOptions.processingUnitType}\n\n` +
         `✓ All parameters validated successfully\n` +
         `✓ OpenTelemetry tracing enabled for generation process\n`,
     );
 
-    const printDifficultyAndEstimate = (
-      label: "prefix" | "suffix",
-      specifier: string,
-    ) => {
-      const difficulty =
-        label == "prefix"
-          ? computePrefixDifficulty(specifier)
-          : computeSuffixDifficulty(specifier);
-      const estimatedSecondsToFindOneAddress =
-        validatedOptions.processingUnitType === ProcessingUnitType.CPU
-          ? difficulty / 10000000
-          : difficulty / 250000000;
+    const difficulty = calculateWorkUnitForProblems(problems);
+    const estimatedSecondsToFindOneAddress =
+      validatedOptions.processingUnitType === ProcessingUnitType.CPU
+        ? difficulty / 10000000
+        : difficulty / 250000000;
 
+    appCtx.consoleInfo(
+      `Difficulty to find an address matching any of the defined patterns: ${displayDifficulty(difficulty)}`,
+    );
+    if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
       appCtx.consoleInfo(
-        `Difficulty of the ${label}: ${displayDifficulty(difficulty)}`,
+        `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime(
+          "GPU ",
+          estimatedSecondsToFindOneAddress,
+        )}`,
       );
-      if (validatedOptions.processingUnitType === ProcessingUnitType.GPU) {
-        appCtx.consoleInfo(
-          `Using GPU worker type. Estimated time on a single Nvidia 3060: ${displayTime(
-            "GPU ",
-            estimatedSecondsToFindOneAddress,
-          )}`,
-        );
-      } else {
-        appCtx.consoleInfo(
-          `Using CPU worker type. Estimated time: ${displayTime(
-            "CPU ",
-            estimatedSecondsToFindOneAddress,
-          )}`,
-        );
-      }
-    };
+    } else {
+      appCtx.consoleInfo(
+        `Using CPU worker type. Estimated time: ${displayTime(
+          "CPU ",
+          estimatedSecondsToFindOneAddress,
+        )}`,
+      );
+    }
 
-    if (validatedOptions.vanityAddressPrefix) {
-      printDifficultyAndEstimate(
-        "prefix",
-        validatedOptions.vanityAddressPrefix.fullPrefix(),
-      );
-    }
-    if (validatedOptions.vanityAddressSuffix) {
-      printDifficultyAndEstimate(
-        "suffix",
-        validatedOptions.vanityAddressSuffix.fullSuffix(),
-      );
-    }
     if (!generateOptions.nonInteractive) {
       appCtx.consoleInfo("Continue in 10 seconds... Press Ctrl+C to cancel");
       await sleep(10);
@@ -225,30 +290,7 @@ async function handleGenerateCommand(
         ? parseInt(options.singlePassSec)
         : 20, // Default single pass duration
       numResults: generateOptions.numResults,
-      problems: [
-        ...(validatedOptions.vanityAddressPrefix
-          ? [
-              {
-                type: "user-prefix",
-                specifier: validatedOptions.vanityAddressPrefix.fullPrefix(),
-              } as const,
-            ]
-          : []),
-        ...(validatedOptions.vanityAddressSuffix
-          ? [
-              {
-                type: "user-suffix",
-                specifier: validatedOptions.vanityAddressSuffix.fullSuffix(),
-              } as const,
-            ]
-          : []),
-
-        { type: "leading-any" },
-        { type: "trailing-any" },
-        { type: "letters-heavy" },
-        { type: "numbers-heavy" },
-        { type: "snake-score-no-case" },
-      ],
+      problems,
     };
 
     const formatDateForFilename = (date = new Date()) => {
@@ -265,7 +307,7 @@ async function handleGenerateCommand(
         process.env.RESULT_CSV_FILE || `results-${formatDateForFilename()}.csv`,
     });
 
-    const reputation = new ReputationImpl();
+    const reputation = new Reputation();
 
     const estimatorService = new EstimatorService(appCtx, {
       problems: generationParams.problems,
@@ -277,6 +319,11 @@ async function handleGenerateCommand(
       ),
       resultService,
     });
+    const maxPossibleWorkers = parseInt(
+      process.env.MAX_POSSIBLE_WORKERS ||
+        generationParams.numberOfWorkers.toString(),
+    );
+
     const sessionManagerParams: SessionManagerParams = {
       rentalDurationSeconds: 15 * 60, // for all cost calculations assume we're renting a provider for 15 minutes at a time
       budgetInitial: generationParams.budgetInitial,
@@ -284,43 +331,25 @@ async function handleGenerateCommand(
       estimatorService,
       reputation,
       resultService,
+      maxPossibleWorkers,
     };
 
-    const dbRecorder: GollemSessionRecorderImpl =
-      new GollemSessionRecorderImpl();
+    const dbRecorder: GolemSessionRecorder = new GolemSessionRecorder();
 
-    let jobUploaderService = null;
+    const jobUploaderServices = [];
     const uploaderBaseUrl = process.env.JOB_UPLOADER_URL;
-    if (uploaderBaseUrl) {
-      jobUploaderService = new JobUploaderService(
-        appCtx,
-        new ExternalJobUploader(uploaderBaseUrl),
+    const newUploaderBaseUrl = process.env.NEW_JOB_UPLOADER_URL;
+    if (uploaderBaseUrl || newUploaderBaseUrl) {
+      jobUploaderServices.push(
+        newJobUploaderService(appCtx, uploaderBaseUrl, newUploaderBaseUrl),
       );
     }
 
     golemSessionManager = new GolemSessionManager(
       sessionManagerParams,
       dbRecorder,
-      jobUploaderService,
+      jobUploaderServices,
     );
-
-    const statusServerAddr = process.env.STATUS_SERVER;
-    if (statusServerAddr) {
-      appCtx.L().info(`Starting status server at ${statusServerAddr}...`);
-      startStatusServer(
-        appCtx,
-        statusServerAddr,
-        estimatorService,
-        golemSessionManager,
-        reputation,
-      );
-    } else {
-      appCtx
-        .L()
-        .info(
-          "Status server is not configured. Use STATUS_SERVER environment if you want to use it.",
-        );
-    }
 
     await golemSessionManager.connectToGolemNetwork(appCtx);
     appCtx.consoleInfo("✅ Connected to Golem network successfully");
@@ -345,6 +374,26 @@ async function handleGenerateCommand(
       estimatorService,
       schedulerRecorder,
     );
+
+    const statusServerAddr = process.env.STATUS_SERVER;
+    if (statusServerAddr) {
+      appCtx.L().info(`Starting status server at ${statusServerAddr}...`);
+      startStatusServer(
+        appCtx,
+        statusServerAddr,
+        estimatorService,
+        golemSessionManager,
+        scheduler,
+        reputation,
+      );
+    } else {
+      appCtx
+        .L()
+        .info(
+          "Status server is not configured. Use STATUS_SERVER environment if you want to use it.",
+        );
+    }
+
     await scheduler.runGenerationProcess(appCtx, generationParams);
 
     // Normal completion, initiate shutdown.
@@ -369,7 +418,7 @@ function main(): void {
 
   program
     .name(APP_NAME)
-    .description("Vanity address generator CLI with OpenTelemetry support")
+    .description("Vanity address generator CLI")
     .version(APP_VERSION);
 
   // Generate command - Step 2 implementation
@@ -382,11 +431,35 @@ function main(): void {
     )
     .option(
       "--vanity-address-prefix <prefix>",
-      "Desired vanity prefix for the generated address",
+      "Search for addresses that start with the specified prefix",
     )
     .option(
       "--vanity-address-suffix <suffix>",
-      "Desired vanity suffix for the generated address",
+      "Search for addresses that end with the specified suffix",
+    )
+    .option(
+      "--vanity-address-mask <mask>",
+      "Search for addresses that match the specified mask. Use X to match any character (e.g., 0xabcXXXXXXXXXXX00XXXXXXXXXXX00XXXXXXXXcba)",
+    )
+    .option(
+      "--vanity-address-leading <length>",
+      "Search for addresses that start with at least <length> of the same character (e.g., 0xaaaaaaaa..., 0x00000000...)",
+    )
+    .option(
+      "--vanity-address-trailing <length>",
+      "Search for addresses that end with at least <length> of the same character (e.g., 0x...aaaaaaaa, 0x...00000000)",
+    )
+    .option(
+      "--vanity-address-letters-heavy <count>",
+      "Search for addresses that contain at least <count> letters",
+    )
+    .option(
+      "--vanity-address-numbers-only",
+      "Search for addresses that are composed of only numbers",
+    )
+    .option(
+      "--vanity-address-snake <count>",
+      "Search for addresses that contain at least the given number of pairs of characters (e.g., 0x222336883aa77bbbbbbccccffff000ffffaafffa)",
     )
     .option(
       "--single-pass-sec <singlePassSec>",

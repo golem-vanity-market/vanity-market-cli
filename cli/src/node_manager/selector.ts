@@ -1,42 +1,8 @@
 import type { OfferProposal } from "@golem-sdk/golem-js";
 import type { AppContext } from "../app_context";
-import type { Reputation } from "./types";
+import { Reputation } from "../reputation/reputation";
 
 export const proposalPool = new Map<string, OfferProposal>();
-
-function getDemandExpirationDate(proposal: OfferProposal): Date | null {
-  const demandExpirationProperty =
-    proposal.demand.details.prototype.properties.find(
-      (el) => el.key === "golem.srv.comp.expiration",
-    );
-  if (demandExpirationProperty) {
-    try {
-      const exp = parseInt(demandExpirationProperty.value.toString());
-      return new Date(exp); // Convert seconds to milliseconds
-    } catch (error) {
-      console.warn(
-        "Error parsing expiration value for proposal:",
-        proposal.id,
-        error,
-      );
-    }
-  }
-  return null;
-}
-
-export function getProposalPoolJson() {
-  return Array.from(proposalPool.values()).map((proposal) => {
-    return {
-      id: proposal.id,
-      providerId: proposal.provider.id,
-      estimatedCost: proposal.getEstimatedCost(1),
-      proposalTime: proposal.timestamp.toISOString(),
-      demandExpiration: getDemandExpirationDate(proposal)?.toISOString(),
-      offer: proposal.properties,
-      pricing: proposal.pricing,
-    };
-  });
-}
 
 export const filterProposal =
   (ctx: AppContext, rep: Reputation) => (proposal: OfferProposal) => {
@@ -55,7 +21,7 @@ export const filterProposal =
     }
 
     if (rep.isProviderBanned(proposal.provider.id)) {
-      ctx.L().info("Skipping banned provider: ", proposal.provider.id);
+      ctx.L().info(`Skipping banned provider: ${proposal.provider.id}`);
       return false;
     }
 

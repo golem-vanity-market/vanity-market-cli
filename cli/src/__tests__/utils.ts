@@ -1,8 +1,6 @@
-import { AppContext, getPinoLoggerWithOtel } from "../app_context";
-import { ROOT_CONTEXT } from "@opentelemetry/api";
+import { AppContext, getPinoLogger } from "../app_context";
 
 export function getCtxForTests(testName: string): AppContext {
-  const logger = getPinoLoggerWithOtel(testName, "info");
-  const ctx: AppContext = new AppContext(ROOT_CONTEXT).WithLogger(logger);
-  return ctx;
+  const logger = getPinoLogger(testName);
+  return new AppContext().withLogger(logger);
 }

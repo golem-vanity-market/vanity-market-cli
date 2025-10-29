@@ -85,7 +85,7 @@ def prepare_client_env_file():
 # Example usage
 if __name__ == "__main__":
     system = platform.system()
-    yagna_version = "pre-rel-v0.17.1-preview.golembase.29"
+    yagna_version = "pre-rel-v0.17.1-preview.golembase.40"
     unpack_location = "base"
 
     if os.path.exists(unpack_location):

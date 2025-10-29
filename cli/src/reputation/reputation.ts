@@ -1,7 +1,6 @@
 import type { AppContext } from "../app_context";
-import type { Reputation } from "../node_manager/types";
 
-export class ReputationImpl implements Reputation {
+export class Reputation {
   private _bannedProviders: string[] = [];
 
   public bannedProviders(): object {

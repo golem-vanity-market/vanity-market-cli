@@ -14,6 +14,7 @@ import {
 import { GolemServices } from "@golem-sdk/golem-js/dist/golem-network";
 import { PaymentModuleOptions } from "@golem-sdk/golem-js/dist/payment/payment.module";
 import { debitNotesTable, NewDebitNoteModel } from "../lib/db/schema";
+import { getErrorMessage } from "../utils/format";
 
 export class VanityPaymentModule extends PaymentModuleImpl {
   public static estimatorService: EstimatorService;
@@ -85,7 +86,9 @@ export class VanityPaymentModule extends PaymentModuleImpl {
     } catch (error) {
       VanityPaymentModule.ctx
         .L()
-        .error(`Failed to accept debit note ${debitNote.id}: ${error}`);
+        .error(
+          `Failed to accept debit note ${debitNote.id}: ${getErrorMessage(error)}`,
+        );
       throw error;
     }
   }
@@ -135,7 +138,9 @@ export class VanityPaymentModule extends PaymentModuleImpl {
     } catch (err) {
       VanityPaymentModule.ctx
         .L()
-        .error(`Failed to accept invoice ${invoice.id}: ${err}`);
+        .error(
+          `Failed to accept invoice ${invoice.id}: ${getErrorMessage(err)}`,
+        );
       throw err;
     }
   }

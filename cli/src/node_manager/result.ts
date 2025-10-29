@@ -1,21 +1,18 @@
 import { ProviderInfo } from "@golem-sdk/golem-js";
 import { ProcessingUnitType } from "../params";
 import { AppContext } from "../app_context";
-import { checkAddressProof } from "../pattern/pattern";
+import { checkAddressProof, MatchingProblems } from "../pattern/pattern";
 import { Problem } from "../lib/db/schema";
 
 export type CommandStatus = "success" | "not_found" | "stopped";
 
 export type VanityResult = {
   address: string;
-  salt: string;
-  pubKey: string;
-  problem: Problem | null;
+  salt: string | null;
+  pubKey: string | null;
+  matchingProblems: MatchingProblems;
   workDone: number;
-};
-
-export type VanityResultMatchingProblem = VanityResult & {
-  problem: Problem;
+  path: string | null;
 };
 
 export interface IterationInfo {
@@ -48,6 +45,16 @@ export function parseVanityResults(
   for (let line of lines) {
     try {
       line = line.trim();
+      if (line.startsWith("Matched address:")) {
+        const r = parseVanityPathResult(line, problems, processingUnit);
+        if (r == null) {
+          ctx.L().warn(`Invalid vanity result line from provider:`, line);
+          failedLines.push(line);
+          continue;
+        }
+        ctx.L().info(`Parsed vanity result: ${r.address}`);
+        results.push(r);
+      }
       if (line.startsWith("0x")) {
         const r = parseVanityResult(line, problems, processingUnit);
         if (r == null) {
@@ -55,6 +62,7 @@ export function parseVanityResults(
           failedLines.push(line);
           continue;
         }
+        ctx.L().info(`Parsed vanity result: ${r.address}`);
         results.push(r);
       }
     } catch (error) {
@@ -66,6 +74,40 @@ export function parseVanityResults(
   //TODO reputation
   //add info about non matching lines
   return { results, failedLines };
+}
+
+export function parseVanityPathResult(
+  line: string,
+  problems: Problem[],
+  processingUnit: ProcessingUnitType,
+): VanityResult | null {
+  const trimmedLine = line.trim();
+  if (!trimmedLine.startsWith("Matched address:")) {
+    return null;
+  }
+
+  const parts = trimmedLine.split(",");
+  if (parts.length < 2) {
+    return null;
+  }
+
+  const address = parts[0].replace("Matched address:", "").trim();
+  const path = parts[1].replace("path:", "").trim();
+
+  const { matchingProblems, workDone } = checkAddressProof(
+    address,
+    problems,
+    processingUnit,
+  );
+
+  return {
+    salt: null,
+    pubKey: null,
+    address,
+    path,
+    matchingProblems,
+    workDone,
+  };
 }
 
 export function parseVanityResult(
@@ -87,16 +129,17 @@ export function parseVanityResult(
   const address = parts[1].trim();
   const pubKey = parts[2].trim();
 
-  const { passedProblem, workDone } = checkAddressProof(
+  const { matchingProblems, workDone } = checkAddressProof(
     address,
     problems,
     processingUnit,
   );
   return {
+    path: null,
     address,
     salt,
     pubKey,
-    problem: passedProblem,
+    matchingProblems,
     workDone,
   };
 }

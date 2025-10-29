@@ -13,7 +13,7 @@ You can run the CLI directly from the private GitHub npm package repository.
 2. **Configure npm authentication**: Set up your npm configuration to authenticate with GitHub Packages:
 
 ```bash
-echo "@unoperate:registry=https://npm.pkg.github.com" >> ~/.npmrc
+echo "@golem-vanity-market:registry=https://npm.pkg.github.com" >> ~/.npmrc
 echo "//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN" >> ~/.npmrc
 ```
 
@@ -31,7 +31,7 @@ Once authentication is configured, you can run the CLI directly:
 
 ```bash
 # Display help
-npx @unoperate/golem-vaddr-cli@0.1.5 --help
+npx @golem-vanity-market/golem-vaddr-cli@0.1.5 --help
 
 export YAGNA_APPKEY=your-generated-app-key
 
@@ -39,7 +39,7 @@ export YAGNA_APPKEY=your-generated-app-key
 export OTEL_CONFIG_FILE=
 
 # Generate vanity address
-npx @unoperate/golem-vaddr-cli@0.1.5 generate \
+npx @golem-vanity-market/golem-vaddr-cli@0.1.5 generate \
   --public-key sample-key.pub \
   --vanity-address-prefix 0x6666 \
   --budget-limit 6 \
@@ -54,7 +54,7 @@ You can also authenticate for a single command:
 
 ```bash
 # Set token and run in one command
-NPM_TOKEN=YOUR_GITHUB_TOKEN npx @unoperate/golem-vaddr-cli@0.1.5 generate \
+NPM_TOKEN=YOUR_GITHUB_TOKEN npx @golem-vanity-market/golem-vaddr-cli@0.1.5 generate \
   --public-key my-public-key.txt \
   --vanity-address-prefix 0xvanity \
   --budget-limit 1000 \
@@ -149,6 +149,7 @@ Internal functionality of the CLI can be configured using environment variables:
 | ----------------------------------- | ------------------------------------------------------------------------------ | ----------------------------- |
 | `YAGNA_APPKEY`                      | Yagna application key for authentication                                       | (required)                    |
 | `OTEL_CONFIG_FILE`                  | Path to OpenTelemetry configuration file for observability support             | `monitoring/otel-config.yaml` |
+| `STATUS_SERVER`                     | HTTP server address for status monitoring API (e.g., `http://localhost:8080`)  | (disabled if not set)         |
 | `MAX_CPU_ENV_PER_HOUR`              | Maximum price per hour for CPU environment (in GLM tokens)                     | `0.1`                         |
 | `MAX_CPU_CPU_PER_HOUR`              | Maximum price per hour for CPU compute (in GLM tokens)                         | `0.1`                         |
 | `MAX_GPU_ENV_PER_HOUR`              | Maximum price per hour for GPU environment (in GLM tokens)                     | `2.0`                         |
@@ -236,6 +237,22 @@ The CLI provides helpful error messages for common issues:
 
 The CLI includes OpenTelemetry observability support for tracing, metrics, and logging.
 
+## Default behavior
+
+Telemetry data is exported to:
+
+- `./logs/traces.jsonl` - Distributed tracing data
+- `./logs/logs.jsonl` - Application logs
+- `http://localhost:9464/metrics` - The CLI automatically exposes metrics in Prometheus format via an embedded HTTP server .
+
+#### Optional: Configure Export Interval
+
+You can adjust the metrics export interval (see [OpenTelemetry docs](https://prometheus.io/docs/guides/opentelemetry/)):
+
+```bash
+export OTEL_METRIC_EXPORT_INTERVAL=15000
+```
+
 ### Running with OpenTelemetry Configuration
 
 To enable comprehensive monitoring with file-based telemetry export:
@@ -254,17 +271,39 @@ npm run dev -- generate \
   --num-workers 2
 ```
 
-### Monitoring Output
-
-When OpenTelemetry is enabled, telemetry data is exported to:
-
-- `./logs/traces.jsonl` - Distributed tracing data
-- `./logs/metrics.jsonl` - Performance metrics
-- `./logs/logs.jsonl` - Application logs
-
-### Monitoring Stack
+### Addon - configuration for the monitoring Stack
 
 A complete monitoring stack is available in the `monitoring/` directory. The CLI provides comprehensive OpenTelemetry observability support.
+
+### Status Server API
+
+The CLI can optionally start a HTTP status server for real-time monitoring and control. Enable it by setting the `STATUS_SERVER` environment variable:
+
+```bash
+# Start with status server on localhost:8080
+export STATUS_SERVER=http://localhost:8080
+
+npm run dev -- generate \
+  --public-key sample-key.pub \
+  --vanity-address-prefix 0x6666 \
+  --budget-limit 6 \
+  --processing-unit cpu \
+  --results-file results.json
+```
+
+The status server provides the following HTTP endpoints:
+
+- `GET /status` - Current generation status and statistics
+- `GET /estimator` - Performance estimation data
+- `GET /golem-session` - Golem network connection status
+- `GET /reputation` - Provider reputation information
+- `POST /set-params` - Update generation parameters
+
+Example status response:
+
+```bash
+curl http://localhost:8080/status
+```
 
 ### Database Management
 

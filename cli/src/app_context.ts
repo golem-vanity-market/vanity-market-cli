@@ -1,19 +1,17 @@
-import * as otl from "@opentelemetry/api";
 import { type Logger } from "@golem-sdk/golem-js";
 import { pinoLogger } from "@golem-sdk/pino-logger";
-import { type MetricsCollector } from "./metrics_collector";
 import { type LibSQLDatabase } from "drizzle-orm/libsql";
 
 export class AppContext {
-  private _activeContext: otl.Context;
   private logger?: Logger;
-  private tracer?: otl.Tracer;
-  private collector?: MetricsCollector;
   private db?: LibSQLDatabase;
+  private showTags = false;
+  private jobId?: string;
+  private providerJobId?: string;
+  private workerNo?: number;
+  private iterationNo?: number;
 
-  constructor(ctx: otl.Context) {
-    this._activeContext = ctx;
-  }
+  constructor() {}
 
   public getDB(): LibSQLDatabase {
     if (!this.db) {
@@ -22,39 +20,27 @@ export class AppContext {
     return this.db;
   }
 
-  public WithLogger(logger: Logger): AppContext {
-    const newCtx = new AppContext(this._activeContext);
+  private duplicate(): AppContext {
+    const newCtx = new AppContext();
+    newCtx.showTags = this.showTags;
+    newCtx.logger = this.logger;
+    newCtx.db = this.db;
+    newCtx.jobId = this.jobId;
+    newCtx.providerJobId = this.providerJobId;
+    newCtx.workerNo = this.workerNo;
+    newCtx.iterationNo = this.iterationNo;
+    return newCtx;
+  }
+
+  public withLogger(logger: Logger): AppContext {
+    const newCtx = this.duplicate();
     newCtx.logger = logger;
-    newCtx.tracer = this.tracer;
-    newCtx.collector = this.collector;
-    newCtx.db = this.db;
     return newCtx;
   }
 
-  public WithDatabase(db: LibSQLDatabase): AppContext {
-    const newCtx = new AppContext(this._activeContext);
-    newCtx.logger = this.logger;
-    newCtx.tracer = this.tracer;
-    newCtx.collector = this.collector;
+  public withDatabase(db: LibSQLDatabase): AppContext {
+    const newCtx = this.duplicate();
     newCtx.db = db;
-    return newCtx;
-  }
-
-  public WithTracer(tracer: otl.Tracer): AppContext {
-    const newCtx = new AppContext(this._activeContext);
-    newCtx.tracer = tracer;
-    newCtx.logger = this.logger;
-    newCtx.collector = this.collector;
-    newCtx.db = this.db;
-    return newCtx;
-  }
-
-  public WithCollector(collector: MetricsCollector): AppContext {
-    const newCtx = new AppContext(this._activeContext);
-    newCtx.collector = collector;
-    newCtx.logger = this.logger;
-    newCtx.tracer = this.tracer;
-    newCtx.db = this.db;
     return newCtx;
   }
 
@@ -64,22 +50,44 @@ export class AppContext {
     }
     return this.logger;
   }
-
-  public withValue<T>(key: string, value: T): AppContext {
-    const otl_key = otl.createContextKey(key);
-    const newOtlCtx = this._activeContext.setValue(otl_key, value);
-
-    const newCtx = new AppContext(newOtlCtx);
-    newCtx.logger = this.logger;
-    newCtx.tracer = this.tracer;
-    newCtx.collector = this.collector;
-    newCtx.db = this.db;
+  public getJobId(): string | undefined {
+    return this.jobId;
+  }
+  public getProviderJobId(): string | undefined {
+    return this.providerJobId;
+  }
+  public getWorkerNo(): number | undefined {
+    return this.workerNo;
+  }
+  public getIterationNo(): number | undefined {
+    return this.iterationNo;
+  }
+  public withJobId(jobId: string): AppContext {
+    const newCtx = this.duplicate();
+    newCtx.jobId = jobId;
     return newCtx;
   }
 
-  public getValue<T>(key: string): T | undefined {
-    const otl_key = otl.createContextKey(key);
-    return this._activeContext.getValue(otl_key) as T | undefined;
+  public withShowTags(show: boolean): AppContext {
+    const newCtx = this.duplicate();
+    newCtx.showTags = show;
+    return newCtx;
+  }
+  public withProviderJobId(providerJobId: string): AppContext {
+    const newCtx = this.duplicate();
+    newCtx.providerJobId = providerJobId;
+    return newCtx;
+  }
+  public withWorkerNo(workerNo: number): AppContext {
+    const newCtx = this.duplicate();
+    newCtx.workerNo = workerNo;
+    return newCtx;
+  }
+
+  public withIterationNo(iterationNo: number): AppContext {
+    const newCtx = this.duplicate();
+    newCtx.iterationNo = iterationNo;
+    return newCtx;
   }
 
   public debug(message: string): void {
@@ -87,7 +95,11 @@ export class AppContext {
       throw new Error("Logger is not set in the AppContext");
     }
     const m = this.withPrefix(message);
-    this.logger.debug(m, this.getTags());
+    if (this.showTags) {
+      this.logger.debug(m, this.getTags());
+    } else {
+      this.logger.debug(m);
+    }
   }
 
   public info(message: string): void {
@@ -95,7 +107,11 @@ export class AppContext {
       throw new Error("Logger is not set in the AppContext");
     }
     const m = this.withPrefix(message);
-    this.logger.info(m, this.getTags());
+    if (this.showTags) {
+      this.logger.info(m, this.getTags());
+    } else {
+      this.logger.info(m);
+    }
   }
 
   public warn(message: string): void {
@@ -103,7 +119,11 @@ export class AppContext {
       throw new Error("Logger is not set in the AppContext");
     }
     const m = this.withPrefix(message);
-    this.logger.warn(m, this.getTags());
+    if (this.showTags) {
+      this.logger.warn(m, this.getTags());
+    } else {
+      this.logger.warn(m);
+    }
   }
 
   public error(message: string): void {
@@ -111,7 +131,11 @@ export class AppContext {
       throw new Error("Logger is not set in the AppContext");
     }
     const m = this.withPrefix(message);
-    this.logger.error(m, this.getTags());
+    if (this.showTags) {
+      this.logger.error(m, this.getTags());
+    } else {
+      this.logger.error(m);
+    }
   }
 
   public consoleInfo(message?: unknown, ...optionalParams: unknown[]): void {
@@ -123,8 +147,8 @@ export class AppContext {
   }
 
   private withPrefix(m: string): string {
-    const workerNo = this.getValue<number>("workerNo");
-    const iterationNo = this.getValue<number>("iterationNo");
+    const workerNo = this.getWorkerNo();
+    const iterationNo = this.getIterationNo();
     let prefix = "";
     if (workerNo !== undefined) prefix = `Worker: ${workerNo}`;
 
@@ -136,15 +160,15 @@ export class AppContext {
 
   public getTags(): Record<string, string> {
     const tags: Record<string, string> = {};
-    const jobId = this.getValue<string>("jobId");
+    const jobId = this.getJobId();
     if (jobId) {
       tags.jobId = jobId;
     }
-    const workerNo = this.getValue<number>("workerNo");
+    const workerNo = this.getWorkerNo();
     if (workerNo !== undefined) {
       tags.workerNo = workerNo.toString();
     }
-    const iterationNo = this.getValue<number>("iterationNo");
+    const iterationNo = this.getIterationNo();
     if (iterationNo !== undefined) {
       tags.iterationNo = iterationNo.toString();
     }
@@ -152,75 +176,19 @@ export class AppContext {
   }
 }
 
-export function withJobId(ctx: AppContext, jobId: string): AppContext {
-  return ctx.withValue("jobId", jobId);
-}
-
-export function getJobId(ctx: AppContext): string {
-  const jobId = ctx.getValue<string>("jobId");
-  if (!jobId) {
-    throw new Error("Job ID not found in AppContext");
-  }
-  return jobId;
-}
-
-export function withWorkerNo(ctx: AppContext, workerNo: number): AppContext {
-  return ctx.withValue("workerNo", workerNo);
-}
-
-export function getWorkerNo(ctx: AppContext): number {
-  const workerNo = ctx.getValue<number>("workerNo");
-  if (workerNo === undefined) {
-    throw new Error("Worker No not found in AppContext");
-  }
-  return workerNo;
-}
-
-export function setIterationNo(
-  ctx: AppContext,
-  iterationNo: number,
-): AppContext {
-  return ctx.withValue("iterationNo", iterationNo);
-}
-
-export function getIterationNo(ctx: AppContext): number {
-  const iterationNo = ctx.getValue<number>("iterationNo");
-  if (iterationNo === undefined) {
-    throw new Error("Iteration No not found in AppContext");
-  }
-  return iterationNo;
-}
-
 /**
- * Creates a Pino logger configured with OpenTelemetry transport
+ * Creates a Pino logger
  *
  * Overwrite the default console log level (through pino-pretty) with GOLEM_PINO_LOG_LEVEL.
  *
  * @param appName - The application name to use for the logger
- * @returns Configured Pino logger with OpenTelemetry support
+ * @returns Configured Pino logger
  */
-export function getPinoLoggerWithOtel(
-  appName: string,
-  otelLoglevel: string,
-): Logger {
+export function getPinoLogger(appName: string): Logger {
   return pinoLogger({
     name: appName,
     transport: {
       targets: [
-        {
-          target: "pino-opentelemetry-transport",
-          level: otelLoglevel,
-          options: {
-            severityNumberMap: {
-              trace: 1,
-              debug: 5,
-              info: 9,
-              warn: 13,
-              error: 17,
-              fatal: 21,
-            },
-          },
-        },
         { target: "pino-pretty", options: { colorize: true }, level: "info" },
       ],
     },

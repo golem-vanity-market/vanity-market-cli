@@ -1,8 +1,23 @@
-import { ProofEntryResult } from "./estimator/proof";
-import { AppContext } from "./app_context";
-import { getCruncherVersion } from "./node_manager/config";
+import type { ProofEntryResult } from "./../estimator/proof";
+import type { AppContext } from "./../app_context";
+import { getCruncherVersion } from "./../node_manager/config";
 
-export class ExternalJobUploader {
+export interface JobUploader {
+  createRemoteJob(
+    ctx: AppContext,
+    providerId: string,
+    providerWalletAddress: string,
+    providerName: string,
+  ): Promise<string>;
+  uploadProofsToCentralServer(
+    ctx: AppContext,
+    proofQueue: ProofEntryResult[],
+    uploadUid: string,
+    agreementId: string,
+  ): Promise<void>;
+}
+
+export class ExternalJobUploader implements JobUploader {
   private uploadBase: string;
   private cruncherVersion: string = getCruncherVersion();
 
@@ -64,6 +79,7 @@ export class ExternalJobUploader {
         salt: entry.salt,
         address: entry.addr,
         factory: entry.pubKey,
+        orderId: null,
       });
     }
 
