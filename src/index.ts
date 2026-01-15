@@ -323,6 +323,11 @@ async function handleGenerateCommand(
       process.env.MAX_POSSIBLE_WORKERS ||
         generationParams.numberOfWorkers.toString(),
     );
+    if (maxPossibleWorkers <= 0) {
+      throw new Error(
+        `Invalid MAX_POSSIBLE_WORKERS value: ${maxPossibleWorkers}. It must be greater than 0.`,
+      );
+    }
 
     const sessionManagerParams: SessionManagerParams = {
       rentalDurationSeconds: 15 * 60, // for all cost calculations assume we're renting a provider for 15 minutes at a time
