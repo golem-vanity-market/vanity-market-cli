@@ -323,7 +323,7 @@ async function handleGenerateCommand(
       process.env.MAX_POSSIBLE_WORKERS ||
         generationParams.numberOfWorkers.toString(),
     );
-    if (maxPossibleWorkers <= 0) {
+    if (!Number.isSafeInteger(maxPossibleWorkers) && maxPossibleWorkers <= 0) {
       throw new Error(
         `Invalid MAX_POSSIBLE_WORKERS value: ${maxPossibleWorkers}. It must be greater than 0.`,
       );
