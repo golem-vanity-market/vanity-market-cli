@@ -204,8 +204,11 @@ export function startStatusServer(
         }
 
         if (req.method === "GET" && pathname === "/providers/banned") {
+          // bannedProviders stays local-only: the shared ban server ingests
+          // it per requestor. The fleet-wide list is reported separately.
           return sendJSON(200, {
             bannedProviders: reputation.bannedProviders(),
+            sharedBannedProviders: reputation.sharedBannedProviders(),
             timestamp: new Date().toISOString(),
           });
         }
