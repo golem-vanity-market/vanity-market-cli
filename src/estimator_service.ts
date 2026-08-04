@@ -50,6 +50,9 @@ export class EstimatorService {
 
   private estimators: Map<string, Estimator> = new Map();
   private costs: Map<string, number> = new Map();
+  // Per-agreement count of consecutive below-target checks (see the
+  // persistence gate in checkIfTerminate).
+  private consecutiveFails: Map<string, number> = new Map();
   private totalEstimator: Estimator | null = null;
   private options;
   private ctx;
@@ -243,7 +246,10 @@ export class EstimatorService {
         `speed ${Math.round(speedEstimation.speed)} < target ${speedLowerThreshold} H/s`,
       );
     }
-    if (problems.length === 0) return null;
+    if (problems.length === 0) {
+      this.consecutiveFails.delete(jobId);
+      return null;
+    }
 
     const windowSecs = Math.round(
       (speedEstimation.currentTimePoint.getTime() -
@@ -251,7 +257,24 @@ export class EstimatorService {
         1000,
     );
     const targetSource = targets ? "ban-server target" : "local threshold";
-    return `${problems.join(" and ")} (${targetSource}, measured over ${windowSecs}s)`;
+    const reason = `${problems.join(" and ")} (${targetSource}, measured over ${windowSecs}s)`;
+
+    // Persistence gate: short-window efficiency is noisy (proofs arrive in
+    // bursts while debit-note cost arrives smoothly), so a single failing
+    // check must not terminate a rental. Only ban when the provider stays
+    // below target for several checks in a row; any passing check resets.
+    const requiredFails = parseInt(
+      process.env.TERMINATE_AFTER_CONSECUTIVE_FAILS || "3",
+    );
+    const fails = (this.consecutiveFails.get(jobId) ?? 0) + 1;
+    this.consecutiveFails.set(jobId, fails);
+    if (fails < requiredFails) {
+      ctx.info(
+        `Provider below target (check ${fails}/${requiredFails}, not terminating yet): ${reason}`,
+      );
+      return null;
+    }
+    return `${reason}; ${fails} consecutive failing checks`;
   }
 
   private get messageLoopSecs(): number {
