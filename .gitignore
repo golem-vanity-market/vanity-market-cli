@@ -63,7 +63,7 @@ results/
 *.sqlite
 
 # code generation
-cli/src/version.ts
+src/version.ts
 
 # tools
 dlf
