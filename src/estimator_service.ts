@@ -4,6 +4,7 @@ import { ProofEntryResult } from "./estimator/proof";
 import { ResultsService } from "./results_service";
 import { EstimatorInfo } from "./estimator/estimator";
 import { Problem } from "./lib/db/schema";
+import { Reputation } from "./reputation/reputation";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
@@ -11,6 +12,10 @@ export interface EstimatorServiceOptions {
   processLoopSecs: number;
   problems: Problem[];
   resultService: ResultsService;
+  // When set, per-provider enforcement targets from the ban server take
+  // precedence over the local dynamic params (which stay the fallback
+  // whenever the ban server has no answer).
+  reputation?: Reputation;
 }
 
 export interface ReportCostResponse {
@@ -194,13 +199,19 @@ export class EstimatorService {
     jobId: string,
     givenCost: number | null,
   ): boolean {
-    const efficiencyLowerThreshold =
-      this.dynamicParams.minimumAcceptedEfficiency;
-    const speedLowerThreshold = this.dynamicParams.minimumAcceptedSpeed;
     const SPEED_ESTIMATION_TIMEFRAME = parseInt(
       process.env.SPEED_ESTIMATION_TIMEFRAME || "300",
     ); // 5 minutes in seconds
     const estimator = this.estimators.get(jobId);
+    // Ban-server targets (per-provider override or fleet-wide global) win;
+    // the local dynamic params remain the fail-safe.
+    const targets = estimator
+      ? this.options.reputation?.targetsFor(estimator.providerId)
+      : null;
+    const efficiencyLowerThreshold =
+      targets?.efficiency ?? this.dynamicParams.minimumAcceptedEfficiency;
+    const speedLowerThreshold =
+      targets?.speed ?? this.dynamicParams.minimumAcceptedSpeed;
     if (estimator) {
       const info = estimator.currentInfo();
 

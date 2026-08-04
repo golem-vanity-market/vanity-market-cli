@@ -14,9 +14,18 @@ import type { AppContext } from "../app_context";
  * /providers/banned exposes - the ban server ingests it per requestor, so it
  * must never contain the shared list (that would echo bans back and forth).
  */
+/** Enforcement targets pulled from the ban server; null = no server value,
+ *  callers fall back to the local thresholds. */
+export interface ProviderTargets {
+  efficiency: number | null; // TH/GLM
+  speed: number | null; // H/s
+}
+
 export class Reputation {
   private _bannedProviders: string[] = [];
   private _sharedBanned: Set<string> = new Set();
+  private _globalTargets: ProviderTargets | null = null;
+  private _targetOverrides: Map<string, ProviderTargets> = new Map();
   private readonly _banServerUrl: string | null;
   private readonly _banServerSource: string;
   private _refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -30,8 +39,10 @@ export class Reputation {
         process.env.BAN_SERVER_REFRESH_SECS || "30",
       );
       void this._refreshSharedList();
+      void this._refreshTargets();
       this._refreshTimer = setInterval(() => {
         void this._refreshSharedList();
+        void this._refreshTargets();
       }, refreshSecs * 1000);
       // never keep the process alive because of the sync loop
       this._refreshTimer.unref?.();
@@ -58,6 +69,70 @@ export class Reputation {
     } catch {
       // ban server unreachable - keep the last known shared list
     }
+  }
+
+  private async _refreshTargets(): Promise<void> {
+    if (!this._banServerUrl) {
+      return;
+    }
+    try {
+      const resp = await fetch(`${this._banServerUrl}/api/v1/targets`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!resp.ok) {
+        return;
+      }
+      const data = (await resp.json()) as {
+        global?: { efficiencyTarget?: number; speedTarget?: number };
+        overrides?: {
+          providerId?: string;
+          efficiencyTarget?: number | null;
+          speedTarget?: number | null;
+        }[];
+      };
+      if (
+        typeof data.global?.efficiencyTarget === "number" &&
+        typeof data.global?.speedTarget === "number"
+      ) {
+        this._globalTargets = {
+          efficiency: data.global.efficiencyTarget,
+          speed: data.global.speedTarget,
+        };
+      }
+      if (Array.isArray(data.overrides)) {
+        const map = new Map<string, ProviderTargets>();
+        for (const o of data.overrides) {
+          if (typeof o.providerId !== "string") continue;
+          map.set(o.providerId.toLowerCase(), {
+            efficiency:
+              typeof o.efficiencyTarget === "number"
+                ? o.efficiencyTarget
+                : null,
+            speed: typeof o.speedTarget === "number" ? o.speedTarget : null,
+          });
+        }
+        this._targetOverrides = map;
+      }
+    } catch {
+      // ban server unreachable - keep the last known targets
+    }
+  }
+
+  /**
+   * Effective enforcement targets for a provider: per-provider override from
+   * the ban server, then the server's global target. Returns null when the
+   * ban server never answered - callers keep their local env thresholds.
+   */
+  public targetsFor(providerId: string): ProviderTargets | null {
+    const override = this._targetOverrides.get(providerId.toLowerCase());
+    const global = this._globalTargets;
+    if (!override && !global) {
+      return null;
+    }
+    return {
+      efficiency: override?.efficiency ?? global?.efficiency ?? null,
+      speed: override?.speed ?? global?.speed ?? null,
+    };
   }
 
   private _reportBan(

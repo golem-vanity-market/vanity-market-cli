@@ -318,6 +318,7 @@ async function handleGenerateCommand(
         process.env.PROCESS_LOOP_SEC_INTERVAL || "1.0",
       ),
       resultService,
+      reputation,
     });
     const maxPossibleWorkers = parseInt(
       process.env.MAX_POSSIBLE_WORKERS ||
