@@ -191,52 +191,67 @@ export class EstimatorService {
     jobId: string,
     givenCost: number | null,
   ): boolean {
-    return this.checkIfTerminate(ctx, jobId, givenCost);
+    return this.checkIfTerminate(ctx, jobId, givenCost) !== null;
   }
 
+  /** Returns a human-readable termination reason (measured value vs target
+   *  and the measurement window) when the provider is below its thresholds,
+   *  or null when the rental should continue. The reason ends up in the ban
+   *  server via Reputation.ban, so keep it self-explanatory. */
   public checkIfTerminate(
     ctx: AppContext,
     jobId: string,
     givenCost: number | null,
-  ): boolean {
+  ): string | null {
     const SPEED_ESTIMATION_TIMEFRAME = parseInt(
       process.env.SPEED_ESTIMATION_TIMEFRAME || "300",
     ); // 5 minutes in seconds
     const estimator = this.estimators.get(jobId);
+    if (!estimator) return null;
     // Ban-server targets (per-provider override or fleet-wide global) win;
     // the local dynamic params remain the fail-safe.
-    const targets = estimator
-      ? this.options.reputation?.targetsFor(estimator.providerId)
-      : null;
+    const targets = this.options.reputation?.targetsFor(estimator.providerId);
     const efficiencyLowerThreshold =
       targets?.efficiency ?? this.dynamicParams.minimumAcceptedEfficiency;
     const speedLowerThreshold =
       targets?.speed ?? this.dynamicParams.minimumAcceptedSpeed;
-    if (estimator) {
-      const info = estimator.currentInfo();
 
-      let speedEstimation;
+    const info = estimator.currentInfo();
+    if (info.cost <= 0) return null;
 
-      if (givenCost !== null) {
-        speedEstimation = estimator.estimatedSpeedGivenCost(
-          SPEED_ESTIMATION_TIMEFRAME,
-          givenCost,
-        );
-      } else {
-        speedEstimation = estimator.estimatedSpeed(SPEED_ESTIMATION_TIMEFRAME);
-      }
+    const speedEstimation =
+      givenCost !== null
+        ? estimator.estimatedSpeedGivenCost(
+            SPEED_ESTIMATION_TIMEFRAME,
+            givenCost,
+          )
+        : estimator.estimatedSpeed(SPEED_ESTIMATION_TIMEFRAME);
 
-      if (info.cost > 0) {
-        if (
-          speedEstimation.efficiency &&
-          (speedEstimation.efficiency < efficiencyLowerThreshold ||
-            speedEstimation.speed < speedLowerThreshold)
-        ) {
-          return true;
-        }
-      }
+    // efficiency === null means no cost accrued inside the window yet — too
+    // early to judge. Note: 0 (cost but zero work) is a valid, judgeable
+    // value; the old truthiness check used to skip exactly those providers.
+    if (speedEstimation.efficiency === null) return null;
+
+    const problems: string[] = [];
+    if (speedEstimation.efficiency < efficiencyLowerThreshold) {
+      problems.push(
+        `efficiency ${speedEstimation.efficiency.toFixed(4)} < target ${efficiencyLowerThreshold} TH/GLM`,
+      );
     }
-    return false;
+    if (speedEstimation.speed < speedLowerThreshold) {
+      problems.push(
+        `speed ${Math.round(speedEstimation.speed)} < target ${speedLowerThreshold} H/s`,
+      );
+    }
+    if (problems.length === 0) return null;
+
+    const windowSecs = Math.round(
+      (speedEstimation.currentTimePoint.getTime() -
+        speedEstimation.startTimePoint.getTime()) /
+        1000,
+    );
+    const targetSource = targets ? "ban-server target" : "local threshold";
+    return `${problems.join(" and ")} (${targetSource}, measured over ${windowSecs}s)`;
   }
 
   private get messageLoopSecs(): number {

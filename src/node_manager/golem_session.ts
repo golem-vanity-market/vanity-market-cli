@@ -540,13 +540,16 @@ export class GolemSessionManager {
     const providerName = rental.agreement.provider.name;
 
     ctx.info(`Checking if terminate rental with provider: ${providerName}`);
-    if (
-      this.estimatorService.checkIfTerminate(ctx, rental.agreement.id, null)
-    ) {
+    const terminateReason = this.estimatorService.checkIfTerminate(
+      ctx,
+      rental.agreement.id,
+      null,
+    );
+    if (terminateReason) {
       ctx.warn(
-        `Terminating rental with provider ${providerName} due to estimator decision`,
+        `Terminating rental with provider ${providerName}: ${terminateReason}`,
       );
-      this.reputation.ban(ctx, rental.agreement.provider.id, "low performance");
+      this.reputation.ban(ctx, rental.agreement.provider.id, terminateReason);
       await this.rentalPool.destroy(rental, 60_000);
       return null; // No results, rental was terminated
     }
