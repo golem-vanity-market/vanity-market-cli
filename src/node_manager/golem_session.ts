@@ -398,6 +398,19 @@ export class GolemSessionManager {
       const endTimeSec = (Date.now() - startTime) / 1000;
       ctx.info(`Command finished after ${endTimeSec.toFixed(1)} s`);
 
+      // exe.run resolves even when the exe-script itself failed (e.g. the
+      // activity terminated provider-side mid-command). Without this check
+      // the failure was recorded as a 0-result success and the dead rental
+      // went back to the pool — the *next* worker then failed on the corpse
+      // and banned with an unrelated "GSB endpoint not found" error.
+      if (res.result !== "Ok") {
+        throw new Error(
+          `command ended with result ${res.result} after ${endTimeSec.toFixed(1)} s: ` +
+            `${res.message ?? "no message"}` +
+            (res.stderr ? `; stderr: ${safeStringifyStdout(res.stderr)}` : ""),
+        );
+      }
+
       /* Uncomment this code to parse reported compute stats
       let biggestCompute = 0;
       const stderr = res.stderr ? String(res.stderr) : "";
