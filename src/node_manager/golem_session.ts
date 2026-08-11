@@ -42,6 +42,20 @@ import * as fs from "node:fs";
 import { GolemSessionRecorder } from "../db/golem_session_recorder";
 import { Reputation } from "../reputation/reputation";
 
+/** One-line, length-capped error description safe to embed in ban reasons. */
+export function compactErrorDetail(error: unknown): string {
+  const msg = error instanceof Error ? error.message : String(error);
+  const flat = msg.replace(/\s+/g, " ").trim();
+  return flat.length > 300 ? `${flat.slice(0, 297)}...` : flat;
+}
+
+/** True when an agreement-termination reason describes a requestor-side
+ *  payment-acknowledgement problem (e.g. "Requestor isn't accepting
+ *  DebitNotes in time") — the provider did nothing wrong in that case. */
+export function isRequestorPaymentLag(reason: string): boolean {
+  return /debit\s*-?\s*note/i.test(reason) && /accept/i.test(reason);
+}
+
 /**
  * Parameters for the GolemSessionManager constructor
  */
@@ -85,6 +99,12 @@ export class GolemSessionManager {
   private stopWorkAC: AbortController = new AbortController();
   private dbRecorder: GolemSessionRecorder;
   private readonly maxPossibleWorkers: number;
+  /** Last termination reason per agreement, so ban reasons can carry the real
+   *  cause and requestor-side terminations are not pinned on the provider. */
+  private agreementTerminations = new Map<
+    string,
+    { reason: string; terminatedBy: "Provider" | "Requestor" }
+  >();
 
   constructor(
     params: SessionManagerParams,
@@ -134,10 +154,19 @@ export class GolemSessionManager {
     });
     this.golemNetwork.market.events.on(
       "agreementTerminated",
-      ({ agreement }) => {
+      ({ agreement, reason, terminatedBy }) => {
         ctx.consoleInfo(
-          `🗑️ Terminated agreement with ${agreement.provider.name}`,
+          `🗑️ Terminated agreement with ${agreement.provider.name} (by ${terminatedBy}: ${reason})`,
         );
+        this.agreementTerminations.set(agreement.id, {
+          reason,
+          terminatedBy,
+        });
+        // Bounded: drop oldest entries (Map preserves insertion order).
+        if (this.agreementTerminations.size > 1000) {
+          const oldest = this.agreementTerminations.keys().next().value;
+          if (oldest) this.agreementTerminations.delete(oldest);
+        }
       },
     );
   }
@@ -456,7 +485,11 @@ export class GolemSessionManager {
         String(error),
       );
 
-      throw new Error(`Profanity execution failed`);
+      // Keep the original cause: the caller uses it to build an honest ban
+      // reason (or to skip the ban when the failure was requestor-side).
+      throw new Error(
+        `Profanity execution failed: ${compactErrorDetail(error)}`,
+      );
     }
   }
 
@@ -556,6 +589,7 @@ export class GolemSessionManager {
 
     let shouldKeepRental: boolean;
     let cmdResult: CommandResult | null = null;
+    let commandErrorDetail: string | null = null;
 
     // TODO Reputation select additional problems for hashrateverification
     const providerJobId = await this.dbRecorder.providerJobCreate(
@@ -639,6 +673,7 @@ export class GolemSessionManager {
       ctx.error(`Error during command execution: ${error}`);
       wasSuccess = false;
       shouldKeepRental = false;
+      commandErrorDetail = compactErrorDetail(error);
     }
     try {
       if (shouldKeepRental) {
@@ -669,11 +704,31 @@ export class GolemSessionManager {
         ctx.consoleInfo(
           `💔 Provider ${providerName} did not run the command successfully, destroying the rental`,
         );
-        this.reputation.ban(
-          ctx,
-          rental.agreement.provider.id,
-          "failed to run command",
-        );
+        // Decide whether the failure is actually the provider's fault. If the
+        // provider terminated the agreement because *we* were slow to accept
+        // DebitNotes (typical right after a stone restart), or we terminated
+        // it ourselves (estimator/shutdown — those paths report their own
+        // detailed reason), a "failed to run command" ban would blame the
+        // provider for a requestor-side event.
+        const termination = this.agreementTerminations.get(rental.agreement.id);
+        if (termination && isRequestorPaymentLag(termination.reason)) {
+          ctx.warn(
+            `NOT banning ${providerName}: agreement ended by ${termination.terminatedBy} due to requestor-side payment lag (${termination.reason})`,
+          );
+        } else if (termination && termination.terminatedBy === "Requestor") {
+          ctx.info(
+            `NOT banning ${providerName} for command failure: we terminated the agreement ourselves (${termination.reason})`,
+          );
+        } else {
+          const detail = termination
+            ? `terminated by ${termination.terminatedBy}: ${termination.reason}`
+            : commandErrorDetail;
+          this.reputation.ban(
+            ctx,
+            rental.agreement.provider.id,
+            detail ? `failed to run command (${detail})` : "failed to run command",
+          );
+        }
         await this.rentalPool.destroy(
           rental,
           AbortSignal.timeout(
