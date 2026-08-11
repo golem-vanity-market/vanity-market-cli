@@ -50,10 +50,15 @@ export function compactErrorDetail(error: unknown): string {
 }
 
 /** True when an agreement-termination reason describes a requestor-side
- *  payment-acknowledgement problem (e.g. "Requestor isn't accepting
- *  DebitNotes in time") — the provider did nothing wrong in that case. */
-export function isRequestorPaymentLag(reason: string): boolean {
-  return /debit\s*-?\s*note/i.test(reason) && /accept/i.test(reason);
+ *  problem — the provider did nothing wrong in that case. Covers payment
+ *  acknowledgement lag ("Requestor isn't accepting DebitNotes in time") and
+ *  provider-side cleanup of agreements we signed but never used ("No
+ *  activity created within 90s" — the rental idled in our pool). */
+export function isRequestorFaultTermination(reason: string): boolean {
+  return (
+    (/debit\s*-?\s*note/i.test(reason) && /accept/i.test(reason)) ||
+    /no activity (was )?created/i.test(reason)
+  );
 }
 
 /**
@@ -724,9 +729,9 @@ export class GolemSessionManager {
         // detailed reason), a "failed to run command" ban would blame the
         // provider for a requestor-side event.
         const termination = this.agreementTerminations.get(rental.agreement.id);
-        if (termination && isRequestorPaymentLag(termination.reason)) {
+        if (termination && isRequestorFaultTermination(termination.reason)) {
           ctx.warn(
-            `NOT banning ${providerName}: agreement ended by ${termination.terminatedBy} due to requestor-side payment lag (${termination.reason})`,
+            `NOT banning ${providerName}: agreement ended by ${termination.terminatedBy} due to a requestor-side cause (${termination.reason})`,
           );
         } else if (termination && termination.terminatedBy === "Requestor") {
           ctx.info(
