@@ -342,6 +342,44 @@ export class GolemSessionManager {
     });
   }
 
+  /** yagna's REST createActivity gives the provider a hard-coded 5 s to
+   *  confirm (ya-ts-client default; golem-js exposes no knob for it and does
+   *  not retry). ya-provider serves activity events from the same loop that
+   *  tears down VMs, so a provider whose previous agreement just ended is
+   *  routinely "busy" for 5-15 s — one attempt turns that into a failed
+   *  agreement and a "Failed to create activity: Timeout" ban. There is no
+   *  hurry here: retry with generous pauses and only give up after ~1 min. */
+  private async getExeUnitWithRetry(
+    ctx: AppContext,
+    rental: ResourceRental,
+    setupTimeoutMs: number,
+  ) {
+    const attempts = Number(process.env.EXE_UNIT_CREATE_ATTEMPTS) || 5;
+    const retryDelayMs =
+      Number(process.env.EXE_UNIT_CREATE_RETRY_DELAY) || 10_000;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        return await rental.getExeUnit(setupTimeoutMs);
+      } catch (error) {
+        lastError = error;
+        const msg = error instanceof Error ? error.message : String(error);
+        if (
+          !/failed to create activity/i.test(msg) ||
+          this.stopWorkAC.signal.aborted ||
+          attempt === attempts
+        ) {
+          throw error;
+        }
+        ctx.warn(
+          `Activity creation for ${rental.agreement.provider.name} failed (attempt ${attempt}/${attempts}), provider likely busy — retrying in ${retryDelayMs} ms: ${compactErrorDetail(error)}`,
+        );
+        await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+      }
+    }
+    throw lastError;
+  }
+
   private async runCommand(
     ctx: AppContext,
     rental: ResourceRental,
@@ -354,7 +392,7 @@ export class GolemSessionManager {
     try {
       const exeSetupTimeout =
         Number(process.env.EXE_UNIT_SETUP_TIMEOUT) || 60_000;
-      const exe = await rental.getExeUnit(exeSetupTimeout);
+      const exe = await this.getExeUnitWithRetry(ctx, rental, exeSetupTimeout);
 
       const provider = exe.provider;
 
@@ -744,7 +782,9 @@ export class GolemSessionManager {
           this.reputation.ban(
             ctx,
             rental.agreement.provider.id,
-            detail ? `failed to run command (${detail})` : "failed to run command",
+            detail
+              ? `failed to run command (${detail})`
+              : "failed to run command",
           );
         }
         await this.rentalPool.destroy(
