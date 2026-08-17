@@ -15,6 +15,7 @@ import { GolemServices } from "@golem-sdk/golem-js/dist/golem-network";
 import { PaymentModuleOptions } from "@golem-sdk/golem-js/dist/payment/payment.module";
 import { debitNotesTable, NewDebitNoteModel } from "../lib/db/schema";
 import { getErrorMessage } from "../utils/format";
+import { NO_BAN_PAY_ALL } from "../temporary_mode";
 
 export class VanityPaymentModule extends PaymentModuleImpl {
   public static estimatorService: EstimatorService;
@@ -70,7 +71,15 @@ export class VanityPaymentModule extends PaymentModuleImpl {
           .error(
             `Failed to report costs for debit note ${debitNote.id}: ${resp.reason}`,
           );
-        return debitNote;
+        if (!NO_BAN_PAY_ALL) {
+          return debitNote;
+        }
+        // temporary_mode: pay every agreement regardless of measured work
+        VanityPaymentModule.ctx
+          .L()
+          .warn(
+            `NO_BAN_PAY_ALL: accepting debit note ${debitNote.id} despite: ${resp.reason}`,
+          );
       }
       const newDebitNote: NewDebitNoteModel = {
         agreementId: debitNote.agreementId,
@@ -131,7 +140,15 @@ export class VanityPaymentModule extends PaymentModuleImpl {
           .error(
             `Failed to report costs for invoice ${invoice.id}: ${resp.reason}`,
           );
-        return invoice;
+        if (!NO_BAN_PAY_ALL) {
+          return invoice;
+        }
+        // temporary_mode: pay every agreement regardless of measured work
+        VanityPaymentModule.ctx
+          .L()
+          .warn(
+            `NO_BAN_PAY_ALL: accepting invoice ${invoice.id} despite: ${resp.reason}`,
+          );
       }
 
       return await super.acceptInvoice(invoice, allocation, amount);

@@ -1,4 +1,5 @@
 import type { AppContext } from "../app_context";
+import { NO_BAN_PAY_ALL } from "../temporary_mode";
 
 /**
  * Provider reputation with optional shared ban server support
@@ -170,6 +171,10 @@ export class Reputation {
   }
 
   isProviderBanned(providerId: string): boolean {
+    if (NO_BAN_PAY_ALL) {
+      // temporary_mode: nobody is banned, existing shared bans are ignored
+      return false;
+    }
     return (
       this._bannedProviders.includes(providerId) ||
       this._sharedBanned.has(providerId.toLowerCase())
@@ -194,6 +199,15 @@ export class Reputation {
    * @returns true if the provider was already banned, false otherwise.
    */
   ban(ctx: AppContext, providerId: string, reason: string): boolean {
+    if (NO_BAN_PAY_ALL) {
+      // temporary_mode: record nothing locally, report nothing to the server
+      ctx
+        .L()
+        .info(
+          `NO_BAN_PAY_ALL: skipping ban of provider ${providerId} (${reason})`,
+        );
+      return false;
+    }
     if (this._bannedProviders.includes(providerId)) {
       return true;
     }

@@ -5,6 +5,7 @@ import { ResultsService } from "./results_service";
 import { EstimatorInfo } from "./estimator/estimator";
 import { Problem } from "./lib/db/schema";
 import { Reputation } from "./reputation/reputation";
+import { NO_BAN_PAY_ALL } from "./temporary_mode";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
@@ -206,6 +207,11 @@ export class EstimatorService {
     jobId: string,
     givenCost: number | null,
   ): string | null {
+    if (NO_BAN_PAY_ALL) {
+      // temporary_mode: never terminate for performance; this also makes
+      // checkIfProviderFailedToDoWork false, so payments always go through
+      return null;
+    }
     const SPEED_ESTIMATION_TIMEFRAME = parseInt(
       process.env.SPEED_ESTIMATION_TIMEFRAME || "300",
     ); // 5 minutes in seconds
