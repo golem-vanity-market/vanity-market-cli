@@ -120,7 +120,11 @@ export abstract class BaseRentalConfig {
           maxEnvPerHourPrice: this._config.maxEnvPricePerHour,
         },
         offerProposalFilter: filterProposal(ctx, reputation),
-        offerProposalSelector: selectBestProvider(ctx, rentalDurationHours),
+        offerProposalSelector: selectBestProvider(
+          ctx,
+          rentalDurationHours,
+          reputation,
+        ),
       },
       payment: {
         allocation,

@@ -1,5 +1,6 @@
 import type { AppContext } from "../app_context";
 import { NO_BAN_PAY_ALL } from "../temporary_mode";
+import { ROTATION } from "../rotation_mode";
 
 /**
  * Provider reputation with optional shared ban server support
@@ -22,11 +23,25 @@ export interface ProviderTargets {
   speed: number | null; // H/s
 }
 
+/** One provider's slice of the ban server's rotation ranking. */
+export interface ProviderRanking {
+  weight: number; // lottery weight (how often it wins a freed slot)
+  ttlMinutes: number; // session length; 0 = until the cycle restart
+  eligible: boolean; // false while active elsewhere / resting / suspended
+}
+
 export class Reputation {
   private _bannedProviders: string[] = [];
   private _sharedBanned: Set<string> = new Set();
   private _globalTargets: ProviderTargets | null = null;
   private _targetOverrides: Map<string, ProviderTargets> = new Map();
+  private _ranking: Map<string, ProviderRanking> = new Map();
+  private _rankingLoaded = false;
+  private _unknownRanking: ProviderRanking = {
+    weight: 0.3,
+    ttlMinutes: 20,
+    eligible: true,
+  };
   private readonly _banServerUrl: string | null;
   private readonly _banServerSource: string;
   private _refreshTimer: ReturnType<typeof setInterval> | null = null;
@@ -39,15 +54,91 @@ export class Reputation {
       const refreshSecs = parseFloat(
         process.env.BAN_SERVER_REFRESH_SECS || "30",
       );
-      void this._refreshSharedList();
-      void this._refreshTargets();
-      this._refreshTimer = setInterval(() => {
-        void this._refreshSharedList();
+      const refresh = (): void => {
+        if (ROTATION) {
+          // rotation supersedes the shared ban list — the ranking already
+          // encodes manual suspensions as eligible=false
+          void this._refreshRanking();
+        } else {
+          void this._refreshSharedList();
+        }
         void this._refreshTargets();
-      }, refreshSecs * 1000);
+      };
+      refresh();
+      this._refreshTimer = setInterval(refresh, refreshSecs * 1000);
       // never keep the process alive because of the sync loop
       this._refreshTimer.unref?.();
     }
+  }
+
+  private async _refreshRanking(): Promise<void> {
+    if (!this._banServerUrl) {
+      return;
+    }
+    try {
+      const resp = await fetch(`${this._banServerUrl}/api/v1/ranking`, {
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!resp.ok) {
+        return;
+      }
+      const data = (await resp.json()) as {
+        unknown?: { weight?: number; ttlMinutes?: number };
+        providers?: {
+          providerId?: string;
+          weight?: number;
+          ttlMinutes?: number;
+          eligible?: boolean;
+        }[];
+      };
+      if (!Array.isArray(data.providers)) {
+        return;
+      }
+      const map = new Map<string, ProviderRanking>();
+      for (const p of data.providers) {
+        if (typeof p.providerId !== "string") continue;
+        map.set(p.providerId.toLowerCase(), {
+          weight: typeof p.weight === "number" ? p.weight : 0.3,
+          ttlMinutes: typeof p.ttlMinutes === "number" ? p.ttlMinutes : 20,
+          eligible: p.eligible === true,
+        });
+      }
+      this._ranking = map;
+      if (
+        typeof data.unknown?.weight === "number" &&
+        typeof data.unknown?.ttlMinutes === "number"
+      ) {
+        this._unknownRanking = {
+          weight: data.unknown.weight,
+          ttlMinutes: data.unknown.ttlMinutes,
+          eligible: true,
+        };
+      }
+      this._rankingLoaded = true;
+    } catch {
+      // ban server unreachable — keep the last known ranking
+    }
+  }
+
+  /** Ranking entry for a provider; unknown providers get the exploration
+   *  defaults. Returns eligible=true for everyone while the ranking has
+   *  never loaded (server down => accept-all, same fallback philosophy as
+   *  the enforcement targets). */
+  public rankingFor(providerId: string): ProviderRanking {
+    if (!this._rankingLoaded) {
+      return { weight: 1, ttlMinutes: 0, eligible: true };
+    }
+    return (
+      this._ranking.get(providerId.toLowerCase()) ?? this._unknownRanking
+    );
+  }
+
+  public isEligible(providerId: string): boolean {
+    return this.rankingFor(providerId).eligible;
+  }
+
+  public rankingLoaded(): boolean {
+    return this._rankingLoaded;
   }
 
   private async _refreshSharedList(): Promise<void> {

@@ -38,6 +38,11 @@ import { validateVanityResult } from "../validator";
 import { Problem, ProviderJobModel } from "../lib/db/schema";
 import { JobUploaderService } from "./job_uploader";
 import { calculateWorkUnitForProblems } from "../pattern/pattern";
+import {
+  ROTATION,
+  ROTATION_ZERO_WORK_MINUTES,
+  ROTATION_ZERO_WORK_MIN_COST,
+} from "../rotation_mode";
 import * as fs from "node:fs";
 import { GolemSessionRecorder } from "../db/golem_session_recorder";
 import { Reputation } from "../reputation/reputation";
@@ -110,6 +115,10 @@ export class GolemSessionManager {
     string,
     { reason: string; terminatedBy: "Provider" | "Requestor" }
   >();
+  /** Rotation: when each agreement was first acquired, so the tier session
+   *  TTL can be measured. Bounded by one cycle's agreements (the process
+   *  restarts every 6h). */
+  private agreementFirstSeen = new Map<string, number>();
 
   constructor(
     params: SessionManagerParams,
@@ -620,6 +629,10 @@ export class GolemSessionManager {
 
     const rental = await this.rentalPool.acquire(this.stopWorkAC.signal); // wait as long as needed to find a provider (cancelled by stopWorkAC)
 
+    if (!this.agreementFirstSeen.has(rental.agreement.id)) {
+      this.agreementFirstSeen.set(rental.agreement.id, Date.now());
+    }
+
     await this.dbRecorder.agreementCreate(
       ctx,
       ctx.getJobId()!,
@@ -733,9 +746,12 @@ export class GolemSessionManager {
     }
     try {
       if (shouldKeepRental) {
-        if (shouldGentlyFinishRental()) {
+        const rotationReason = this.rotationFinishReason(rental);
+        if (shouldGentlyFinishRental() || rotationReason !== null) {
           ctx.info(
-            `Gently closing rental with provider: ${providerName}, waiting for next command`,
+            rotationReason !== null
+              ? `Gently closing rental with provider: ${providerName} — ${rotationReason}`
+              : `Gently closing rental with provider: ${providerName}, waiting for next command`,
           );
           await this.rentalPool.destroy(
             rental,
@@ -809,6 +825,44 @@ export class GolemSessionManager {
       );
     }
     return cmdResult;
+  }
+
+  /**
+   * Rotation: decide whether a healthy rental should rotate out after the
+   * pass that just finished. Two reasons, neither of which is a ban:
+   *  - the provider's tier session TTL has passed ("shift complete" — full
+   *    shifts for proven providers, short auditions for unproven ones), or
+   *  - the agreement has accrued real cost for a while with zero proved
+   *    work (a dead slot the capped fleet cannot afford to hold).
+   * The provider simply rests per its tier and re-enters the lottery.
+   */
+  private rotationFinishReason(rental: ResourceRental): string | null {
+    if (!ROTATION) return null;
+    const agreementId = rental.agreement.id;
+    const firstSeen = this.agreementFirstSeen.get(agreementId);
+    if (firstSeen === undefined) return null;
+    const ageMinutes = (Date.now() - firstSeen) / 60_000;
+
+    const ttlMinutes = this.reputation.rankingFor(
+      rental.agreement.provider.id,
+    ).ttlMinutes;
+    if (ttlMinutes > 0 && ageMinutes >= ttlMinutes) {
+      return `rotation: shift complete (${Math.round(ageMinutes)} min >= ${ttlMinutes} min tier TTL)`;
+    }
+
+    if (ageMinutes >= ROTATION_ZERO_WORK_MINUTES) {
+      try {
+        const info = this.estimatorService
+          .getEstimator(agreementId)
+          .currentInfo();
+        if (info.cost >= ROTATION_ZERO_WORK_MIN_COST && info.attempts <= 0) {
+          return `rotation: no proved work after ${Math.round(ageMinutes)} min despite ${info.cost.toFixed(4)} GLM cost`;
+        }
+      } catch {
+        // estimator not initialized for this agreement — nothing to judge
+      }
+    }
+    return null;
   }
 
   private async storeHashRate(
