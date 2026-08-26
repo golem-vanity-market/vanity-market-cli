@@ -60,6 +60,30 @@ export class VanityPaymentModule extends PaymentModuleImpl {
         return debitNote;
       }
 
+      // Rotation minimum-efficiency floor: never accept a large bill for
+      // essentially no measured work. Not a ban — the session is rotated out
+      // by the scheduler and the provider's rank carries the consequence.
+      const refusal =
+        VanityPaymentModule.estimatorService.rotationPaymentRefusalReason(
+          debitNote.agreementId,
+          amountF,
+        );
+      if (refusal !== null) {
+        VanityPaymentModule.ctx
+          .L()
+          .warn(`NOT accepting debit note ${debitNote.id}: ${refusal}`);
+        await VanityPaymentModule.ctx
+          .getDB()
+          .insert(debitNotesTable)
+          .values({
+            agreementId: debitNote.agreementId,
+            debitNoteId: debitNote.id,
+            glmAmount: amountF,
+            status: "rejected",
+          });
+        return debitNote;
+      }
+
       const resp = VanityPaymentModule.estimatorService.reportCosts(
         debitNote.agreementId,
         amountF,
@@ -127,6 +151,19 @@ export class VanityPaymentModule extends PaymentModuleImpl {
           .warn(
             `EstimatorService terminated the agreement for invoice ${invoice.id}`,
           );
+        return invoice;
+      }
+
+      // Rotation minimum-efficiency floor (see acceptDebitNote).
+      const refusal =
+        VanityPaymentModule.estimatorService.rotationPaymentRefusalReason(
+          invoice.agreementId,
+          amountF,
+        );
+      if (refusal !== null) {
+        VanityPaymentModule.ctx
+          .L()
+          .warn(`NOT accepting invoice ${invoice.id}: ${refusal}`);
         return invoice;
       }
 

@@ -42,6 +42,8 @@ import {
   ROTATION,
   ROTATION_ZERO_WORK_MINUTES,
   ROTATION_ZERO_WORK_MIN_COST,
+  ROTATION_MIN_EFFICIENCY,
+  ROTATION_MIN_EFF_GRACE_GLM,
 } from "../rotation_mode";
 import * as fs from "node:fs";
 import { GolemSessionRecorder } from "../db/golem_session_recorder";
@@ -857,6 +859,15 @@ export class GolemSessionManager {
           .currentInfo();
         if (info.cost >= ROTATION_ZERO_WORK_MIN_COST && info.attempts <= 0) {
           return `rotation: no proved work after ${Math.round(ageMinutes)} min despite ${info.cost.toFixed(4)} GLM cost`;
+        }
+        // Minimum-efficiency floor: stop the session as soon as it would
+        // stop being payable (the payment guard refuses amounts past the
+        // grace threshold at the same floor), so exposure never grows.
+        if (info.cost > ROTATION_MIN_EFF_GRACE_GLM) {
+          const efficiency = info.attempts / info.cost / 1e12; // TH/GLM
+          if (efficiency < ROTATION_MIN_EFFICIENCY) {
+            return `rotation: efficiency ${efficiency.toFixed(5)} TH/GLM below the minimum floor ${ROTATION_MIN_EFFICIENCY} (${info.cost.toFixed(4)} GLM accrued)`;
+          }
         }
       } catch {
         // estimator not initialized for this agreement — nothing to judge

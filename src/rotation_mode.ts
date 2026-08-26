@@ -38,3 +38,20 @@ export const ROTATION_ZERO_WORK_MINUTES = parseFloat(
 export const ROTATION_ZERO_WORK_MIN_COST = parseFloat(
   process.env.ROTATION_ZERO_WORK_MIN_COST || "0.02",
 );
+
+/** Minimum-efficiency floor (TH/GLM) — deliberately generous: 5x below the
+ *  0.0125 enforcement target and ~16x below the fleet median. An agreement
+ *  measured under this floor is (a) gently rotated out and (b) has debit
+ *  notes / invoices beyond the grace amount refused — we never pay a large
+ *  bill for essentially no work. Everything above the floor is paid in full,
+ *  and rank (not payment) is what rewards doing well vs barely enough. */
+export const ROTATION_MIN_EFFICIENCY = parseFloat(
+  process.env.ROTATION_MIN_EFFICIENCY || "0.0025",
+);
+
+/** Amounts up to this many GLM are always accepted regardless of measured
+ *  efficiency: auditions, dust and short sessions get paid no questions
+ *  asked, so the floor only ever bites sustained cost without work. */
+export const ROTATION_MIN_EFF_GRACE_GLM = parseFloat(
+  process.env.ROTATION_MIN_EFF_GRACE_GLM || "0.05",
+);

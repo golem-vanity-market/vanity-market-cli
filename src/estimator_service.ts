@@ -6,6 +6,11 @@ import { EstimatorInfo } from "./estimator/estimator";
 import { Problem } from "./lib/db/schema";
 import { Reputation } from "./reputation/reputation";
 import { NO_BAN_PAY_ALL } from "./temporary_mode";
+import {
+  ROTATION,
+  ROTATION_MIN_EFFICIENCY,
+  ROTATION_MIN_EFF_GRACE_GLM,
+} from "./rotation_mode";
 
 export interface EstimatorServiceOptions {
   disableMessageLoop?: boolean;
@@ -281,6 +286,36 @@ export class EstimatorService {
       return null;
     }
     return `${reason}; ${fails} consecutive failing checks`;
+  }
+
+  /**
+   * Rotation minimum-efficiency payment guard. Returns a refusal reason when
+   * a debit note / invoice totalling `totalDueGlm` should NOT be accepted:
+   * the amount is past the grace threshold and the agreement's whole-life
+   * measured efficiency (total proved work / total due) is under the
+   * generous ROTATION_MIN_EFFICIENCY floor — i.e. someone is billing real
+   * money for essentially no work. Returns null (pay) in every other case,
+   * including an unknown estimator (an agreement we cannot judge is paid —
+   * refusing those caused the pre-ban-server complaint flood).
+   */
+  public rotationPaymentRefusalReason(
+    jobId: string,
+    totalDueGlm: number,
+  ): string | null {
+    if (!ROTATION) return null;
+    if (!Number.isFinite(totalDueGlm) || totalDueGlm <= 0) return null;
+    if (totalDueGlm <= ROTATION_MIN_EFF_GRACE_GLM) return null;
+    const estimator = this.estimators.get(jobId);
+    if (!estimator) return null;
+    const attempts = estimator.currentInfo().attempts;
+    const efficiency = attempts / totalDueGlm / 1e12; // TH per GLM
+    if (efficiency >= ROTATION_MIN_EFFICIENCY) return null;
+    return (
+      `rotation minimum-efficiency floor: ${totalDueGlm.toFixed(4)} GLM due for ` +
+      `${(attempts / 1e9).toFixed(3)} GH of proved work = ` +
+      `${efficiency.toFixed(5)} TH/GLM < floor ${ROTATION_MIN_EFFICIENCY} ` +
+      `(amounts up to ${ROTATION_MIN_EFF_GRACE_GLM} GLM are always accepted)`
+    );
   }
 
   private get messageLoopSecs(): number {
