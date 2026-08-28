@@ -185,11 +185,21 @@ export class AppContext {
  * @returns Configured Pino logger
  */
 export function getPinoLogger(appName: string): Logger {
+  // Under systemd there is no terminal to colorize for, and every ANSI escape
+  // becomes bytes in the journal (~15-20% of each line) that nobody reads back.
+  // The level now honours GOLEM_PINO_LOG_LEVEL as documented above, so a stone
+  // can be quietened from its .env without a rebuild.
+  const level = process.env.GOLEM_PINO_LOG_LEVEL ?? "info";
   return pinoLogger({
     name: appName,
+    level,
     transport: {
       targets: [
-        { target: "pino-pretty", options: { colorize: true }, level: "info" },
+        {
+          target: "pino-pretty",
+          options: { colorize: process.stdout.isTTY === true },
+          level,
+        },
       ],
     },
   });

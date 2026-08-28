@@ -24,6 +24,7 @@ import { EstimatorService } from "./estimator_service";
 import { ResultsService } from "./results_service";
 import { APP_NAME, APP_VERSION } from "./version";
 import { drizzle } from "drizzle-orm/libsql";
+import { sql } from "drizzle-orm";
 import { GolemSessionRecorder } from "./db/golem_session_recorder";
 import { SchedulerRecorderImpl } from "./db/scheduler_recorder";
 import { SchedulerRecorder } from "./scheduler/types";
@@ -42,6 +43,14 @@ async function handleGenerateCommand(
   const logger = getPinoLogger(APP_NAME);
 
   const db = drizzle(`file:${options.db}`);
+  // The recorder writes ~4 small transactions per provider job against a
+  // multi-GB file. libsql opens with journal_mode=delete, which writes a
+  // rollback journal and fsyncs twice for each of them; WAL with
+  // synchronous=NORMAL is the standard pairing and drops most of that write
+  // amplification. journal_mode is persisted in the file header, synchronous
+  // is per-connection, so both are set on every start.
+  await db.run(sql`PRAGMA journal_mode = WAL`);
+  await db.run(sql`PRAGMA synchronous = NORMAL`);
 
   const appCtx = new AppContext()
     .withLogger(logger)

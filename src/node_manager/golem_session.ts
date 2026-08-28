@@ -49,6 +49,10 @@ import * as fs from "node:fs";
 import { GolemSessionRecorder } from "../db/golem_session_recorder";
 import { Reputation } from "../reputation/reputation";
 
+/** Last override-params payload written to the log, so an unchanged one is
+ *  not repeated for every job. */
+let lastLoggedOverrideParams: string | null = null;
+
 /** One-line, length-capped error description safe to embed in ban reasons. */
 export function compactErrorDetail(error: unknown): string {
   const msg = error instanceof Error ? error.message : String(error);
@@ -691,9 +695,16 @@ export class GolemSessionManager {
         );
         // we don't override singlePassSeconds
         shortParams.singlePassSeconds = generationParams.singlePassSeconds;
-        console.log(
-          `Order params overridden from file ${JSON.stringify(getParamsShortToJSONObj(shortParams))}`,
+        // Logged once per change instead of once per job: the payload carries
+        // the full 128-char pubKey and was ~300 lines / 10 min / stone of
+        // identical text in the journal.
+        const overrideJson = JSON.stringify(
+          getParamsShortToJSONObj(shortParams),
         );
+        if (overrideJson !== lastLoggedOverrideParams) {
+          lastLoggedOverrideParams = overrideJson;
+          console.log(`Order params overridden from file ${overrideJson}`);
+        }
       }
 
       const problems = shortParams.problems;

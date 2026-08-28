@@ -52,7 +52,10 @@ export function parseVanityResults(
           failedLines.push(line);
           continue;
         }
-        ctx.L().info(`Parsed vanity result: ${r.address}`);
+        // One line per proof at info level was the single most frequent entry
+        // in the journal fleet-wide; the addresses are kept in the result set
+        // and shipped to the central server anyway.
+        ctx.L().debug(`Parsed vanity result: ${r.address}`);
         results.push(r);
       }
       if (line.startsWith("0x")) {
@@ -62,7 +65,7 @@ export function parseVanityResults(
           failedLines.push(line);
           continue;
         }
-        ctx.L().info(`Parsed vanity result: ${r.address}`);
+        ctx.L().debug(`Parsed vanity result: ${r.address}`);
         results.push(r);
       }
     } catch (error) {

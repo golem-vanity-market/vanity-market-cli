@@ -154,6 +154,12 @@ export class GolemSessionRecorder {
     results: VanityResult[],
     pubKey: string,
   ): Promise<void> {
+    // The local `proof` table has no reader anywhere in the stack - the proofs
+    // that matter leave over HTTP (see uploader/new_job_uploader.ts). This ran
+    // one transaction per proof (~130k/day/stone) and had grown each stone's
+    // db.sqlite by ~1.6 GB of rows nothing ever selects. Set
+    // STORE_PROOFS_LOCALLY=1 to put the writes back.
+    if (process.env.STORE_PROOFS_LOCALLY !== "1") return;
     const newProofs: NewProofModel[] = results.map((res) => {
       const bestProblem = res.matchingProblems.reduce((best, current) => {
         if (best.difficulty < current.difficulty) {
