@@ -217,6 +217,22 @@ export class CPURentalConfig extends BaseRentalConfig {
 
     const commandParts = [
       "parallel",
+      // Emit each job's output line-by-line as it is produced, instead of
+      // parallel's default --group, which spools every job's stdout to a temp
+      // file in the container and writes the whole lot in one burst when the
+      // job exits. Note this does NOT make results reach the requestor any
+      // sooner: exe.run() is batch (Promise<Result>), so we block until
+      // `... && sleep 1` exits and read stdout once. Don't reach for
+      // exe.runAndStream() to change that — streaming is broken, this stays
+      // batch on purpose. What --line-buffer buys: no per-job temp files, no
+      // end-of-pass output burst (the pattern most exposed to the yagna
+      // stdout-truncation bug the `sleep 1` above works around,
+      // golemfactory/yagna#3450), and whole lines — results are parsed with
+      // stdout.split("\n"), and --ungroup would let up to `cpuCount`
+      // concurrent jobs interleave halves of a line into failedLines.
+      // --ungroup cannot be combined with this flag anyway: GNU parallel
+      // errors out and produces no output at all.
+      "--line-buffer",
       "profanity_cuda",
       "--cpu",
       "-k",
