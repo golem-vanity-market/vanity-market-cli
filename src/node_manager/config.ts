@@ -184,6 +184,7 @@ export class CPURentalConfig extends BaseRentalConfig {
 
   public async checkAndSetCapabilities(exe: ExeUnit): Promise<void> {
     const attempts = Number(process.env.NPROC_DETECT_ATTEMPTS) || 3;
+    const detectTimeoutMs = Number(process.env.NPROC_DETECT_TIMEOUT) || 15_000;
     let lastError: unknown = null;
 
     for (let attempt = 1; attempt <= attempts; attempt++) {
@@ -197,7 +198,15 @@ export class CPURentalConfig extends BaseRentalConfig {
         // 53% on a 31-thread one, i.e. we paid for the whole box and used one
         // core. Never reintroduce a default here: an undetectable cpu count is
         // an error, not a 1.
-        const result = await exe.run("nproc && sleep 1");
+        // exe.run without options gets `Ul(undefined)` in golem-js, i.e. a
+        // fresh AbortController signal that nothing ever aborts -- the probe
+        // had no deadline at all, while the work command sets one explicitly
+        // and the 60s EXE_UNIT_SETUP_TIMEOUT covers only setup(). A `nproc`
+        // that never returned pinned the worker until the rental was
+        // finalized, so give it its own deadline.
+        const result = await exe.run("nproc && sleep 1", {
+          signalOrTimeout: AbortSignal.timeout(detectTimeoutMs),
+        });
         if (result.result !== "Ok") {
           throw new Error(
             `nproc exited with result ${result.result}: ${result.message ?? "no message"}`,
