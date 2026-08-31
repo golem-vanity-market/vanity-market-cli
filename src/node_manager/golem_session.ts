@@ -125,6 +125,13 @@ export class GolemSessionManager {
    *  TTL can be measured. Bounded by one cycle's agreements (the process
    *  restarts every 6h). */
   private agreementFirstSeen = new Map<string, number>();
+  /** Detected `nproc` per agreement. A rental's thread count cannot change
+   *  mid-rental, so it is probed once on the first pass and reused for every
+   *  later pass on that agreement. Before this, runCommand built a fresh
+   *  CPURentalConfig per pass and re-probed every ~50s -- ~12.8k probes per
+   *  stone per 4h window, each an independent chance for a truncated `nproc`
+   *  to collapse the job count to 1. Evicted when the agreement terminates. */
+  private agreementCpuCount = new Map<string, number>();
 
   constructor(
     params: SessionManagerParams,
@@ -182,10 +189,15 @@ export class GolemSessionManager {
           reason,
           terminatedBy,
         });
+        this.agreementCpuCount.delete(agreement.id);
         // Bounded: drop oldest entries (Map preserves insertion order).
         if (this.agreementTerminations.size > 1000) {
           const oldest = this.agreementTerminations.keys().next().value;
           if (oldest) this.agreementTerminations.delete(oldest);
+        }
+        if (this.agreementCpuCount.size > 1000) {
+          const oldest = this.agreementCpuCount.keys().next().value;
+          if (oldest) this.agreementCpuCount.delete(oldest);
         }
       },
     );
@@ -415,8 +427,22 @@ export class GolemSessionManager {
         `Exe unit ready, running capability check: ${provider.name}, type: ${this.processingUnitType}`,
       );
 
-      // Validate capabilities (CPU or GPU specific)
-      await config.checkAndSetCapabilities(exe);
+      // Validate capabilities (CPU or GPU specific). The cpu count is probed
+      // once per agreement and cached: `nproc` cannot change for the life of a
+      // rental, and re-probing every pass is what exposed us to the truncated
+      // stdout that silently collapsed the job count to 1.
+      const cachedCpuCount = config.isCPU()
+        ? this.agreementCpuCount.get(agreementId)
+        : undefined;
+      if (cachedCpuCount !== undefined) {
+        config.setCpuCount(cachedCpuCount);
+      } else {
+        await config.checkAndSetCapabilities(exe);
+        const detected = config.config.cpuCount;
+        if (config.isCPU() && detected !== undefined) {
+          this.agreementCpuCount.set(agreementId, detected);
+        }
+      }
 
       /* Uncomment this to simulate random execution time
       const simulateRandomExecutionTime = true;

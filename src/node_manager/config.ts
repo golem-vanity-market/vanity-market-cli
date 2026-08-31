@@ -66,10 +66,17 @@ export abstract class BaseRentalConfig {
   }
 
   protected updateConfigCpuCount(count: number) {
-    if (count < 1 || count > 255) {
-      throw new Error("CPU count must be between 1 and 255");
+    if (!Number.isInteger(count) || count < 1 || count > 255) {
+      throw new Error(`CPU count must be an integer between 1 and 255, got ${count}`);
     }
     this._config.cpuCount = count;
+  }
+
+  /** Apply a cpu count already detected for this agreement, skipping the
+   *  `nproc` probe entirely. A rental's thread count cannot change mid-rental,
+   *  so it is detected once per agreement and cached by the session manager. */
+  public setCpuCount(count: number): void {
+    this.updateConfigCpuCount(count);
   }
 
   /**
@@ -176,25 +183,61 @@ export class CPURentalConfig extends BaseRentalConfig {
   }
 
   public async checkAndSetCapabilities(exe: ExeUnit): Promise<void> {
-    try {
-      const result = await exe.run("nproc");
-      const cpuCount = parseInt(
-        safeStringifyStdout(result.stdout || "").trim() || "1",
-      );
+    const attempts = Number(process.env.NPROC_DETECT_ATTEMPTS) || 3;
+    let lastError: unknown = null;
 
-      if (cpuCount < 1) {
-        throw new Error("CPU count cannot be smaller than 1");
-      }
-      if (cpuCount > 255) {
-        throw new Error("CPU count cannot be greater than 255");
-      }
+    for (let attempt = 1; attempt <= attempts; attempt++) {
+      try {
+        // `&& sleep 1` mirrors the workaround on the work command in
+        // golem_session.ts: yagna truncates a command's stdout when the
+        // exe-script exits immediately (golemfactory/yagna#3450), and `nproc`
+        // exits instantly. That truncation used to land on the old
+        // `... .trim() || "1"` fallback, which silently pinned big machines to
+        // a single job -- measured at 88% of passes on a 4-thread provider and
+        // 53% on a 31-thread one, i.e. we paid for the whole box and used one
+        // core. Never reintroduce a default here: an undetectable cpu count is
+        // an error, not a 1.
+        const result = await exe.run("nproc && sleep 1");
+        if (result.result !== "Ok") {
+          throw new Error(
+            `nproc exited with result ${result.result}: ${result.message ?? "no message"}`,
+          );
+        }
 
-      this.updateConfigCpuCount(cpuCount);
-    } catch (error) {
-      throw new Error(
-        `Failed to detect CPU capabilities: ${getErrorMessage(error)}`,
-      );
+        const raw = safeStringifyStdout(result.stdout || "").trim();
+        if (!raw) {
+          throw new Error("nproc returned empty output");
+        }
+
+        const cpuCount = parseInt(raw, 10);
+        // NaN would pass both range checks below (NaN < 1 and NaN > 255 are
+        // each false) and `.repeat(NaN)` yields "", producing a `parallel ...
+        // :::` with zero jobs -- a pass that accrues cost and does no work.
+        if (!Number.isInteger(cpuCount)) {
+          throw new Error(
+            `nproc returned unparseable output: ${JSON.stringify(raw.slice(0, 64))}`,
+          );
+        }
+        if (cpuCount < 1) {
+          throw new Error("CPU count cannot be smaller than 1");
+        }
+        if (cpuCount > 255) {
+          throw new Error("CPU count cannot be greater than 255");
+        }
+
+        this.updateConfigCpuCount(cpuCount);
+        return;
+      } catch (error) {
+        lastError = error;
+        if (attempt < attempts) {
+          await new Promise((resolve) => setTimeout(resolve, 500));
+        }
+      }
     }
+
+    throw new Error(
+      `Failed to detect CPU capabilities after ${attempts} attempts: ${getErrorMessage(lastError)}`,
+    );
   }
 
   public generateCommand(params: GenerationParamsShort): string {
