@@ -132,6 +132,16 @@ export class GolemSessionManager {
    *  stone per 4h window, each an independent chance for a truncated `nproc`
    *  to collapse the job count to 1. Evicted when the agreement terminates. */
   private agreementCpuCount = new Map<string, number>();
+  /** Agreements whose provider announced it intends to terminate them — the
+   *  graceful-shutdown notice yagna >= 0.18.0-rc6 sends and golem-js >= 3.11.0
+   *  surfaces as `agreementTerminationNoticeReceived` (e.g. the operator ran
+   *  `golemsp stop --graceful`). We schedule no further work on those
+   *  agreements and close them ourselves, which is also what lets the
+   *  provider finish shutting down instead of waiting out its grace period. */
+  private agreementTerminationNotices = new Map<
+    string,
+    { reason: string; deadline: Date }
+  >();
 
   constructor(
     params: SessionManagerParams,
@@ -190,6 +200,7 @@ export class GolemSessionManager {
           terminatedBy,
         });
         this.agreementCpuCount.delete(agreement.id);
+        this.agreementTerminationNotices.delete(agreement.id);
         // Bounded: drop oldest entries (Map preserves insertion order).
         if (this.agreementTerminations.size > 1000) {
           const oldest = this.agreementTerminations.keys().next().value;
@@ -201,6 +212,102 @@ export class GolemSessionManager {
         }
       },
     );
+    this.golemNetwork.market.events.on(
+      "agreementTerminationNoticeReceived",
+      ({ agreement, terminationDeadline, reason }) => {
+        ctx.consoleInfo(
+          `🛑 ${agreement.provider.name} announced it will terminate agreement ${agreement.id} by ${terminationDeadline.toISOString()} (${reason || "no reason given"}) — closing it`,
+        );
+        this.agreementTerminationNotices.set(agreement.id, {
+          reason: reason || "provider announced termination",
+          deadline: terminationDeadline,
+        });
+        if (this.agreementTerminationNotices.size > 1000) {
+          const oldest = this.agreementTerminationNotices.keys().next().value;
+          if (oldest) this.agreementTerminationNotices.delete(oldest);
+        }
+        this.closeAgreementAfterNotice(ctx, agreement).catch((error) => {
+          ctx.error(
+            `Failed to close agreement ${agreement.id} after the provider's termination notice: ${compactErrorDetail(error)}`,
+          );
+        });
+      },
+    );
+  }
+
+  /**
+   * Close an agreement whose provider announced it is shutting down.
+   *
+   * A rental sitting idle in the pool is taken out of it and finalized right
+   * away — that is the fast path and the one the provider is waiting for. A
+   * rental that is currently running a command is left alone: the pass
+   * finishes and `terminationNoticeFinishReason` makes `runSingleIteration`
+   * destroy it instead of releasing it back to the pool (the same gentle
+   * finish rotation uses — we never kill a rental mid-command). If the pool
+   * no longer knows the agreement, terminate it directly through the market.
+   */
+  private async closeAgreementAfterNotice(
+    ctx: AppContext,
+    agreement: ResourceRental["agreement"],
+  ): Promise<void> {
+    const notice = this.agreementTerminationNotices.get(agreement.id);
+    const reason = `provider announced termination${notice ? `: ${notice.reason}` : ""}`;
+    const pool = this.rentalPool;
+    if (pool) {
+      for (const idle of [
+        pool["highPriority"] as Set<ResourceRental>,
+        pool["lowPriority"] as Set<ResourceRental>,
+      ]) {
+        for (const rental of idle) {
+          if (rental.agreement.id !== agreement.id) continue;
+          // Take it out of the pool first: destroy() only clears `borrowed`,
+          // so an idle rental would otherwise stay acquirable while we
+          // finalize it.
+          idle.delete(rental);
+          ctx.info(
+            `Closing idle rental with ${agreement.provider.name} — ${reason}`,
+          );
+          await pool.destroy(
+            rental,
+            AbortSignal.timeout(
+              Number(process.env.RENTAL_DESTROY_TIMEOUT) || 30_000,
+            ),
+          );
+          return;
+        }
+      }
+      const borrowed = pool["borrowed"] as Set<ResourceRental>;
+      for (const rental of borrowed) {
+        if (rental.agreement.id === agreement.id) {
+          ctx.info(
+            `${agreement.provider.name} is running a command — will close agreement ${agreement.id} when the pass finishes (${reason})`,
+          );
+          return;
+        }
+      }
+    }
+    ctx.info(
+      `No rental left for agreement ${agreement.id}, terminating it directly — ${reason}`,
+    );
+    try {
+      await this.golemNetwork!.market.terminateAgreement(agreement, reason);
+    } catch (error) {
+      // Already gone (the provider may have terminated it the moment its
+      // grace period expired) — nothing left to close.
+      ctx.warn(
+        `Terminating agreement ${agreement.id} after the notice failed: ${compactErrorDetail(error)}`,
+      );
+    }
+  }
+
+  /** A provider that announced its shutdown gets no further work: report it
+   *  as a finish reason so the rental is destroyed rather than released back
+   *  to the pool. Independent of the ROTATION flag — this is the provider's
+   *  own request, not our scheduling policy. */
+  private terminationNoticeFinishReason(rental: ResourceRental): string | null {
+    const notice = this.agreementTerminationNotices.get(rental.agreement.id);
+    if (!notice) return null;
+    return `provider announced termination by ${notice.deadline.toISOString()} (${notice.reason})`;
   }
 
   public getAllocationId(): string {
@@ -673,6 +780,20 @@ export class GolemSessionManager {
 
     const providerName = rental.agreement.provider.name;
 
+    const noticeReason = this.terminationNoticeFinishReason(rental);
+    if (noticeReason) {
+      ctx.info(
+        `Not starting work on ${providerName}: ${noticeReason} — closing the agreement`,
+      );
+      await this.rentalPool.destroy(
+        rental,
+        AbortSignal.timeout(
+          Number(process.env.RENTAL_DESTROY_TIMEOUT) || 30_000,
+        ),
+      );
+      return null; // the provider is shutting down, not a failure
+    }
+
     ctx.info(`Checking if terminate rental with provider: ${providerName}`);
     const terminateReason = this.estimatorService.checkIfTerminate(
       ctx,
@@ -785,7 +906,9 @@ export class GolemSessionManager {
     }
     try {
       if (shouldKeepRental) {
-        const rotationReason = this.rotationFinishReason(rental);
+        const rotationReason =
+          this.terminationNoticeFinishReason(rental) ??
+          this.rotationFinishReason(rental);
         if (shouldGentlyFinishRental() || rotationReason !== null) {
           ctx.info(
             rotationReason !== null

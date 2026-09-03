@@ -56,7 +56,7 @@
     "typescript-eslint": "^8.33.1"
   },
   "dependencies": {
-    "@golem-sdk/golem-js": "=3.9.0-master.1",
+    "@golem-sdk/golem-js": "=3.11.0",
     "@golem-sdk/pino-logger": "^1.1.0",
     "@libsql/client": "^0.15.9",
     "@types/uuid": "^10.0.0",
